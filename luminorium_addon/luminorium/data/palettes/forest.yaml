@@ -1,0 +1,13 @@
+id: forest
+name: Forest
+category: [nature, forest]
+colors:
+  - { xy: [0.25, 0.55], weight: 3 }   # leaf green
+  - { xy: [0.32, 0.50], weight: 2 }   # yellow-green
+  - { hex: "#1f6b3a", weight: 2 }     # deep green
+  - { kelvin: 2700, weight: 1 }       # sunlight through the canopy
+brightness: [35, 70]
+transition_s: [8, 20]
+hold_s: [5, 30]
+spread: per_element
+white: { kelvin: 3000 }

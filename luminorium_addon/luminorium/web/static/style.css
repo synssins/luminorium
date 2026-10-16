@@ -108,6 +108,8 @@ main { max-width: 860px; margin: 0 auto; padding: 12px 16px; }
 .toggle input:checked + span::after { transform: translateX(16px); }
 .activity { margin: 16px 0; }
 .activity ul { padding-left: 18px; font-size: 13px; }
+.palette-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.palette-row select { flex: 1 1 140px; min-width: 0; font: inherit; padding: 6px; }
 .stopbar {
   position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
   background: var(--card); border-top: 1px solid var(--line); display: flex; justify-content: center;

@@ -1,0 +1,135 @@
+# Normalised effects and how each integration names them (DESIGN.md section 6.1).
+#
+# For each effect:
+#   name:      shown in the UI
+#   color:     key colour, for the software and static fallbacks
+#   brightness: 0-1 for the fallbacks
+#   software:  software effect to run where no native one exists (flicker, candle, breathe,
+#              lightning), or omitted for the static fallback
+#   native:    per integration ("*" is tried for every integration after its own entry):
+#                exact: names of the same effect
+#                close: names of a near alternative
+#              Names are matched against each light's effect_list, ignoring case and spacing.
+#
+# Files in /config/effects/*.yaml are read after this one; an effect with the same key replaces
+# this one's entry.
+
+fire:
+  name: Fire
+  color: "#ff5a10"
+  brightness: 0.85
+  software: candle
+  native:
+    zigbee2mqtt: { exact: [fireplace], close: [candle] }
+    wiz: { exact: [Fireplace], close: [Candlelight] }
+    wled: { exact: [Fire 2012, Fire Flicker, Firenoise], close: [Candle Multi, Candle] }
+    govee2mqtt: { exact: [Fire, Bonfire], close: [Candlelight] }
+    "*": { exact: [fire, fireplace], close: [candle] }
+
+candle:
+  name: Candle
+  color: { kelvin: 1900 }
+  brightness: 0.6
+  software: candle
+  native:
+    zigbee2mqtt: { exact: [candle], close: [fireplace] }
+    wiz: { exact: [Candlelight], close: [Fireplace] }
+    wled: { exact: [Candle, Candle Multi], close: [Fire Flicker] }
+    govee2mqtt: { exact: [Candlelight], close: [Fire, Bonfire] }
+    "*": { exact: [candle, candlelight], close: [] }
+
+ocean:
+  name: Ocean
+  color: "#0066cc"
+  brightness: 0.7
+  native:
+    zigbee2mqtt: { exact: [underwater], close: [] }
+    wiz: { exact: [Ocean], close: [Deep dive] }
+    wled: { exact: [Pacifica, Lake], close: [Colorwaves] }
+    govee2mqtt: { exact: [Ocean, Deep sea, Sea bottom], close: [Wave, Glacier] }
+    "*": { exact: [ocean], close: [] }
+
+forest:
+  name: Forest
+  color: "#2e8b3a"
+  brightness: 0.6
+  native:
+    wiz: { exact: [Forest], close: [Jungle] }
+    wled: { exact: [], close: [Lake] }
+    govee2mqtt: { exact: [Forest], close: [Rustling leaves, Tree shadow] }
+    "*": { exact: [forest], close: [jungle] }
+
+aurora:
+  name: Aurora
+  color: "#30e0a0"
+  brightness: 0.6
+  native:
+    zigbee2mqtt: { exact: [], close: [cosmos] }
+    wled: { exact: [Aurora, Polar Lights], close: [Colorwaves] }
+    govee2mqtt: { exact: [Aurora], close: [Nebula] }
+    "*": { exact: [aurora], close: [] }
+
+party:
+  name: Party
+  color: "#ff00ff"
+  brightness: 1.0
+  native:
+    zigbee2mqtt: { exact: [], close: [colorloop] }
+    wiz: { exact: [Party], close: [Rhythm] }
+    wled: { exact: [Colorloop, Rainbow], close: [Random Colors] }
+    govee2mqtt: { exact: [Party, Dance Party], close: [Rainbow, Colorful] }
+    "*": { exact: [party], close: [colorloop, rainbow] }
+
+sparkle:
+  name: Sparkle
+  color: "#ffffff"
+  brightness: 0.8
+  software: flicker
+  native:
+    zigbee2mqtt: { exact: [sparkle], close: [glisten] }
+    wled: { exact: [Sparkle, Twinkle], close: [Glitter, Twinklefox] }
+    govee2mqtt: { exact: [Star, Twinkle], close: [Firefly] }
+    "*": { exact: [sparkle], close: [twinkle] }
+
+lightning:
+  name: Lightning
+  color: "#c8d8ff"
+  brightness: 1.0
+  software: lightning
+  native:
+    wled: { exact: [Lightning], close: [] }
+    govee2mqtt: { exact: [Thunderstorm], close: [] }
+    "*": { exact: [lightning, thunderstorm], close: [] }
+
+breathe:
+  name: Breathe
+  color: "#ffffff"
+  brightness: 0.8
+  software: breathe
+  native:
+    wiz: { exact: [], close: [Pulse] }
+    wled: { exact: [Breathe], close: [Fade] }
+    govee2mqtt: { exact: [Breathe], close: [Heartbeat] }
+    "*": { exact: [], close: [] }  # z2m's "breathe" is an identify blink, not a slow breathe
+
+sunrise:
+  name: Sunrise
+  color: "#ff9a40"
+  brightness: 0.8
+  native:
+    zigbee2mqtt: { exact: [sunrise], close: [] }
+    wiz: { exact: [Wake-up], close: [] }
+    wled: { exact: [Sunrise], close: [] }
+    govee2mqtt: { exact: [Sunrise], close: [Morning] }
+    "*": { exact: [sunrise], close: [] }
+
+sunset:
+  name: Sunset
+  color: "#ff6040"
+  brightness: 0.7
+  native:
+    zigbee2mqtt: { exact: [sunset], close: [] }
+    wiz: { exact: [Sunset], close: [] }
+    wled: { exact: [], close: [Sunrise] }
+    govee2mqtt: { exact: [Sunset], close: [Sunset Glow, Twilight] }
+    "*": { exact: [sunset], close: [sunset glow] }

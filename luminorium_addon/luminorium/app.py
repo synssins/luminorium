@@ -8,12 +8,14 @@ import logging
 
 from .drivers.base import Driver
 from .drivers.ha import HADriver
+from .engine.engine import Engine
 from .engine.governor import Governor
 from .engine.safety import Safety
 from .engine.testlight import LightTester
 from .ha.client import HAClient
 from .inventory.model import Light
 from .inventory.service import InventoryService
+from .library import Library
 from .settings import Settings
 from .store import JsonStore
 
@@ -30,6 +32,9 @@ class Luminorium:
         self.governor = Governor(self.driver_for)
         self.safety = Safety(self.inventory, self.governor, self.store)
         self.tester = LightTester(self.safety, **({"hold_s": test_hold_s} if test_hold_s else {}))
+        self.library = Library(settings.config_dir)
+        self.effects = self.library.effects()
+        self.engine = Engine(self.inventory, self.safety, self.effects, self.library.palettes)
         self._startup: asyncio.Task | None = None
 
     def driver_for(self, light: Light) -> Driver:
@@ -59,6 +64,7 @@ class Luminorium:
             self._startup.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._startup
+        await self.engine.close()  # Stop all below restores what the shows touched
         if self.safety.snapshots and self.ha.connected and not self.settings.read_only:
             with contextlib.suppress(Exception):
                 await asyncio.wait_for(self.safety.stop_all(), 10)

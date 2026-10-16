@@ -33,6 +33,17 @@
 
   <div id="floors"></div>
 
+  <details id="palettes" class="activity">
+    <summary>Palettes</summary>
+    <div class="palette-row">
+      <select id="palette-pick" aria-label="Palette"></select>
+      <select id="palette-where" aria-label="Where"></select>
+      <button id="palette-play" class="test">Play</button>
+    </div>
+    <p id="running-none" class="muted small">Nothing playing.</p>
+    <ul id="running"></ul>
+  </details>
+
   <details class="activity">
     <summary>Activity</summary>
     <ul id="activity"></ul>
@@ -67,5 +78,6 @@
 </template>
 
 <script src="static/app.js"></script>
+<script src="static/shows.js"></script>
 </body>
 </html>

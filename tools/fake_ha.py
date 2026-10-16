@@ -201,6 +201,8 @@ class FakeHA:
             ("xy_color", "xy"),
             ("hs_color", "hs"),
             ("rgb_color", "rgb"),
+            ("rgbw_color", "rgbw"),
+            ("rgbww_color", "rgbww"),
             ("color_temp_kelvin", "color_temp"),
         ):
             if key in data:

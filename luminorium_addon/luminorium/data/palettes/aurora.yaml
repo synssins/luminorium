@@ -1,0 +1,13 @@
+id: aurora
+name: Aurora
+category: [nature, sky]
+colors:
+  - { hex: "#20e090", weight: 3 }   # aurora green
+  - { hex: "#10b0a0", weight: 2 }   # teal
+  - { hex: "#7040e0", weight: 2 }   # violet
+  - { hex: "#d040a0", weight: 1 }   # magenta fringe
+brightness: [25, 65]
+transition_s: [10, 25]
+hold_s: [4, 20]
+spread: per_element
+white: { kelvin: 5500 }

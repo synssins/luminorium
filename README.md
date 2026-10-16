@@ -5,9 +5,10 @@ Zigbee (Zigbee2MQTT), Z-Wave dimmers and relays, WiZ, WLED, Govee, ESPHome and M
 Assistant stays the source of truth for lights, areas and floors; Luminorium adds effects,
 palettes, spatial shows mapped with a phone camera, and automations on top.
 
-**Status:** phase 1 of 8 (skeleton add-on). It reads the house's lights from HA, shows them by
-floor and area with what each can do, and has a safe Test button, Stop all, and crash recovery.
-Nothing here runs effects yet.
+**Status:** phase 1 of 8 (skeleton add-on) is done: it reads the house's lights from HA, shows
+them by floor and area with what each can do, and has a safe Test button, Stop all, and crash
+recovery. The phase 3 show engine core is in: palettes, native and software effects, dip and
+flash, shows as YAML, and an API to play them ([docs/engine.md](docs/engine.md)).
 
 ## Documentation
 
@@ -18,6 +19,7 @@ Nothing here runs effects yet.
 | [SPIKES.md](SPIKES.md) | Research results (2026-10-16): the real inventory, Z-Wave, z2m, Govee, WiZ, phone camera, image size; open questions |
 | [docs/architecture.md](docs/architecture.md) | How the code is organised today |
 | [docs/inventory.md](docs/inventory.md) | How HA entities become lights: kinds, exclusions, segments, duplicates, profiles |
+| [docs/engine.md](docs/engine.md) | The show engine: colour, layers, palettes, effect resolution, the planner, shows, storage |
 | [docs/safety.md](docs/safety.md) | Rate governor, snapshots, Stop all, crash restore, outside changes, read-only |
 | [docs/api.md](docs/api.md) | The HTTP API |
 | [docs/development.md](docs/development.md) | Setup, tests, the fake HA, running on a PC, fixtures |
@@ -40,7 +42,7 @@ Nothing here runs effects yet.
 
 ```bash
 py -3.13 -m venv .venv
-.venv/Scripts/python -m pip install aiohttp fastapi uvicorn pytest pytest-asyncio httpx ruff
+.venv/Scripts/python -m pip install aiohttp fastapi uvicorn pyyaml pytest pytest-asyncio httpx ruff
 .venv/Scripts/python -m pytest
 .venv/Scripts/python tools/dev.py
 ```

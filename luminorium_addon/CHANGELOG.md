@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.0-dev.4
+
+The show engine core (phase 3).
+
+- **Colour:** OKLab blending; each light gets what it can show: xy, hs, rgb, rgbw, rgbww, the
+  nearest white temperature for white-only lights, a level for dimmers, on/off for relays.
+- **Engine:** a 20 Hz tick composes layers per light (fixtures as one). The planner sends one
+  fade per change to lights that can fade, steps for those that can't, averages fast content for
+  slow lights (Z-Wave, Govee cloud), sends nothing for invisible changes, keeps within every
+  network's budget, and sends early by each light's latency.
+- **Layers:** static, palette (per-light random walk, seeded), native effect, software effect
+  (flicker, candle, breathe, lightning), dip (back to each light's own level), flash (at most
+  3 per second). Shows overlap by priority; `on_end` restore, fade or hold.
+- **Effects:** normalised names resolved per integration from `effects/*.yaml` against each
+  light's effect list: native, close, software, then the key colour.
+- **Palettes and shows** as YAML in `/config`, with seven starter palettes.
+- **API:** play, stop and list palettes and shows; `GET /api/running`. A small Palettes panel on
+  the lights page.
+- New dependency: PyYAML.
+
 ## 0.1.0-dev.3
 
 - Levels and rooms fold (tap a heading), with Collapse all / Expand all, remembered per device.

@@ -1,0 +1,13 @@
+id: ocean
+name: Ocean
+category: [nature, water]
+colors:
+  - { hex: "#0050c8", weight: 3 }   # deep blue
+  - { hex: "#0090d0", weight: 2 }   # sea blue
+  - { hex: "#00c0b0", weight: 2 }   # turquoise
+  - { hex: "#2040a0", weight: 1 }   # dusk blue
+brightness: [30, 70]
+transition_s: [6, 15]
+hold_s: [3, 15]
+spread: per_element
+white: { kelvin: 6500 }

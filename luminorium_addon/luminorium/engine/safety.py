@@ -131,6 +131,30 @@ class Safety:
             self._persist()
         self.sessions.pop(session.name, None)
 
+    async def release(
+        self,
+        session: Session,
+        entity_ids: list[str],
+        *,
+        restore: bool = True,
+        transition_ms: int | None = None,
+    ) -> None:
+        """Give some of a session's lights back: restore them (optionally with a fade), or
+        leave them as they are and forget their snapshots."""
+        owned = [
+            eid
+            for eid in entity_ids
+            if (snap := self.snapshots.get(eid)) is not None and snap.session == session.name
+        ]
+        if not owned:
+            return
+        if restore:
+            await self._restore(owned, transition_ms=transition_ms)
+        else:
+            for eid in owned:
+                self.snapshots.pop(eid, None)
+            self._persist()
+
     # ---- stop all and restore -----------------------------------------------------------------
 
     async def stop_all(self) -> int:
@@ -166,7 +190,7 @@ class Safety:
         self.note(f"Restored {count} light(s) left over from the previous run")
         return count
 
-    async def _restore(self, entity_ids: list[str]) -> None:
+    async def _restore(self, entity_ids: list[str], transition_ms: int | None = None) -> None:
         async def one(eid: str) -> None:
             snap = self.snapshots.get(eid)
             light = self.inventory.inventory.get(eid)
@@ -177,7 +201,9 @@ class Safety:
                 return
             snap.expected = snap.state
             try:
-                context = await self.governor.send(light, snap.state, priority=Priority.RESTORE)
+                context = await self.governor.send(
+                    light, snap.state, transition_ms=transition_ms, priority=Priority.RESTORE
+                )
                 self._remember(context)
             except Superseded:
                 pass
