@@ -1,0 +1,4 @@
+# Debian, not Alpine: opencv-python-headless (phase 5) has no musllinux wheels.
+# A tag, never a digest: with a digest the Supervisor silently builds from its own base image.
+build_from:
+  amd64: ghcr.io/home-assistant/amd64-base-debian:trixie-2026.10.0

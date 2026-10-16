@@ -1,0 +1,2882 @@
+{
+ "3c93e74f2b51eeb5c3c153c6d594510d": {
+  "status": {
+   "node_id": 2,
+   "is_routing": true,
+   "status": 3,
+   "is_secure": false,
+   "ready": false,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 119,
+     "name": "Node Naming and Location",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "7d3ac055820100357d56ad0bcf367c79": {
+  "status": {
+   "node_id": 5,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": true,
+   "ready": true,
+   "zwave_plus_version": 2,
+   "highest_security_class": 1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 142,
+     "name": "Multi Channel Association",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 135,
+     "name": "Indicator",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 5,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    }
+   ]
+  }
+ },
+ "8907bfad832c378ea42e06b34eca5559": {
+  "status": {
+   "node_id": 6,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": true,
+   "ready": true,
+   "zwave_plus_version": 2,
+   "highest_security_class": 1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 142,
+     "name": "Multi Channel Association",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 135,
+     "name": "Indicator",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 5,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    }
+   ]
+  }
+ },
+ "543b79b06c75def919cec1c1959e7834": {
+  "status": {
+   "node_id": 7,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 38,
+     "name": "Multilevel Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 119,
+     "name": "Node Naming and Location",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "4170010184675d7964710977515417c3": {
+  "status": {
+   "node_id": 8,
+   "is_routing": true,
+   "status": 3,
+   "is_secure": false,
+   "ready": false,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 38,
+     "name": "Multilevel Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "f014e895e97af4c1e979303e25100ffc": {
+  "status": {
+   "node_id": 11,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": true,
+   "ready": true,
+   "zwave_plus_version": 1,
+   "highest_security_class": 1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 34,
+     "name": "Application Status",
+     "version": 0,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 44,
+     "name": "Scene Actuator Configuration",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 43,
+     "name": "Scene Activation",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    }
+   ]
+  }
+ },
+ "3224648c83fb152707cb5626bed623e5": {
+  "status": {
+   "node_id": 12,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 38,
+     "name": "Multilevel Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 119,
+     "name": "Node Naming and Location",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "57cfe20a7c2d4a7556543f073afc3795": {
+  "status": {
+   "node_id": 14,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": 1,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 44,
+     "name": "Scene Actuator Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 43,
+     "name": "Scene Activation",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 34,
+     "name": "Application Status",
+     "version": 0,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 4,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "bf1ad511da9507071db699ecb2553b75": {
+  "status": {
+   "node_id": 15,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": 2,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 142,
+     "name": "Multi Channel Association",
+     "version": 4,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 135,
+     "name": "Indicator",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 5,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "832639f5ca301b6de0d8630a0c30c24a": {
+  "status": {
+   "node_id": 16,
+   "is_routing": true,
+   "status": 3,
+   "is_secure": false,
+   "ready": false,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 119,
+     "name": "Node Naming and Location",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "c70a8aa4dccd697102f80f579227e2c7": {
+  "status": {
+   "node_id": 17,
+   "is_routing": true,
+   "status": 3,
+   "is_secure": false,
+   "ready": false,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 119,
+     "name": "Node Naming and Location",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "c38fb66bb1a369d400ac9b7d66d8d96f": {
+  "status": {
+   "node_id": 18,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 119,
+     "name": "Node Naming and Location",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "95d53e1dec459b6d507417fd9f422797": {
+  "status": {
+   "node_id": 19,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": true,
+   "ready": true,
+   "zwave_plus_version": 1,
+   "highest_security_class": 1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 34,
+     "name": "Application Status",
+     "version": 0,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 44,
+     "name": "Scene Actuator Configuration",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 43,
+     "name": "Scene Activation",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    }
+   ]
+  }
+ },
+ "397f6a90aae35d1864cbaa05ea75283a": {
+  "status": {
+   "node_id": 21,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": true,
+   "ready": true,
+   "zwave_plus_version": 2,
+   "highest_security_class": 1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 142,
+     "name": "Multi Channel Association",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 135,
+     "name": "Indicator",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 5,
+     "isSecure": true,
+     "is_secure": true
+    }
+   ]
+  }
+ },
+ "d98cda261a7b622654e97f6dcb491124": {
+  "status": {
+   "node_id": 22,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 38,
+     "name": "Multilevel Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 119,
+     "name": "Node Naming and Location",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "2a038b1a5995f5f2702e9219da155b58": {
+  "status": {
+   "node_id": 23,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": true,
+   "ready": true,
+   "zwave_plus_version": 2,
+   "highest_security_class": 1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 142,
+     "name": "Multi Channel Association",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 135,
+     "name": "Indicator",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 5,
+     "isSecure": true,
+     "is_secure": true
+    }
+   ]
+  }
+ },
+ "560e11ef46e03cb5b502290b015a502d": {
+  "status": {
+   "node_id": 26,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": true,
+   "ready": true,
+   "zwave_plus_version": 2,
+   "highest_security_class": 1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 38,
+     "name": "Multilevel Switch",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 142,
+     "name": "Multi Channel Association",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 135,
+     "name": "Indicator",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 5,
+     "isSecure": true,
+     "is_secure": true
+    }
+   ]
+  }
+ },
+ "25718f0280d6a471651139ef62eb72cc": {
+  "status": {
+   "node_id": 29,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": 2,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 142,
+     "name": "Multi Channel Association",
+     "version": 4,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 135,
+     "name": "Indicator",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 5,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "6edd60e10dbc2c0c76d801dd29f4633e": {
+  "status": {
+   "node_id": 30,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": 1,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 38,
+     "name": "Multilevel Switch",
+     "version": 4,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 34,
+     "name": "Application Status",
+     "version": 0,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 4,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "8854b151a1bc59a0d503f0b90ceb1c94": {
+  "status": {
+   "node_id": 31,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 38,
+     "name": "Multilevel Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 119,
+     "name": "Node Naming and Location",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "224cff294a3400338935c0e96cfec07c": {
+  "status": {
+   "node_id": 32,
+   "is_routing": true,
+   "status": 3,
+   "is_secure": false,
+   "ready": false,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 38,
+     "name": "Multilevel Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "a9f498114a5ab85ae1a57bb9dbf4ec19": {
+  "status": {
+   "node_id": 33,
+   "is_routing": true,
+   "status": 3,
+   "is_secure": false,
+   "ready": false,
+   "zwave_plus_version": 2,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 142,
+     "name": "Multi Channel Association",
+     "version": 4,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 135,
+     "name": "Indicator",
+     "version": 3,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 5,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "68061af8c954ca447ebf40a682b910f9": {
+  "status": {
+   "node_id": 37,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": 1,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 86,
+     "name": "CRC-16 Encapsulation",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 44,
+     "name": "Scene Actuator Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 43,
+     "name": "Scene Activation",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "93b0f24b2a87ab9e6a9aca7958b50c12": {
+  "status": {
+   "node_id": 38,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 38,
+     "name": "Multilevel Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 119,
+     "name": "Node Naming and Location",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "08cbfd1249fd31c1b8015a610a3f8475": {
+  "status": {
+   "node_id": 39,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": false,
+   "ready": true,
+   "zwave_plus_version": null,
+   "highest_security_class": -1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": false
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 119,
+     "name": "Node Naming and Location",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    }
+   ]
+  }
+ },
+ "c63b067723dcfe1ace517e513a8641b6": {
+  "status": {
+   "node_id": 41,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": true,
+   "ready": true,
+   "zwave_plus_version": 2,
+   "highest_security_class": 1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 142,
+     "name": "Multi Channel Association",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 135,
+     "name": "Indicator",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 5,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    }
+   ]
+  }
+ },
+ "48055c4fad5fbc67bcace67fefd025f2": {
+  "status": {
+   "node_id": 49,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": true,
+   "ready": true,
+   "zwave_plus_version": 2,
+   "highest_security_class": 1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 142,
+     "name": "Multi Channel Association",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 135,
+     "name": "Indicator",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 5,
+     "isSecure": true,
+     "is_secure": true
+    }
+   ]
+  }
+ },
+ "e6c348c059477c2a0e2bcee65fcc45f8": {
+  "status": {
+   "node_id": 50,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": true,
+   "ready": true,
+   "zwave_plus_version": 1,
+   "highest_security_class": 1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 152,
+     "name": "Security",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 37,
+     "name": "Binary Switch",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 43,
+     "name": "Scene Activation",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 44,
+     "name": "Scene Actuator Configuration",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 113,
+     "name": "Notification",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 117,
+     "name": "Protection",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    }
+   ]
+  }
+ },
+ "d0114a51ca90199f91ca511bb8bcfacc": {
+  "status": {
+   "node_id": 51,
+   "is_routing": true,
+   "status": 4,
+   "is_secure": true,
+   "ready": true,
+   "zwave_plus_version": 2,
+   "highest_security_class": 1,
+   "is_controller_node": false,
+   "has_firmware_update_cc": true
+  },
+  "capabilities": {
+   "0": [
+    {
+     "id": 94,
+     "name": "Z-Wave Plus Info",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 159,
+     "name": "Security 2",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 85,
+     "name": "Transport Service",
+     "version": 2,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 108,
+     "name": "Supervision",
+     "version": 1,
+     "isSecure": false,
+     "is_secure": false
+    },
+    {
+     "id": 134,
+     "name": "Version",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 115,
+     "name": "Powerlevel",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 38,
+     "name": "Multilevel Switch",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 114,
+     "name": "Manufacturer Specific",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 135,
+     "name": "Indicator",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 122,
+     "name": "Firmware Update Meta Data",
+     "version": 5,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 90,
+     "name": "Device Reset Locally",
+     "version": 1,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 112,
+     "name": "Configuration",
+     "version": 4,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 91,
+     "name": "Central Scene",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 142,
+     "name": "Multi Channel Association",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 89,
+     "name": "Association Group Information",
+     "version": 3,
+     "isSecure": true,
+     "is_secure": true
+    },
+    {
+     "id": 133,
+     "name": "Association",
+     "version": 2,
+     "isSecure": true,
+     "is_secure": true
+    }
+   ]
+  }
+ }
+}

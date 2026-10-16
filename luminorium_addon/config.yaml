@@ -1,0 +1,42 @@
+name: Luminorium
+# Give every build its own version: HA reuses a cached image when the tag is unchanged.
+version: "0.1.0-dev.1"
+slug: luminorium
+description: "Light effects, shows and sequences across every light in Home Assistant"
+url: https://github.com/synssins/luminorium
+
+# The HA host is amd64. aarch64 can be added once OpenCV (phase 5) is measured there.
+arch:
+  - amd64
+
+init: false
+startup: application
+stage: experimental
+
+# Registries, states, events and services over HA's websocket (SUPERVISOR_TOKEN)
+homeassistant_api: true
+# Find other add-ons (Z-Wave JS, Mosquitto) and their addresses
+hassio_api: true
+
+ingress: true
+# Not 8099: Zigbee2MQTT publishes 8099 on the host, and phase 2 moves this add-on to host networking.
+ingress_port: 8199
+panel_icon: mdi:lightbulb-group
+panel_title: Luminorium
+panel_admin: true
+
+# Phase 1 talks only to HA, so it stays on the add-on network. Phase 2 (WiZ, WLED, Govee over
+# UDP) switches this on; the web server already accepts only the Supervisor's ingress proxy.
+host_network: false
+
+map:
+  # Shows, palettes and plugins (user content); /data holds runtime state. Both are backed up.
+  - addon_config:rw
+
+options:
+  log_level: info
+  read_only: false
+
+schema:
+  log_level: list(debug|info|warning|error)
+  read_only: bool

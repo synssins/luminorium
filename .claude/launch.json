@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "luminorium-fake",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["tools/dev.py"],
+      "port": 8199
+    },
+    {
+      "name": "luminorium-real-readonly",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["tools/dev.py", "--real", "--port", "8198"],
+      "port": 8198,
+      "env": { "LUMINORIUM_HA_TOKEN_FILE": "F:/Projects/Sonorium/ha.tok.txt" }
+    }
+  ]
+}

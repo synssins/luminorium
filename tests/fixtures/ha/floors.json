@@ -1,0 +1,38 @@
+[
+ {
+  "aliases": [],
+  "created_at": 0,
+  "floor_id": "bedroom_level",
+  "icon": null,
+  "level": 4,
+  "name": "Bedroom Level",
+  "modified_at": 0
+ },
+ {
+  "aliases": [],
+  "created_at": 0,
+  "floor_id": "main_level",
+  "icon": null,
+  "level": 3,
+  "name": "Main Level",
+  "modified_at": 0
+ },
+ {
+  "aliases": [],
+  "created_at": 0,
+  "floor_id": "ground_level",
+  "icon": null,
+  "level": 2,
+  "name": "Ground Level",
+  "modified_at": 0
+ },
+ {
+  "aliases": [],
+  "created_at": 0,
+  "floor_id": "basement",
+  "icon": null,
+  "level": 1,
+  "name": "Basement",
+  "modified_at": 0
+ }
+]

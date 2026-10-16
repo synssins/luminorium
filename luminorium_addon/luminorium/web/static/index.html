@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Luminorium</title>
+<link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">Luminorium <span id="version" class="muted"></span></div>
+  <div id="link" class="pill">connecting…</div>
+</header>
+
+<main>
+  <section id="banner" class="banner" hidden></section>
+
+  <nav class="filters" aria-label="Filter">
+    <button data-filter="included" class="chip on">Included</button>
+    <button data-filter="switches" class="chip">Switches</button>
+    <button data-filter="excluded" class="chip">Excluded</button>
+    <button data-filter="all" class="chip">All</button>
+    <input id="search" type="search" placeholder="Search" aria-label="Search lights">
+  </nav>
+  <p id="counts" class="muted small"></p>
+
+  <div id="floors"></div>
+
+  <details class="activity">
+    <summary>Activity</summary>
+    <ul id="activity"></ul>
+  </details>
+
+  <p class="small"><a href="camera">Phone camera check</a></p>
+</main>
+
+<footer class="stopbar">
+  <button id="stopall" class="stop">Stop all</button>
+</footer>
+
+<template id="light-row">
+  <div class="light">
+    <div class="line1">
+      <span class="dot"></span>
+      <span class="name"></span>
+      <span class="actions">
+        <label class="toggle" title="Include in Luminorium"><input type="checkbox"><span></span></label>
+        <button class="test">Test</button>
+      </span>
+    </div>
+    <div class="badges"></div>
+    <div class="meta muted small"></div>
+  </div>
+</template>
+
+<script src="static/app.js"></script>
+</body>
+</html>

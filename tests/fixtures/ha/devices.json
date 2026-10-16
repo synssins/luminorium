@@ -1,0 +1,3866 @@
+[
+ {
+  "area_id": "master_bedroom",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "17",
+  "id": "e3f88d6d558e305e54c2f60274ba5631",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x00178801105de2ac"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Philips",
+  "model": "Hue white and color ambiance E26/E27/E14",
+  "model_id": "9290012573A",
+  "modified_at": 1786408942.803739,
+  "name_by_user": "Partner Bedside Lamp",
+  "name": "Master Bedroom Ceiling Flood",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "67.116.3",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "master_bedroom",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "953c95b6876772ca3bb1babb91b65f21",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0xe20db9fffe027b32"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "CREE",
+  "model": "Connected bulb",
+  "model_id": "B00TN589ZG",
+  "modified_at": 1735948487.927419,
+  "name_by_user": null,
+  "name": "Master Closet Light",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "522             ",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "living_room",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "2",
+  "id": "1cf7187da34bacfb0a7facf63da8ad61",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0xa4c1384245a95a0e"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Gledopto",
+  "model": "Zigbee 6W Downlight RGB+CCT (pro CRI>90)",
+  "model_id": "GL-D-002P",
+  "modified_at": 1735948488.48628,
+  "name_by_user": null,
+  "name": "Living Room Cabinets 01",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "10551203",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "living_room",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "2",
+  "id": "4bece16fc276a7fd600c4b5f916352f8",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0xa4c13878bf1cc586"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Gledopto",
+  "model": "Zigbee 6W Downlight RGB+CCT (pro CRI>90)",
+  "model_id": "GL-D-002P",
+  "modified_at": 1735948488.619236,
+  "name_by_user": null,
+  "name": "Living Room Cabinets 02",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "10551203",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "front_entrance",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "51c2a016aba17a28777adaf3e701a555",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x001788010d371d14"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Philips",
+  "model": "Hue White and Color Ambiance BR30 with bluetooth",
+  "model_id": "046677577957",
+  "modified_at": 1736056239.062706,
+  "name_by_user": null,
+  "name": "Front Entryway Flood 02",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "1.122.2",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "front_entrance",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "68961aeb5c8cf3c7019df291674c6afb",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x001788010d6ee173"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Philips",
+  "model": "Hue White and Color Ambiance BR30 with bluetooth",
+  "model_id": "046677577957",
+  "modified_at": 1736056239.235417,
+  "name_by_user": null,
+  "name": "Front Entryway Flood 01",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "1.122.2",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "front_yard",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "86bbec42cd053ea65fb0971459f17e45",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x001788010c7daeb5"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Philips",
+  "model": "Hue White and Color Ambiance A19 1100 lumen",
+  "model_id": "9290024687",
+  "modified_at": 1789264567.799956,
+  "name_by_user": null,
+  "name": "Front Driveway Light 01",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "1.163.1",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "front_yard",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "c8d2ccc5b41abbe3c22e8c06c5ecdc51",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x001788010c84e400"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Philips",
+  "model": "Hue White and Color Ambiance A19 1100 lumen",
+  "model_id": "9290024687",
+  "modified_at": 1789264607.046165,
+  "name_by_user": null,
+  "name": "Front Driveway Light 02",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "1.163.1",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "office",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "2",
+  "id": "5bbadb63b6ec15dc8b86391e0f545951",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0xa4c13802a2358d0e"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Gledopto",
+  "model": "Zigbee LED Controller WW/CW (pro)",
+  "model_id": "GL-C-006P",
+  "modified_at": 1735948489.547532,
+  "name_by_user": null,
+  "name": "Office Desk Monitor Lamp",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "10651203",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "office",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "2",
+  "id": "d524c3d32abc694b68f54831c4e700b2",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0xa4c138efcb23e083"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Gledopto",
+  "model": "Zigbee 6W Downlight RGB+CCT (pro CRI>90)",
+  "model_id": "GL-D-002P",
+  "modified_at": 1735948489.763701,
+  "name_by_user": null,
+  "name": "Office Wall Wash",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "10551203",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "office",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "0",
+  "id": "bb859457196b49f0c6817d51396cc33b",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x000d6f000fc7505f"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Sunricher",
+  "model": "3 scene RGBW touch panel controller (RGBGenie ZB-3009)",
+  "model_id": "ZGRC-TUS-002",
+  "modified_at": 1792153146.79465,
+  "name_by_user": null,
+  "name": "0x000d6f000fc7505f",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "2.2.3_r10",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "porch",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "1d4e4f6d1fe273086852fc6ba730a8f8",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x001788010d6eede6"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Philips",
+  "model": "Hue White and Color Ambiance BR30 with bluetooth",
+  "model_id": "046677577957",
+  "modified_at": 1789264568.031964,
+  "name_by_user": null,
+  "name": "Front Porch Light ",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "1.163.1",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "master_bedroom",
+  "configuration_url": null,
+  "config_entries": [
+   "74b572f42ef31b7e470df3aa4ba7cf5e"
+  ],
+  "config_entries_subentries": {
+   "74b572f42ef31b7e470df3aa4ba7cf5e": [
+    null
+   ]
+  },
+  "config_entry_id": "74b572f42ef31b7e470df3aa4ba7cf5e",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "06:f0:86:b3:f9:e2"
+   ]
+  ],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "ESP24 01",
+  "id": "ffe1435bc8d00fbf560a1cc7364dc3e6",
+  "identifiers": [],
+  "labels": [],
+  "manufacturer": "WiZ",
+  "model": "SHRGBC",
+  "model_id": null,
+  "modified_at": 1790018340.635559,
+  "name_by_user": "Master Bedroom Ceiling Flood",
+  "name": "WiZ RGBW Tunable F1E0A7",
+  "parent_device_id": null,
+  "primary_config_entry": "74b572f42ef31b7e470df3aa4ba7cf5e",
+  "serial_number": null,
+  "sw_version": "1.38.0",
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "219ce4c46878a1f57927dd3347d5ef49"
+  ],
+  "config_entries_subentries": {
+   "219ce4c46878a1f57927dd3347d5ef49": [
+    null
+   ]
+  },
+  "config_entry_id": "219ce4c46878a1f57927dd3347d5ef49",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "e3:bc:9e:a2:34:56"
+   ]
+  ],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "ESP24 01",
+  "id": "d8a92913a0bb01c09a5423379f165042",
+  "identifiers": [],
+  "labels": [],
+  "manufacturer": "WiZ",
+  "model": "SHRGBW",
+  "model_id": null,
+  "modified_at": 1790883993.378623,
+  "name_by_user": null,
+  "name": "WiZ RGBWW Tunable C3B549",
+  "parent_device_id": null,
+  "primary_config_entry": "219ce4c46878a1f57927dd3347d5ef49",
+  "serial_number": null,
+  "sw_version": "1.39.0",
+  "via_device_id": null
+ },
+ {
+  "area_id": "front_garage",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "3fd406f19aae90acf5c1f36b0eb843d6",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0xe20db9fffe03b550"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "CREE",
+  "model": "Connected bulb",
+  "model_id": "B00TN589ZG",
+  "modified_at": 1735948490.549921,
+  "name_by_user": null,
+  "name": "Garage Light Bulb 1",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "522             ",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "front_garage",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "f3d4e4cb9bcb2b64d299ab11884b4f3d",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0xe20db9fffe03c874"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "CREE",
+  "model": "Connected bulb",
+  "model_id": "B00TN589ZG",
+  "modified_at": 1735948490.721965,
+  "name_by_user": null,
+  "name": "Garage light bulb 2",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "522             ",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "office",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "3c93e74f2b51eeb5c3c153c6d594510d",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-2-99:18770:12338"
+   ],
+   [
+    "zwave_js",
+    "295581680-2"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "12722 / ZW4005",
+  "model_id": null,
+  "modified_at": 1724635924.82573,
+  "name_by_user": "Office overhead lights",
+  "name": "In-Wall Paddle Switch, 500S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.29",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "front_entrance",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "7d3ac055820100357d56ad0bcf367c79",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-5"
+   ],
+   [
+    "zwave_js",
+    "295581680-5-634:28672:40961"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zooz",
+  "model": "ZEN71",
+  "model_id": null,
+  "modified_at": 1783719631.582455,
+  "name_by_user": "Front Entryway Overhead Light Switch",
+  "name": "On/Off Switch",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.70.0",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "front_yard",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "8907bfad832c378ea42e06b34eca5559",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-6"
+   ],
+   [
+    "zwave_js",
+    "295581680-6-634:28672:40961"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zooz",
+  "model": "ZEN71",
+  "model_id": null,
+  "modified_at": 1783720531.618824,
+  "name_by_user": "Front Porch Light Switch",
+  "name": "On/Off Switch",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.70.0",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "543b79b06c75def919cec1c1959e7834",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-7-99:18756:12337"
+   ],
+   [
+    "zwave_js",
+    "295581680-7"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "12724 / ZW3005",
+  "model_id": null,
+  "modified_at": 1724635924.827419,
+  "name_by_user": "Living room overhead lights switch",
+  "name": "In-Wall Paddle Dimmer, 300S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.37",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "4170010184675d7964710977515417c3",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-8-99:17495:12848"
+   ],
+   [
+    "zwave_js",
+    "295581680-8"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "45606 / ZW3001",
+  "model_id": null,
+  "modified_at": 1724635924.827844,
+  "name_by_user": "Living room floor lamp switch",
+  "name": "In-Wall Paddle Dimmer, 300S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.29",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "living_room",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "f014e895e97af4c1e979303e25100ffc",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-11-99:18770:12597"
+   ],
+   [
+    "zwave_js",
+    "295581680-11"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE/Enbrighten",
+  "model": "46201 / ZW4008",
+  "model_id": null,
+  "modified_at": 1724635924.828283,
+  "name_by_user": "Living room ceiling fan",
+  "name": "In-Wall Paddle Switch, QFSW, 500S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "5.53",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "dining_room",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "3224648c83fb152707cb5626bed623e5",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-12"
+   ],
+   [
+    "zwave_js",
+    "295581680-12-99:18756:12337"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "12724 / ZW3005",
+  "model_id": null,
+  "modified_at": 1724635924.828702,
+  "name_by_user": "Dining room overhead light switch",
+  "name": "In-Wall Paddle Dimmer, 300S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.35",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "back_yard",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "57cfe20a7c2d4a7556543f073afc3795",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-14"
+   ],
+   [
+    "zwave_js",
+    "295581680-14-57:18770:12597"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Honeywell",
+  "model": "39348 / 39455 / ZW4008",
+  "model_id": null,
+  "modified_at": 1724635924.82912,
+  "name_by_user": "Back patio light switch",
+  "name": "In-Wall Paddle Switch, QFSW, 500S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "5.53",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "back_yard",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "bf1ad511da9507071db699ecb2553b75",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-15-634:28672:40966"
+   ],
+   [
+    "zwave_js",
+    "295581680-15"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zooz",
+  "model": "ZEN76",
+  "model_id": null,
+  "modified_at": 1771290885.199725,
+  "name_by_user": "Backyard light switch",
+  "name": "S2 On/Off Switch",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "2.30.1",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "wood_shop",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "832639f5ca301b6de0d8630a0c30c24a",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-16-99:18770:12338"
+   ],
+   [
+    "zwave_js",
+    "295581680-16"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "12722 / ZW4005",
+  "model_id": null,
+  "modified_at": 1724635924.830051,
+  "name_by_user": "Wood shop light switch",
+  "name": "In-Wall Paddle Switch, 500S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.29",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "back_yard",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "c70a8aa4dccd697102f80f579227e2c7",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-17"
+   ],
+   [
+    "zwave_js",
+    "295581680-17-99:18770:12338"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "12722 / ZW4005",
+  "model_id": null,
+  "modified_at": 1724635924.830487,
+  "name_by_user": "Back driveway light switch",
+  "name": "In-Wall Paddle Switch, 500S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.27",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "back_entrance",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "c38fb66bb1a369d400ac9b7d66d8d96f",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-18"
+   ],
+   [
+    "zwave_js",
+    "295581680-18-99:18770:12338"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "12722 / ZW4005",
+  "model_id": null,
+  "modified_at": 1724635924.831179,
+  "name_by_user": "Back entryway light switch",
+  "name": "In-Wall Paddle Switch, 500S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.27",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "laundry_room",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "95d53e1dec459b6d507417fd9f422797",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-19-57:18770:12597"
+   ],
+   [
+    "zwave_js",
+    "295581680-19"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Honeywell",
+  "model": "39348 / 39455 / ZW4008",
+  "model_id": null,
+  "modified_at": 1724635924.831609,
+  "name_by_user": "Laundry room light switch",
+  "name": "In-Wall Paddle Switch, QFSW, 500S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "5.53",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "3",
+  "id": "0755c4603756565a12c7ac210ec87b65",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x000d6f000a93df07"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Iris",
+  "model": "Smart plug",
+  "model_id": "3210-L",
+  "modified_at": 1735948491.750157,
+  "name_by_user": null,
+  "name": "0x000d6f000a93df07",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "lower_hallway",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "397f6a90aae35d1864cbaa05ea75283a",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-21"
+   ],
+   [
+    "zwave_js",
+    "295581680-21-634:28672:40966"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zooz",
+  "model": "ZEN76",
+  "model_id": null,
+  "modified_at": 1765204705.586518,
+  "name_by_user": "Theater Stairwell light switch",
+  "name": "S2 On/Off Switch",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "10.30.1",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "lower_hallway",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "d98cda261a7b622654e97f6dcb491124",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-22"
+   ],
+   [
+    "zwave_js",
+    "295581680-22-99:18756:12337"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "12724 / ZW3005",
+  "model_id": null,
+  "modified_at": 1724635924.83417,
+  "name_by_user": "Lower hallway light switch",
+  "name": "In-Wall Paddle Dimmer, 300S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.37",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "kitchen",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "2a038b1a5995f5f2702e9219da155b58",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-23"
+   ],
+   [
+    "zwave_js",
+    "295581680-23-634:28672:40966"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zooz",
+  "model": "ZEN76",
+  "model_id": null,
+  "modified_at": 1783719314.329067,
+  "name_by_user": "Kitchen sink light switch",
+  "name": "S2 On/Off Switch",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "10.30.1",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "kitchen",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "560e11ef46e03cb5b502290b015a502d",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-26"
+   ],
+   [
+    "zwave_js",
+    "295581680-26-634:28672:40967"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zooz",
+  "model": "ZEN77",
+  "model_id": null,
+  "modified_at": 1735948304.6061,
+  "name_by_user": "Kitchen cabinet light switch",
+  "name": "S2 Dimmer",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "10.40.2",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "kitchen",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "25718f0280d6a471651139ef62eb72cc",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-29"
+   ],
+   [
+    "zwave_js",
+    "295581680-29-634:28672:40968"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zooz",
+  "model": "ZEN32",
+  "model_id": null,
+  "modified_at": 1783720183.577272,
+  "name_by_user": "Kitchen Overhead Light Switch",
+  "name": "Scene Controller",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "10.50.2",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "upstairs_hallway",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "6edd60e10dbc2c0c76d801dd29f4633e",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-30-57:18756:12853"
+   ],
+   [
+    "zwave_js",
+    "295581680-30"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Honeywell",
+  "model": "39351 / 39458 / ZW3010",
+  "model_id": null,
+  "modified_at": 1724635924.836699,
+  "name_by_user": "Upstairs hallway light switch",
+  "name": "In-Wall Paddle Dimmer, QFSW, 500S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "5.54",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "master_bedroom",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "8854b151a1bc59a0d503f0b90ceb1c94",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-31-99:18756:12337"
+   ],
+   [
+    "zwave_js",
+    "295581680-31"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "12724 / ZW3005",
+  "model_id": null,
+  "modified_at": 1724635924.83712,
+  "name_by_user": "Master bedroom overhead light switch",
+  "name": "In-Wall Paddle Dimmer, 300S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.35",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "master_bedroom",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "224cff294a3400338935c0e96cfec07c",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-32-99:18756:12340"
+   ],
+   [
+    "zwave_js",
+    "295581680-32"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "12730 / ZW4002",
+  "model_id": null,
+  "modified_at": 1724635924.837612,
+  "name_by_user": "Master bedroom ceiling fan switch",
+  "name": "In-Wall Fan Speed Control, 300S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.10",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "master_bedroom",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "a9f498114a5ab85ae1a57bb9dbf4ec19",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-33-634:28672:40966"
+   ],
+   [
+    "zwave_js",
+    "295581680-33"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zooz",
+  "model": "ZEN76",
+  "model_id": null,
+  "modified_at": 1765298882.651794,
+  "name_by_user": "Master bedroom headboard light switch",
+  "name": "S2 On/Off Switch",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "10.30.1",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "master_bedroom",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "ff21d5d5be75a196809813885cbc9696",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x001788010d370ce8"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Philips",
+  "model": "Hue White and Color Ambiance BR30 with bluetooth",
+  "model_id": "046677577957",
+  "modified_at": 1789264568.589593,
+  "name_by_user": null,
+  "name": "Office Ceiling Flood 2",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "1.163.1",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "EmberZNet 7.4.4 [GA]",
+  "id": "28f887798573f8b01a0e8ac62c3bc14e",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_bridge_0xe0798dfffeeaee2d"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zigbee2MQTT",
+  "model": "Bridge",
+  "model_id": null,
+  "modified_at": 1790999273.178923,
+  "name_by_user": null,
+  "name": "Zigbee2MQTT Bridge",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "2.14.2",
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "17eef0dc8ca46fbd34c536e12a5aeb6d",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x00124b001d04d2e5"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Gledopto",
+  "model": "Zigbee LED Controller RGBW (1 ID)",
+  "model_id": "GL-C-007-1ID",
+  "modified_at": 1735948487.796086,
+  "name_by_user": null,
+  "name": "Master bedroom color bar one",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "2.0.0",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "9cf302b152feb9273983755cb4a805da",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x00124b001d04ccad"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Gledopto",
+  "model": "Zigbee LED Controller RGBW (1 ID)",
+  "model_id": "GL-C-007-1ID",
+  "modified_at": 1735948487.663024,
+  "name_by_user": null,
+  "name": "Master bedroom color light bar two",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "2.0.0",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "444b6763cfb6c8ad7610defd37b03e5c",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0x00124b001d04d2c0"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Gledopto",
+  "model": "Zigbee LED Controller RGBW (1 ID)",
+  "model_id": "GL-C-007-1ID",
+  "modified_at": 1735948494.979807,
+  "name_by_user": null,
+  "name": "Master bedroom color light bar Partner",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "2.0.0",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": null,
+  "configuration_url": "http://192.168.1.190",
+  "config_entries": [
+   "9824cc790dc0877024942f7dfa0807f4"
+  ],
+  "config_entries_subentries": {
+   "9824cc790dc0877024942f7dfa0807f4": [
+    null
+   ]
+  },
+  "config_entry_id": "9824cc790dc0877024942f7dfa0807f4",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "5a:d7:42:7a:0a:8f"
+   ]
+  ],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "esp32",
+  "id": "565a021db3f453f956a102632f63d270",
+  "identifiers": [
+   [
+    "wled",
+    "b8d61a582e54"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "WLED",
+  "model": "FOSS",
+  "model_id": null,
+  "modified_at": 1777936560.762646,
+  "name_by_user": null,
+  "name": "WLED",
+  "parent_device_id": null,
+  "primary_config_entry": "9824cc790dc0877024942f7dfa0807f4",
+  "serial_number": null,
+  "sw_version": "0.15.0",
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": "http://192.168.100.156",
+  "config_entries": [
+   "1c5487e24a806b03907e0119766c3147"
+  ],
+  "config_entries_subentries": {
+   "1c5487e24a806b03907e0119766c3147": [
+    null
+   ]
+  },
+  "config_entry_id": "1c5487e24a806b03907e0119766c3147",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "75:89:f6:28:3d:3a"
+   ]
+  ],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "esp32",
+  "id": "7577d7c2cb1eb1b03f16be25d38f4672",
+  "identifiers": [
+   [
+    "wled",
+    "d48afca1d7d0"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "WLED",
+  "model": "FOSS",
+  "model_id": null,
+  "modified_at": 1780944283.91843,
+  "name_by_user": null,
+  "name": "TV Ambilight",
+  "parent_device_id": null,
+  "primary_config_entry": "1c5487e24a806b03907e0119766c3147",
+  "serial_number": null,
+  "sw_version": "16.0.0",
+  "via_device_id": null
+ },
+ {
+  "area_id": "master_bedroom",
+  "configuration_url": null,
+  "config_entries": [
+   "bf2d0e82a0e262b2ff1fd9acc99db91b"
+  ],
+  "config_entries_subentries": {
+   "bf2d0e82a0e262b2ff1fd9acc99db91b": [
+    null
+   ]
+  },
+  "config_entry_id": "bf2d0e82a0e262b2ff1fd9acc99db91b",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "07:be:ed:a2:7f:06"
+   ]
+  ],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "ESP24 01",
+  "id": "f2404bb36f9b4bb9c7a78197e20c5e2e",
+  "identifiers": [],
+  "labels": [],
+  "manufacturer": "WiZ",
+  "model": "SHRGB",
+  "model_id": null,
+  "modified_at": 1790009655.771324,
+  "name_by_user": "Master Bedroom Arc Lamp 1",
+  "name": "WiZ RGBWW Tunable D5DB9F",
+  "parent_device_id": null,
+  "primary_config_entry": "bf2d0e82a0e262b2ff1fd9acc99db91b",
+  "serial_number": null,
+  "sw_version": "1.38.0",
+  "via_device_id": null
+ },
+ {
+  "area_id": "master_bedroom",
+  "configuration_url": null,
+  "config_entries": [
+   "0a74a5734f188d206d5831bb3807ba77"
+  ],
+  "config_entries_subentries": {
+   "0a74a5734f188d206d5831bb3807ba77": [
+    null
+   ]
+  },
+  "config_entry_id": "0a74a5734f188d206d5831bb3807ba77",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "4c:ae:16:19:19:6d"
+   ]
+  ],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "ESP24 01",
+  "id": "5201ce806a84a560a058dfe2fb6dcdeb",
+  "identifiers": [],
+  "labels": [],
+  "manufacturer": "WiZ",
+  "model": "SHRGB",
+  "model_id": null,
+  "modified_at": 1790013770.278223,
+  "name_by_user": "Master Bedroom Arc Lamp 2",
+  "name": "WiZ RGBWW Tunable D5DE03",
+  "parent_device_id": null,
+  "primary_config_entry": "0a74a5734f188d206d5831bb3807ba77",
+  "serial_number": null,
+  "sw_version": "1.38.0",
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "68061af8c954ca447ebf40a682b910f9",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-37-99:20562:12344"
+   ],
+   [
+    "zwave_js",
+    "295581680-37"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "28169 / ZW4103",
+  "model_id": null,
+  "modified_at": 1724635924.839796,
+  "name_by_user": "3D Printer Shelf Lights",
+  "name": "Plug-In 1-Outlet Switch, 500S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "5.25",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "93b0f24b2a87ab9e6a9aca7958b50c12",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-38-99:18756:12337"
+   ],
+   [
+    "zwave_js",
+    "295581680-38"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "12724 / ZW3005",
+  "model_id": null,
+  "modified_at": 1724635924.840221,
+  "name_by_user": "Basement main lights",
+  "name": "In-Wall Paddle Dimmer, 300S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.37",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "08cbfd1249fd31c1b8015a610a3f8475",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-39"
+   ],
+   [
+    "zwave_js",
+    "295581680-39-99:18770:12338"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "GE",
+  "model": "12722 / ZW4005",
+  "model_id": null,
+  "modified_at": 1783302132.581641,
+  "name_by_user": "Basement perimeter lights",
+  "name": "In-Wall Paddle Switch, 500S",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.29",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "office",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "c63b067723dcfe1ace517e513a8641b6",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-41"
+   ],
+   [
+    "zwave_js",
+    "295581680-41-634:28672:40961"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zooz",
+  "model": "ZEN71",
+  "model_id": null,
+  "modified_at": 1765200818.141951,
+  "name_by_user": "Office Overhead Light Switch new",
+  "name": "On/Off Switch",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "3.70.0",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "office",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "6d90f2f71c96b4c52ae515c56d9d8b8d",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0xa4c13870f24c8977"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "LEDEPLY",
+  "model": "Zigbee A15 5W Smart Bulbs",
+  "model_id": "SG45-E26",
+  "modified_at": 1772590541.226458,
+  "name_by_user": null,
+  "name": "Office Fan RGB1",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "office",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1",
+  "id": "de898d948bb4665a918d9fab59a71a4f",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_0xa4c138645633918b"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "LEDEPLY",
+  "model": "Zigbee A15 5W Smart Bulbs",
+  "model_id": "SG45-E26",
+  "modified_at": 1772590541.467629,
+  "name_by_user": null,
+  "name": "Office Fan RGB2",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "front_garage",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "8e48893e9f6359134fbe824fd079bf74",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-48"
+   ],
+   [
+    "zwave_js",
+    "295581680-48-634:28672:40970"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": null,
+  "model": null,
+  "model_id": null,
+  "modified_at": 1789262911.041658,
+  "name_by_user": "Garage Door",
+  "name": "Node 48",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "2.30.0",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "front_garage",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1725150304.650654,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "48055c4fad5fbc67bcace67fefd025f2",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-49-634:28672:40966"
+   ],
+   [
+    "zwave_js",
+    "295581680-49"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zooz",
+  "model": "ZEN76",
+  "model_id": null,
+  "modified_at": 1783721078.346111,
+  "name_by_user": "Front garage ceiling lights",
+  "name": "S2 On/Off Switch",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "10.30.1",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "driveway",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1725150460.945447,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "e6c348c059477c2a0e2bcee65fcc45f8",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-50"
+   ],
+   [
+    "zwave_js",
+    "295581680-50-26:21324:1283"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Eaton",
+  "model": "RF9601",
+  "model_id": null,
+  "modified_at": 1725150598.834869,
+  "name_by_user": "Front driveway lights switch",
+  "name": "Z-Wave Plus Wireless Switch",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "1.0",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1726066575.908047,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "d4b28b7ccf6a1ffd096ecf25c6c404db",
+  "identifiers": [
+   [
+    "browser_mod",
+    "MainPC-Browser"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1726066575.908071,
+  "name_by_user": null,
+  "name": "MainPC-Browser",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1726066585.589375,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "68814aac0be7b3396178055696f9edef",
+  "identifiers": [
+   [
+    "browser_mod",
+    "CAST"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1726066585.589413,
+  "name_by_user": null,
+  "name": "CAST",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1726093718.010332,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "90a0c1d09ebaed6b9a02bd4851c460f9",
+  "identifiers": [
+   [
+    "browser_mod",
+    "d5ffddd2-310061fc"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1726093718.010411,
+  "name_by_user": null,
+  "name": "d5ffddd2-310061fc",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1728936946.382932,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "2c7d56e3f3af459839e9d37de45b499e",
+  "identifiers": [
+   [
+    "browser_mod",
+    "b0aa6c81-1980e40f"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1728936946.383018,
+  "name_by_user": null,
+  "name": "b0aa6c81-1980e40f",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1733007643.964288,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "d343e8c92e8ceab10504cd9c325c9804",
+  "identifiers": [
+   [
+    "browser_mod",
+    "7d38a79c-36165d44"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1733007643.964375,
+  "name_by_user": null,
+  "name": "7d38a79c-36165d44",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1734718277.319313,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "8717c91d9a0fabe6b2f3070a550b9cf9",
+  "identifiers": [
+   [
+    "browser_mod",
+    "c952f3fe-aee33d99"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1734718277.319409,
+  "name_by_user": null,
+  "name": "c952f3fe-aee33d99",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": "http://192.168.1.101",
+  "config_entries": [
+   "01JH1Z4V9BX55QYP0CM09RWXQ7"
+  ],
+  "config_entries_subentries": {
+   "01JH1Z4V9BX55QYP0CM09RWXQ7": [
+    null
+   ]
+  },
+  "config_entry_id": "01JH1Z4V9BX55QYP0CM09RWXQ7",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "55:1A:04:45:28:6B"
+   ]
+  ],
+  "created_at": 1735956110.011455,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "esp8266",
+  "id": "cb4d31be32fb11894b55e82634a21247",
+  "identifiers": [
+   [
+    "wled",
+    "485519655518"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "WLED",
+  "model": "FOSS",
+  "model_id": null,
+  "modified_at": 1777984310.639314,
+  "name_by_user": null,
+  "name": "wled-LightPanel",
+  "parent_device_id": null,
+  "primary_config_entry": "01JH1Z4V9BX55QYP0CM09RWXQ7",
+  "serial_number": null,
+  "sw_version": "17.0.0-dev",
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1737856819.493291,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "05a0c63d4cabdfac43966bc5a0f185c7",
+  "identifiers": [
+   [
+    "browser_mod",
+    "852258f9-0afd94d9"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1737856819.493372,
+  "name_by_user": null,
+  "name": "852258f9-0afd94d9",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1739993206.059213,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "54c2807cb02bed32e527ccc88eb26f6f",
+  "identifiers": [
+   [
+    "browser_mod",
+    "2bd18aaf-645d27f4"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1739993206.059308,
+  "name_by_user": null,
+  "name": "2bd18aaf-645d27f4",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1743641229.398288,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "69e8e2e09f376f7a8b01ce90003a4d81",
+  "identifiers": [
+   [
+    "browser_mod",
+    "e3ba2be0-e66969bd"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1743641229.39837,
+  "name_by_user": null,
+  "name": "e3ba2be0-e66969bd",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1745279992.528475,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "f5117815cc242a34de0baecb4afae289",
+  "identifiers": [
+   [
+    "browser_mod",
+    "5807adc7-0190a7a0"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1745279992.528561,
+  "name_by_user": null,
+  "name": "5807adc7-0190a7a0",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1745286064.456269,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "00a422adb616bf95557166bfba648eac",
+  "identifiers": [
+   [
+    "browser_mod",
+    "2b062db4-3b609abb"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1745286064.45635,
+  "name_by_user": null,
+  "name": "2b062db4-3b609abb",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": "living_room",
+  "configuration_url": "homeassistant://app/5c53de3b_esphome",
+  "config_entries": [
+   "01KHMCM3JC0F4Z0TTEMQPX2VJT"
+  ],
+  "config_entries_subentries": {
+   "01KHMCM3JC0F4Z0TTEMQPX2VJT": [
+    null
+   ]
+  },
+  "config_entry_id": "01KHMCM3JC0F4Z0TTEMQPX2VJT",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "61:68:c9:fd:a8:82"
+   ]
+  ],
+  "created_at": 1745354246.619192,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "b998906a96231d0576845e04e497de64",
+  "identifiers": [],
+  "labels": [],
+  "manufacturer": "FutureProofHomes",
+  "model": "Satellite1",
+  "model_id": null,
+  "modified_at": 1789258937.67737,
+  "name_by_user": null,
+  "name": "Satellite1 Office",
+  "parent_device_id": null,
+  "primary_config_entry": "01KHMCM3JC0F4Z0TTEMQPX2VJT",
+  "serial_number": null,
+  "sw_version": "dev (ESPHome 2026.3.1)",
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1745356315.041834,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "627ce631098812d59b8575d58e563bdd",
+  "identifiers": [
+   [
+    "browser_mod",
+    "f9506ef8-edb4063c"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1745356315.041882,
+  "name_by_user": null,
+  "name": "f9506ef8-edb4063c",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": "front_yard",
+  "configuration_url": "http://192.168.10.215",
+  "config_entries": [
+   "01JZVA1ZEDAJT9S4EM7ZSNYKGD"
+  ],
+  "config_entries_subentries": {
+   "01JZVA1ZEDAJT9S4EM7ZSNYKGD": [
+    null
+   ]
+  },
+  "config_entry_id": "01JZVA1ZEDAJT9S4EM7ZSNYKGD",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "99:55:66:f5:c4:73"
+   ]
+  ],
+  "created_at": 1747078381.15147,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "esp32",
+  "id": "e06d114f846f155612ca11d2e72cc26f",
+  "identifiers": [
+   [
+    "wled",
+    "d48afca1d67c"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "WLED",
+  "model": "FOSS",
+  "model_id": null,
+  "modified_at": 1789991962.692312,
+  "name_by_user": null,
+  "name": "Front pathway lights ",
+  "parent_device_id": null,
+  "primary_config_entry": "01JZVA1ZEDAJT9S4EM7ZSNYKGD",
+  "serial_number": null,
+  "sw_version": "17.0.0-dev",
+  "via_device_id": null
+ },
+ {
+  "area_id": "office",
+  "configuration_url": null,
+  "config_entries": [
+   "01JW45T6K9V9PN1XPXTT326FK7"
+  ],
+  "config_entries_subentries": {
+   "01JW45T6K9V9PN1XPXTT326FK7": [
+    null
+   ]
+  },
+  "config_entry_id": "01JW45T6K9V9PN1XPXTT326FK7",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1748192008.842995,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "001e11f01c53a1169ca68dc4043bcef0",
+  "identifiers": [
+   [
+    "signalrgb",
+    "01JW45T6K9V9PN1XPXTT326FK7"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "WhirlwindFX",
+  "model": "SignalRGB",
+  "model_id": null,
+  "modified_at": 1748192018.816889,
+  "name_by_user": null,
+  "name": "SignalRGB 192.168.1.198",
+  "parent_device_id": null,
+  "primary_config_entry": "01JW45T6K9V9PN1XPXTT326FK7",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1751745127.146095,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "72a555045c0ca2b8f5bf4831087aeced",
+  "identifiers": [
+   [
+    "browser_mod",
+    "browser_mod_52299371_5143b563"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1751745127.146124,
+  "name_by_user": null,
+  "name": "browser_mod_52299371_5143b563",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01JRVAJA1VF03V6CKH7TCWHYW2"
+  ],
+  "config_entries_subentries": {
+   "01JRVAJA1VF03V6CKH7TCWHYW2": [
+    null
+   ]
+  },
+  "config_entry_id": "01JRVAJA1VF03V6CKH7TCWHYW2",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1752271258.130847,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": "1.0",
+  "id": "f531c5b2116a95d4ea64d3fe381f20a5",
+  "identifiers": [
+   [
+    "matter",
+    "deviceid_5EF493F6D24C49EA-0000000000000003-MatterNodeDevice"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Shenzhen Qianyan Technology",
+  "model": "H60B0",
+  "model_id": "24752",
+  "modified_at": 1752271258.130876,
+  "name_by_user": null,
+  "name": "H60B0",
+  "parent_device_id": null,
+  "primary_config_entry": "01JRVAJA1VF03V6CKH7TCWHYW2",
+  "serial_number": null,
+  "sw_version": "27.0",
+  "via_device_id": null
+ },
+ {
+  "area_id": "back_patio",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1752433925.850288,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "a946a1f0d0ffcbb931d26473dd870eb2",
+  "identifiers": [
+   [
+    "mqtt",
+    "gv2mqtt-C15484239E5E8631"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Govee",
+  "model": "H7021",
+  "model_id": null,
+  "modified_at": 1752458011.062707,
+  "name_by_user": null,
+  "name": "Back Patio String 1",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": "dd046c50aa21233474ff7863996eaece"
+ },
+ {
+  "area_id": "bedroom",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1752433929.397944,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "85e3ee3b9e2250c958c899ef3721117a",
+  "identifiers": [
+   [
+    "mqtt",
+    "gv2mqtt-6BADFCE1805600B1"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Govee",
+  "model": "H60B0",
+  "model_id": null,
+  "modified_at": 1752458014.613727,
+  "name_by_user": null,
+  "name": "Uplighter Floor Lamp",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": "dd046c50aa21233474ff7863996eaece"
+ },
+ {
+  "area_id": "back_patio",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1752433931.423191,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "5d13a7ff1702175dad3aed004893ec25",
+  "identifiers": [
+   [
+    "mqtt",
+    "gv2mqtt-FFC0EFD2ABEE03DA"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Govee",
+  "model": "H7066",
+  "model_id": null,
+  "modified_at": 1752458010.148378,
+  "name_by_user": null,
+  "name": "Back Patio RGBIC Flood",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": "dd046c50aa21233474ff7863996eaece"
+ },
+ {
+  "area_id": "front_yard",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1752433932.336567,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "d6b49562751cd25e38488860d119287e",
+  "identifiers": [
+   [
+    "mqtt",
+    "gv2mqtt-1BC8BC5470053FC2"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Govee",
+  "model": "H7055",
+  "model_id": null,
+  "modified_at": 1752460965.202222,
+  "name_by_user": null,
+  "name": "RGBIC Path Lights",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": "dd046c50aa21233474ff7863996eaece"
+ },
+ {
+  "area_id": "back_patio",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1752458016.646017,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "22916749766a4b2b00842067ed6092ce",
+  "identifiers": [
+   [
+    "mqtt",
+    "gv2mqtt-B21EFAC8288DABAA"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Govee",
+  "model": "H7021",
+  "model_id": null,
+  "modified_at": 1752458016.646129,
+  "name_by_user": null,
+  "name": "Back Patio String 2",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": "dd046c50aa21233474ff7863996eaece"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1764973523.51942,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "66292af189e3f4ca3979769f06bead4c",
+  "identifiers": [
+   [
+    "browser_mod",
+    "browser_mod_4f72b260_0dc84481"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1764973523.519452,
+  "name_by_user": null,
+  "name": "browser_mod_4f72b260_0dc84481",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1765575864.640492,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "ccd3c3c4fa373e6abe68720b4b14567e",
+  "identifiers": [
+   [
+    "browser_mod",
+    "browser_mod_ce4da1dc_072d2e67"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1765575864.640579,
+  "name_by_user": null,
+  "name": "browser_mod_ce4da1dc_072d2e67",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1770612031.590238,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "5b2b3e9134f86c6c6dbc2f68f2093561",
+  "identifiers": [
+   [
+    "browser_mod",
+    "browser_mod_49cc97bf_a7856dee"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1770612031.590277,
+  "name_by_user": null,
+  "name": "browser_mod_49cc97bf_a7856dee",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1772295410.138238,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "1a7ac1ddd8a0871619033a8748a01fd6",
+  "identifiers": [
+   [
+    "browser_mod",
+    "browser_mod_275bb16d_0645acf9"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1772295410.138271,
+  "name_by_user": null,
+  "name": "browser_mod_275bb16d_0645acf9",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1773115324.468155,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "e09000415f1a8e20f8f5925f0a9e5499",
+  "identifiers": [
+   [
+    "browser_mod",
+    "browser_mod_8ad1495e_ef9449fa"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1773115324.46827,
+  "name_by_user": null,
+  "name": "browser_mod_8ad1495e_ef9449fa",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1773542609.937549,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "3fdb000eb444a69d84ca6cefcf21cbe5",
+  "identifiers": [
+   [
+    "mqtt",
+    "SHIELDAndroidTV1529411142"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "TabDeveloper",
+  "model": "SHIELD Android TV",
+  "model_id": null,
+  "modified_at": 1773542609.937652,
+  "name_by_user": null,
+  "name": "TvOverlay - SHIELD Android TV",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": "living_room",
+  "configuration_url": null,
+  "config_entries": [
+   "afa3b92201363631276bbd81e825cba1"
+  ],
+  "config_entries_subentries": {
+   "afa3b92201363631276bbd81e825cba1": [
+    null
+   ]
+  },
+  "config_entry_id": "afa3b92201363631276bbd81e825cba1",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1773691303.944772,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "d0114a51ca90199f91ca511bb8bcfacc",
+  "identifiers": [
+   [
+    "zwave_js",
+    "295581680-51-634:28672:40984"
+   ],
+   [
+    "zwave_js",
+    "295581680-51"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zooz",
+  "model": "ZEN35",
+  "model_id": null,
+  "modified_at": 1784479290.243638,
+  "name_by_user": "Living Room Scene Controller ",
+  "name": "Dimmer & Scene Controller",
+  "parent_device_id": null,
+  "primary_config_entry": "afa3b92201363631276bbd81e825cba1",
+  "serial_number": null,
+  "sw_version": "1.40.0",
+  "via_device_id": "9eff5d99d67effe141ad6d3281cc921f"
+ },
+ {
+  "area_id": "office",
+  "configuration_url": null,
+  "config_entries": [
+   "01KM3XBMQA88J7403DDE8THFSK"
+  ],
+  "config_entries_subentries": {
+   "01KM3XBMQA88J7403DDE8THFSK": [
+    null
+   ]
+  },
+  "config_entry_id": "01KM3XBMQA88J7403DDE8THFSK",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "ed:33:fe:1d:f2:7f"
+   ]
+  ],
+  "created_at": 1773952923.154809,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "15ab60f437815c796b9da873bb57f107",
+  "identifiers": [],
+  "labels": [],
+  "manufacturer": "m5stack",
+  "model": "atom-echo-wake-word-voice-assistant",
+  "model_id": null,
+  "modified_at": 1789258937.66708,
+  "name_by_user": null,
+  "name": "M5Stack Atom Echo 1ba3fc",
+  "parent_device_id": null,
+  "primary_config_entry": "01KM3XBMQA88J7403DDE8THFSK",
+  "serial_number": null,
+  "sw_version": "25.12.2 (ESPHome 2025.11.3)",
+  "via_device_id": null
+ },
+ {
+  "area_id": "living_room",
+  "configuration_url": "homeassistant://app/5c53de3b_esphome",
+  "config_entries": [
+   "01KMFZGJ13P0CX8D6J93V1ZRTZ"
+  ],
+  "config_entries_subentries": {
+   "01KMFZGJ13P0CX8D6J93V1ZRTZ": [
+    null
+   ]
+  },
+  "config_entry_id": "01KMFZGJ13P0CX8D6J93V1ZRTZ",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "8f:7e:9d:38:0c:90"
+   ]
+  ],
+  "created_at": 1774320709.367157,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "04c920ac690010ccead4c58fa95a13ba",
+  "identifiers": [],
+  "labels": [],
+  "manufacturer": "Espressif",
+  "model": "esp32-s3-devkitc-1",
+  "model_id": null,
+  "modified_at": 1789258937.711445,
+  "name_by_user": null,
+  "name": "Waveshare-Audio-3",
+  "parent_device_id": null,
+  "primary_config_entry": "01KMFZGJ13P0CX8D6J93V1ZRTZ",
+  "serial_number": null,
+  "sw_version": "2026.3.1 (2026-03-30 17:39:41 -0500)",
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1777948516.569262,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "38c3cf1dfe919f2f26108eda49af8c06",
+  "identifiers": [
+   [
+    "browser_mod",
+    "browser_mod_e3a7a144_d3bf4f3b"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1777948516.569315,
+  "name_by_user": null,
+  "name": "browser_mod_e3a7a144_d3bf4f3b",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": "http://192.168.1.151:80",
+  "config_entries": [
+   "01KV3VQV1M3J47W1V1E4M18EAK"
+  ],
+  "config_entries_subentries": {
+   "01KV3VQV1M3J47W1V1E4M18EAK": [
+    null
+   ]
+  },
+  "config_entry_id": "01KV3VQV1M3J47W1V1E4M18EAK",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "b1:c3:e4:37:65:5f"
+   ]
+  ],
+  "created_at": 1781392003.515558,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "064aab49f4510ac37555cc2cdab7fcc7",
+  "identifiers": [],
+  "labels": [],
+  "manufacturer": "Espressif",
+  "model": "esp32-s3-devkitc-1",
+  "model_id": null,
+  "modified_at": 1789258937.671393,
+  "name_by_user": "GLaDOS-AMOLED",
+  "name": "GLaDOS AMOLED",
+  "parent_device_id": null,
+  "primary_config_entry": "01KV3VQV1M3J47W1V1E4M18EAK",
+  "serial_number": null,
+  "sw_version": "2026.5.3 (2026-06-16 09:35:17 -0500)",
+  "via_device_id": null
+ },
+ {
+  "area_id": "office",
+  "configuration_url": null,
+  "config_entries": [
+   "01KZP6NA85SNB9T72JXG30CEF1"
+  ],
+  "config_entries_subentries": {
+   "01KZP6NA85SNB9T72JXG30CEF1": [
+    null
+   ]
+  },
+  "config_entry_id": "01KZP6NA85SNB9T72JXG30CEF1",
+  "config_subentry_id": null,
+  "connections": [
+   [
+    "mac",
+    "4e:d6:28:07:c6:9d"
+   ]
+  ],
+  "created_at": 1786376036.856337,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "01d960b5bde2952b9743ec8d18262cfe",
+  "identifiers": [],
+  "labels": [],
+  "manufacturer": "EchoMuse",
+  "model": "Echo Dot Gen 2 (biscuit)",
+  "model_id": null,
+  "modified_at": 1786377840.909145,
+  "name_by_user": null,
+  "name": "OfficeTest Voice Assistant",
+  "parent_device_id": null,
+  "primary_config_entry": "01KZP6NA85SNB9T72JXG30CEF1",
+  "serial_number": null,
+  "sw_version": "v2.17.0 (ESPHome )",
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "01J7GS7RR4XP1KAQ9VE7XDH01V"
+  ],
+  "config_entries_subentries": {
+   "01J7GS7RR4XP1KAQ9VE7XDH01V": [
+    null
+   ]
+  },
+  "config_entry_id": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1790118058.201366,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "6b2cc51454f0546661b8fcbc9b09d715",
+  "identifiers": [
+   [
+    "browser_mod",
+    "browser_mod_dc0f32e2_4ebd810d"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Browser Mod",
+  "model": null,
+  "model_id": null,
+  "modified_at": 1790118058.201442,
+  "name_by_user": null,
+  "name": "browser_mod_dc0f32e2_4ebd810d",
+  "parent_device_id": null,
+  "primary_config_entry": "01J7GS7RR4XP1KAQ9VE7XDH01V",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1766278267.30071,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "bbbbda92797001d2cd2ce9d32fd5f6c7",
+  "identifiers": [
+   [
+    "mqtt",
+    "sonorium_device"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Sonorium",
+  "model": "Ambient Soundscape Mixer",
+  "model_id": null,
+  "modified_at": 1791755354.725621,
+  "name_by_user": null,
+  "name": "Sonorium",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": null,
+  "via_device_id": null
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1792106871.316935,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "4c655885b444bb20f2466b1d94a0d637",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_1221051039810110150109113116116_2"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zigbee2MQTT",
+  "model": "Group",
+  "model_id": null,
+  "modified_at": 1792106871.316987,
+  "name_by_user": null,
+  "name": "Office",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "Zigbee2MQTT 2.14.2",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": "office",
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 0,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "7c2b56a6743e33993d450ca7cd636d9c",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_1221051039810110150109113116116_1"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zigbee2MQTT",
+  "model": "Group",
+  "model_id": null,
+  "modified_at": 1792108604.509082,
+  "name_by_user": null,
+  "name": "Living Room",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "Zigbee2MQTT 2.14.2",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1792108664.284743,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "5f4ed309869e4f9702d4747a09283d74",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_1221051039810110150109113116116_3"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zigbee2MQTT",
+  "model": "Group",
+  "model_id": null,
+  "modified_at": 1792108664.284819,
+  "name_by_user": null,
+  "name": "Front Entrance",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "Zigbee2MQTT 2.14.2",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ },
+ {
+  "area_id": null,
+  "configuration_url": null,
+  "config_entries": [
+   "56120c7a4a019f9ad3c6eb652140484f"
+  ],
+  "config_entries_subentries": {
+   "56120c7a4a019f9ad3c6eb652140484f": [
+    null
+   ]
+  },
+  "config_entry_id": "56120c7a4a019f9ad3c6eb652140484f",
+  "config_subentry_id": null,
+  "connections": [],
+  "created_at": 1792108702.629803,
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "8967df5bf80316953890cd3f0968e1da",
+  "identifiers": [
+   [
+    "mqtt",
+    "zigbee2mqtt_1221051039810110150109113116116_4"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "Zigbee2MQTT",
+  "model": "Group",
+  "model_id": null,
+  "modified_at": 1792108702.629879,
+  "name_by_user": null,
+  "name": "Main Level",
+  "parent_device_id": null,
+  "primary_config_entry": "56120c7a4a019f9ad3c6eb652140484f",
+  "serial_number": null,
+  "sw_version": "Zigbee2MQTT 2.14.2",
+  "via_device_id": "28f887798573f8b01a0e8ac62c3bc14e"
+ }
+]

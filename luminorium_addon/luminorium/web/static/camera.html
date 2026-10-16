@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Camera check</title>
+<link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">Camera check</div>
+  <a class="pill" href="./">Back</a>
+</header>
+<main class="cam">
+  <p class="small muted">Checks what phone mapping (phase 5) can use here: the rear camera, its
+  exposure and white-balance controls, and the motion and orientation sensors. Nothing is
+  recorded or sent anywhere.</p>
+  <p>
+    <button class="test" id="start">Start camera</button>
+    <button class="test" id="lock">Try locking exposure and white balance</button>
+    <button class="test" id="motion">Start motion sensors</button>
+  </p>
+  <video id="video" playsinline muted autoplay></video>
+  <pre id="out">Tap "Start camera".</pre>
+</main>
+<script>
+"use strict";
+const out = document.getElementById("out");
+const lines = [];
+const env = {
+  secureContext: window.isSecureContext,
+  inIframe: window.self !== window.top,
+  userAgent: navigator.userAgent,
+  getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+  DeviceMotionEvent: typeof DeviceMotionEvent !== "undefined",
+  motionNeedsPermission: typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function",
+  DeviceOrientationEvent: typeof DeviceOrientationEvent !== "undefined",
+};
+let track = null;
+const motion = { samples: 0, maxAccel: 0, heading: null, rotationRate: null };
+
+function show() {
+  out.textContent = JSON.stringify({ env, track: track && describe(track), motion, log: lines }, null, 2);
+}
+function log(msg) { lines.push(msg); show(); }
+function describe(t) {
+  const caps = t.getCapabilities ? t.getCapabilities() : "getCapabilities not supported";
+  const keep = {};
+  if (typeof caps === "object") {
+    for (const k of ["width", "height", "frameRate", "facingMode", "exposureMode", "exposureCompensation",
+      "exposureTime", "whiteBalanceMode", "colorTemperature", "iso", "focusMode", "zoom", "torch"]) {
+      if (k in caps) keep[k] = caps[k];
+    }
+  }
+  return { label: t.label, settings: t.getSettings(), capabilities: typeof caps === "object" ? keep : caps };
+}
+
+document.getElementById("start").onclick = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    });
+    document.getElementById("video").srcObject = stream;
+    track = stream.getVideoTracks()[0];
+    log("camera started");
+  } catch (e) { log(`camera failed: ${e.name}: ${e.message}`); }
+};
+
+document.getElementById("lock").onclick = async () => {
+  if (!track) return log("start the camera first");
+  const attempts = [
+    { exposureMode: "manual" }, { exposureMode: "continuous" }, { whiteBalanceMode: "manual" },
+  ];
+  for (const c of attempts) {
+    try { await track.applyConstraints({ advanced: [c] }); log(`applied ${JSON.stringify(c)} -> ${JSON.stringify(track.getSettings().exposureMode || track.getSettings().whiteBalanceMode || "?")}`); }
+    catch (e) { log(`${JSON.stringify(c)} failed: ${e.name}`); }
+  }
+  show();
+};
+
+document.getElementById("motion").onclick = async () => {
+  try {
+    if (env.motionNeedsPermission) {
+      const r = await DeviceMotionEvent.requestPermission();
+      log(`motion permission: ${r}`);
+      if (typeof DeviceOrientationEvent.requestPermission === "function") {
+        log(`orientation permission: ${await DeviceOrientationEvent.requestPermission()}`);
+      }
+    }
+    window.addEventListener("devicemotion", (e) => {
+      motion.samples++;
+      const a = e.acceleration || e.accelerationIncludingGravity || {};
+      const mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
+      motion.maxAccel = Math.max(motion.maxAccel, Math.round(mag * 100) / 100);
+      motion.rotationRate = e.rotationRate && { alpha: e.rotationRate.alpha, beta: e.rotationRate.beta, gamma: e.rotationRate.gamma };
+      if (motion.samples % 20 === 0) show();
+    });
+    window.addEventListener("deviceorientation", (e) => {
+      motion.heading = e.webkitCompassHeading ?? (e.absolute ? 360 - e.alpha : e.alpha);
+    });
+    log("motion listeners on; move the phone");
+  } catch (e) { log(`motion failed: ${e.name}: ${e.message}`); }
+};
+show();
+</script>
+</body>
+</html>
