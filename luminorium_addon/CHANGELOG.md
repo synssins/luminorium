@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.0-dev.4
+
+Phase 5: views and camera mapping.
+
+- **Views:** a photo of the house per viewpoint, with lights and fixtures placed on it. Place by
+  hand (tap a light, tap the photo, drag to move), or map with the phone camera; both make the
+  same elements. Segmented lights and several lights in a row can be spread along a drawn line.
+- **Planes:** mark the lawn or the house front with four taps and an optional real size; lights
+  on a plane get positions in metres on it.
+- **Map with the camera:** pick what's visible, then the app leads three stations (centre, about
+  45° left, about 45° right) with a steadiness meter and compass guidance. At each station it
+  takes a reference, blinks a sync light, inverts one light (or fixture) at a time and moves on as
+  soon as the change has settled, retakes jolted steps with a single revert, and puts every light
+  back. Frames, motion and the command log are saved under `/config/mapping/sessions` and
+  analysed in the add-on (OpenCV): regions, latency, grouping (one window = one element, a long
+  window = segments), 3D positions from the three stations.
+- **Review:** the results go onto the view: outlines on the photo; merge, split, reorder,
+  rename, assign planes. Measured latencies replace the profile defaults.
+- Record-and-upload fallback when the live camera doesn't work in the HA app.
+- Stop all ends a capture and restores; nothing is flashed in read-only mode.
+- New dependencies: numpy, opencv-python-headless, websockets (the image grows by about 220 MB).
+
 ## 0.1.0-dev.3
 
 - Levels and rooms fold (tap a heading), with Collapse all / Expand all, remembered per device.

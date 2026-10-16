@@ -5,9 +5,10 @@ Zigbee (Zigbee2MQTT), Z-Wave dimmers and relays, WiZ, WLED, Govee, ESPHome and M
 Assistant stays the source of truth for lights, areas and floors; Luminorium adds effects,
 palettes, spatial shows mapped with a phone camera, and automations on top.
 
-**Status:** phase 1 of 8 (skeleton add-on). It reads the house's lights from HA, shows them by
-floor and area with what each can do, and has a safe Test button, Stop all, and crash recovery.
-Nothing here runs effects yet.
+**Status:** phase 1 of 8 (skeleton add-on) is deployed: it reads the house's lights from HA,
+shows them by floor and area with what each can do, and has a safe Test button, Stop all, and
+crash recovery. Phase 5 (views and phone-camera mapping) is built and tested on synthetic data,
+not yet on the real house. Nothing here runs effects yet.
 
 ## Documentation
 
@@ -19,6 +20,7 @@ Nothing here runs effects yet.
 | [docs/architecture.md](docs/architecture.md) | How the code is organised today |
 | [docs/inventory.md](docs/inventory.md) | How HA entities become lights: kinds, exclusions, segments, duplicates, profiles |
 | [docs/safety.md](docs/safety.md) | Rate governor, snapshots, Stop all, crash restore, outside changes, read-only |
+| [docs/mapping.md](docs/mapping.md) | Views, planes, elements; manual placement; the guided camera capture, live step detection, analysis, results, raw sessions |
 | [docs/api.md](docs/api.md) | The HTTP API |
 | [docs/development.md](docs/development.md) | Setup, tests, the fake HA, running on a PC, fixtures |
 | [docs/deployment.md](docs/deployment.md) | Add-on packaging, versioning rules, installing on HA |
@@ -34,13 +36,13 @@ Nothing here runs effects yet.
 | `tests/` | pytest suite; `tests/fixtures/ha/` is scrubbed data captured from the real HA |
 | `tools/` | `fake_ha.py` (fake HA server), `dev.py` (run on a PC), `capture_ha.mjs` + `make_fixtures.py` (refresh fixtures) |
 | `docs/` | Documentation |
-| `proto/mapping/` | Offline prototype of the phone-mapping analysis on synthetic data (added separately) |
+| `proto/mapping/` | Offline prototype of the phone-mapping analysis on synthetic data; its renderer drives the add-on's end-to-end mapping tests |
 
 ## Quick start (development)
 
 ```bash
 py -3.13 -m venv .venv
-.venv/Scripts/python -m pip install aiohttp fastapi uvicorn pytest pytest-asyncio httpx ruff
+.venv/Scripts/python -m pip install aiohttp fastapi uvicorn websockets numpy opencv-python-headless pytest pytest-asyncio httpx ruff
 .venv/Scripts/python -m pytest
 .venv/Scripts/python tools/dev.py
 ```

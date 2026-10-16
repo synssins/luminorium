@@ -62,3 +62,16 @@ async def wait_for(predicate, timeout: float = 5.0, interval: float = 0.02):
             return
         await asyncio.sleep(interval)
     raise AssertionError("condition not met in time")
+
+
+def pytest_addoption(parser):
+    parser.addoption("--slow", action="store_true", help="also run the slow mapping scenarios")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--slow"):
+        return
+    skip = pytest.mark.skip(reason="slow: run with --slow")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip)

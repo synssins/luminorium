@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Map with the camera · Luminorium</title>
+<link rel="stylesheet" href="static/style.css">
+<link rel="stylesheet" href="static/spatial.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">Map with the camera</div>
+  <nav class="toplinks small"><a href="./">Lights</a> <a id="to-view" href="views">Views</a></nav>
+</header>
+
+<main class="spatial">
+  <section id="banner" class="banner" hidden></section>
+
+  <!-- 1. what's visible from here -->
+  <section id="setup" class="panel">
+    <h3>1. What's visible from here?</h3>
+    <div class="row">
+      <select id="view-pick" aria-label="View"></select>
+    </div>
+    <p class="small muted">Tick the lights you can see from the street (through windows too).
+    Only these are flashed. Lights in a fixture flash together, as one.</p>
+    <input id="search" type="search" placeholder="Search" aria-label="Search lights">
+    <div id="pickers" class="pickers"></div>
+    <details class="small">
+      <summary>Known distance (for real metres)</summary>
+      <div class="row">
+        <select id="kd-a" aria-label="First light"></select>
+        <select id="kd-b" aria-label="Second light"></select>
+        <input id="kd-m" type="number" min="0" step="0.1" placeholder="metres" class="num">
+      </div>
+    </details>
+    <p id="picked" class="small"></p>
+    <p class="small muted">Then: pick an anchor in the middle of the house front (the front door)
+    and keep it in the circle the whole time. The app leads you through three stations: straight
+    on, about 45° to the left, about 45° to the right. Each takes about half a minute; hold still
+    while the lights flash. Night is best.</p>
+    <button id="begin" class="big" disabled>Start</button>
+  </section>
+
+  <!-- 2. the capture -->
+  <section id="live" hidden>
+    <div class="capture-video">
+      <video id="video" playsinline muted autoplay></video>
+      <div class="cross" aria-hidden="true"></div>
+      <div id="say" class="say">Starting the camera…</div>
+    </div>
+    <div class="panel">
+      <div class="row small"><span>Steady</span><div id="steady" class="meter" style="flex:1"><span></span></div></div>
+      <div class="row small"><span id="compass-text">Compass: waiting</span><div id="turn" class="meter" style="flex:1"><span></span></div></div>
+      <div id="stations" class="stations"></div>
+      <div class="row">
+        <button id="go" class="big">Start the centre station</button>
+      </div>
+      <div class="row"><button id="stop" class="test danger">Stop this pass</button>
+        <span id="link" class="small muted"></span></div>
+    </div>
+
+    <details class="panel" id="fallback">
+      <summary>Camera not working here? Record a video instead</summary>
+      <p class="small muted">For each station: start the pass below, start recording in your
+      camera app within 5 seconds, hold still until the lights are back, stop recording, then
+      upload the video. Keep the anchor in the middle.</p>
+      <div id="record-rows"></div>
+    </details>
+
+    <section id="results" class="panel" hidden>
+      <h3>Results</h3>
+      <p id="results-text" class="small"></p>
+      <button id="apply" class="big">Put them on the view and review</button>
+    </section>
+  </section>
+</main>
+
+<footer class="stopbar">
+  <div id="toast" class="toast" role="status" hidden></div>
+  <button id="stopall" class="stop">Stop all</button>
+</footer>
+<script src="static/capture.js"></script>
+</body>
+</html>

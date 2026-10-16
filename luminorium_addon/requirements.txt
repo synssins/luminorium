@@ -1,3 +1,8 @@
 aiohttp==3.14.5
 fastapi==0.143.3
 uvicorn==0.54.0
+# The phone's capture websocket (uvicorn has no websocket support without it)
+websockets==17.2
+# Camera mapping analysis
+numpy==2.5.4
+opencv-python-headless==5.0.0.93

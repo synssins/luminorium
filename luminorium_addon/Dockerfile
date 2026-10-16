@@ -17,7 +17,7 @@ ENV PATH="/opt/venv/bin:${PATH}" \
     PYTHONPATH="/app" \
     PYTHONUNBUFFERED=1
 
-RUN python3 -c "import luminorium; print('Luminorium', luminorium.__version__)"
+RUN python3 -c "import luminorium, cv2, numpy, websockets; print('Luminorium', luminorium.__version__, 'OpenCV', cv2.__version__)"
 
 COPY run.sh /run.sh
 # run.sh runs under s6-overlay's with-contenv; fail the build if the base image lacks it

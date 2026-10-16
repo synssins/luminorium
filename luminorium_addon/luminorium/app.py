@@ -14,14 +14,23 @@ from .engine.testlight import LightTester
 from .ha.client import HAClient
 from .inventory.model import Light
 from .inventory.service import InventoryService
+from .mapping.clock import Clock
+from .mapping.service import MappingService
 from .settings import Settings
+from .spatial.service import SpatialService
 from .store import JsonStore
 
 log = logging.getLogger(__name__)
 
 
 class Luminorium:
-    def __init__(self, settings: Settings, *, test_hold_s: float | None = None):
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        test_hold_s: float | None = None,
+        mapping_clock: Clock | None = None,
+    ):
         self.settings = settings
         self.store = JsonStore(settings.data_dir)
         self.ha = HAClient(settings.ha_url, settings.ha_token, read_only=settings.read_only)
@@ -30,6 +39,15 @@ class Luminorium:
         self.governor = Governor(self.driver_for)
         self.safety = Safety(self.inventory, self.governor, self.store)
         self.tester = LightTester(self.safety, **({"hold_s": test_hold_s} if test_hold_s else {}))
+        self.spatial = SpatialService(settings.config_dir, lambda: self.inventory.inventory)
+        self.mapping = MappingService(
+            settings.config_dir,
+            self.inventory,
+            self.safety,
+            self.spatial,
+            read_only=settings.read_only,
+            clock=mapping_clock,
+        )
         self._startup: asyncio.Task | None = None
 
     def driver_for(self, light: Light) -> Driver:

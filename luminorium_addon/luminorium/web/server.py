@@ -18,6 +18,7 @@ from .. import __version__
 from ..app import Luminorium
 from ..engine.testlight import LightTestError
 from ..inventory.model import Kind
+from . import mapping_api, spatial_api
 
 STATIC = Path(__file__).parent / "static"
 
@@ -71,6 +72,17 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
     @app.get("/camera")
     async def camera():
         return FileResponse(STATIC / "camera.html")
+
+    @app.get("/views")
+    async def views_page():
+        return FileResponse(STATIC / "views.html")
+
+    @app.get("/capture")
+    async def capture_page():
+        return FileResponse(STATIC / "capture.html")
+
+    app.include_router(spatial_api.router(lum))
+    app.include_router(mapping_api.router(lum))
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 

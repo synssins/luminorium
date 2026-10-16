@@ -7,7 +7,7 @@ are needed.
 
 ```bash
 py -3.13 -m venv .venv
-.venv/Scripts/python -m pip install aiohttp fastapi uvicorn pytest pytest-asyncio httpx ruff
+.venv/Scripts/python -m pip install aiohttp fastapi uvicorn websockets numpy opencv-python-headless pytest pytest-asyncio httpx ruff
 ```
 
 The add-on's own pinned dependencies are in `luminorium_addon/requirements.txt`.
@@ -24,6 +24,12 @@ The add-on's own pinned dependencies are in `luminorium_addon/requirements.txt`.
 | `tests/test_governor.py` | Latest value wins, priorities, restore skips the per-light wait, network budget, cancel |
 | `tests/test_safety.py` | Test button sequence and restore, relays, refusals, outside changes, Stop all, crash recovery, read-only, reconnect |
 | `tests/test_web.py` | API endpoints, include/exclude, pages, the ingress-only allow-list |
+| `tests/test_spatial.py` | Views, planes, elements, merge/split/reorder, segment lines, photo replacement, the views API |
+| `tests/test_mapping.py` | Capture units and order, refusals, Stop all and phone disconnect mid-pass, the live detector, the upload fallback (`--slow`) |
+| `tests/test_mapping_e2e.py` | The prototype's synthetic house streamed over the real websocket against the fake HA, scored like the prototype ([mapping.md](mapping.md#tests)); clean always, the other scenarios with `--slow` |
+
+The clean end-to-end capture takes about 2.5 minutes. `--slow` adds the other three scenarios and
+the upload fallback (about 10 more minutes); `-m "not slow" -k "not e2e"` skips them all.
 
 `pytest-asyncio` runs in auto mode. `tests/conftest.py` gives a `fake_ha` server and a started
 `lum` app (data in a temp folder, test hold time 0.05 s).
@@ -35,7 +41,7 @@ A websocket server speaking HA's protocol from the fixtures:
 - `zwave_js/node_status` and `zwave_js/node_capabilities`
 - `call_service` for `light.turn_on/turn_off` and `switch.turn_on/turn_off`: updates its states,
   emits `state_changed` with the call's context, records each call (`fake.calls`,
-  `fake.calls_for(entity_id)`)
+  `fake.calls_for(entity_id)`) and tells `fake.listeners` (the mapping tests' simulated house)
 - `latency` per entity and `default_latency` to delay state changes
 - `external_change(entity_id, state, **attrs)` to simulate a wall switch, `drop_clients()` to
   simulate an HA restart

@@ -460,8 +460,10 @@ stays centred.
      big jolt during a step (smoothed rotation rate > 45 °/s or acceleration > 4 m/s²), or a step
      whose frames align badly, is marked "retake". At the end the pass **reverts that light once**
      (one more single-light change). It doesn't restart the whole pass.
-   - **Live feedback:** a steadiness indicator and "hold still" prompts. Lights detected with low
-     confidence turn amber and are retried at the end, in the same pass.
+   - **Live feedback:** a steadiness indicator and "hold still" prompts. A step whose frames
+     align badly is retaken like a jolted one. (Built: the live detector only times the steps;
+     confidence comes from the offline analysis. A change that never settles makes a long step,
+     which is good data, so it isn't retaken. See docs/mapping.md.)
    - **Exposure:** normalised in software on every frame, from flat mid-tone reference pixels,
      with near-saturated pixels treated as clipped. This handles auto-exposure reacting to every
      light change. A browser exposure or white-balance lock is a bonus, not a requirement (iOS has

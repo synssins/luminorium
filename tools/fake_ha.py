@@ -48,6 +48,8 @@ class FakeHA:
     # Seconds between a service call and its state change (per entity id, else the default).
     latency: dict = field(default_factory=dict)
     default_latency: float = 0.0
+    # Called with every recorded Call (tests use it to drive a simulated house)
+    listeners: list = field(default_factory=list)
     _clients: list = field(default_factory=list)
     _runner: web.AppRunner | None = None
     port: int = 0
@@ -174,7 +176,10 @@ class FakeHA:
                 await fail("not_found", f"{eid}")
                 return
         context_id = uuid.uuid4().hex
-        self.calls.append(Call(time.monotonic(), domain, service, list(targets), data, context_id))
+        call = Call(time.monotonic(), domain, service, list(targets), data, context_id)
+        self.calls.append(call)
+        for listener in self.listeners:
+            listener(call)
         await ok({"context": {"id": context_id, "parent_id": None, "user_id": None}})
         for eid in targets:
             delay = self.latency.get(eid, self.default_latency)
