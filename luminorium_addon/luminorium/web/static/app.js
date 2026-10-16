@@ -1,8 +1,56 @@
 // Luminorium UI. All URLs are relative: HA Ingress serves the app under a per-session prefix.
+// No prompt()/confirm()/alert(): the HA companion app's webview may not show them.
 "use strict";
 
-const state = { inventory: null, status: null, filter: "included", search: "" };
+// Collapsed floors ("f:<id>") and areas ("a:<id>"), remembered per browser.
+const COLLAPSED_KEY = "luminorium.collapsed";
+const state = {
+  inventory: null,
+  status: null,
+  filter: "included",
+  search: "",
+  collapsed: loadCollapsed(),
+  grouping: false, // picking lights for a new fixture
+  selected: new Set(),
+};
 const $ = (sel) => document.querySelector(sel);
+
+function loadCollapsed() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+function saveCollapsed() {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...state.collapsed]));
+  } catch {
+    // storage unavailable (private window): collapsing still works for this visit
+  }
+}
+function toggleCollapsed(key) {
+  if (state.collapsed.has(key)) state.collapsed.delete(key);
+  else state.collapsed.add(key);
+  saveCollapsed();
+  render();
+}
+
+// A header that folds its section: chevron, name, and a count of lights (and how many are on).
+function foldHeader(tag, key, name, lights) {
+  const h = document.createElement(tag);
+  const btn = document.createElement("button");
+  btn.className = "fold";
+  const open = !state.collapsed.has(key) || !!state.search;
+  btn.setAttribute("aria-expanded", String(open));
+  const on = lights.filter((l) => l.state === "on").length;
+  btn.innerHTML = `<span class="chev" aria-hidden="true"></span><span class="fold-name"></span><span class="fold-count muted"></span>`;
+  btn.querySelector(".fold-name").textContent = name;
+  btn.querySelector(".fold-count").textContent = `${lights.length}${on ? ` · ${on} on` : ""}`;
+  btn.addEventListener("click", () => toggleCollapsed(key));
+  h.append(btn);
+  return { header: h, open };
+}
 
 async function api(path, options = {}) {
   const res = await fetch(path, {
@@ -12,6 +60,14 @@ async function api(path, options = {}) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || res.statusText);
   return body;
+}
+
+function toast(message) {
+  const t = $("#toast");
+  t.textContent = message;
+  t.hidden = false;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (t.hidden = true), 4000);
 }
 
 const INTEGRATION = {
@@ -64,65 +120,198 @@ function visible(light) {
   return true;
 }
 
+function busySet() {
+  return new Set((state.status && state.status.touched) || []);
+}
+
+function lightRow(light, { member = false } = {}) {
+  const readOnly = state.status && state.status.read_only;
+  const busy = busySet();
+  const row = $("#light-row").content.firstElementChild.cloneNode(true);
+  row.classList.toggle("excluded", !light.included);
+  row.classList.toggle("member", member);
+  row.querySelector(".name").textContent = light.name;
+  const dot = row.querySelector(".dot");
+  dot.classList.toggle("on", light.state === "on");
+  dot.classList.toggle("unavailable", !light.available);
+  dot.title = light.state;
+  const box = row.querySelector(".toggle input");
+  box.checked = light.included;
+  box.disabled = light.kind === "group" || light.kind === "setting";
+  box.addEventListener("change", () => setInclude(light, box.checked));
+  const test = row.querySelector(".test");
+  if (member) {
+    test.remove(); // a fixture's lights are tested together, from the fixture
+  } else {
+    const testable = light.included && light.available && (light.kind === "light" || light.kind === "switch");
+    test.disabled = !testable || readOnly || busy.has(light.entity_id);
+    test.title = readOnly ? "Read-only mode" : busy.has(light.entity_id) ? "In use" : "On, off, then restore";
+    test.addEventListener("click", () => testLight(light, test));
+  }
+  if (state.grouping && !member && (light.kind === "light" || light.kind === "switch")) {
+    const pick = document.createElement("input");
+    pick.type = "checkbox";
+    pick.className = "pick";
+    pick.title = "Part of the new fixture";
+    pick.checked = state.selected.has(light.entity_id);
+    pick.addEventListener("change", () => {
+      if (pick.checked) state.selected.add(light.entity_id);
+      else state.selected.delete(light.entity_id);
+      renderGroupBar();
+    });
+    row.querySelector(".line1").prepend(pick);
+  }
+  const bEl = row.querySelector(".badges");
+  for (const [text, cls] of badges(light)) {
+    const b = document.createElement("span");
+    b.className = "badge" + (cls ? " " + cls : "");
+    b.textContent = text;
+    bEl.append(b);
+  }
+  row.querySelector(".meta").textContent = meta(light);
+  return row;
+}
+
+function fixtureBlock(fixture, members) {
+  const readOnly = state.status && state.status.read_only;
+  const busy = busySet();
+  const el = document.createElement("div");
+  el.className = "fixture";
+  const head = document.createElement("div");
+  head.className = "line1 fixture-head";
+  head.innerHTML = `<span class="dot"></span><span class="name"></span>
+    <span class="actions"><button class="link rename">Rename</button><button class="link ungroup">Ungroup</button><button class="test">Test</button></span>`;
+  head.querySelector(".dot").classList.toggle("on", members.some((l) => l.state === "on"));
+  const nameEl = head.querySelector(".name");
+  nameEl.textContent = fixture.name;
+  head.querySelector(".rename").addEventListener("click", () => renameFixture(fixture, nameEl));
+  head.querySelector(".ungroup").addEventListener("click", async () => {
+    await api(`api/fixtures/${fixture.id}`, { method: "DELETE" }).catch((e) => toast(e.message));
+    refresh(true);
+  });
+  const test = head.querySelector(".test");
+  const testable = members.some((l) => l.included && l.available);
+  const inUse = members.some((l) => busy.has(l.entity_id));
+  test.disabled = !testable || readOnly || inUse;
+  test.title = readOnly ? "Read-only mode" : inUse ? "In use" : "All its lights on, off, then restore";
+  test.addEventListener("click", () => testFixture(fixture, test));
+  const sub = document.createElement("div");
+  sub.className = "badges";
+  sub.innerHTML = `<span class="badge fixture-badge"></span>`;
+  sub.firstElementChild.textContent = `fixture · ${members.length} lights, tested and mapped as one`;
+  el.append(head, sub);
+  for (const light of members) el.append(lightRow(light, { member: true }));
+  return el;
+}
+
+function renameFixture(fixture, nameEl) {
+  const input = document.createElement("input");
+  input.className = "inline-name";
+  input.value = fixture.name;
+  let done = false;
+  const finish = async (save) => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim();
+    if (save && name && name !== fixture.name) {
+      await api(`api/fixtures/${fixture.id}`, { method: "PUT", body: JSON.stringify({ name }) }).catch((e) => toast(e.message));
+    }
+    refresh(true);
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") finish(true);
+    if (e.key === "Escape") finish(false);
+  });
+  input.addEventListener("blur", () => finish(true));
+  nameEl.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+function suggestionRow(s, byId) {
+  const el = document.createElement("div");
+  el.className = "suggestion";
+  el.innerHTML = `<div class="small"><strong>One fixture?</strong> <span class="names"></span></div>
+    <div class="small muted why"></div>
+    <div class="actions"><button class="test yes">Group as one</button><button class="link no">Not the same</button></div>`;
+  el.querySelector(".names").textContent = s.members.map((id) => (byId.get(id) || { name: id }).name).join(" + ");
+  el.querySelector(".why").textContent = s.reason;
+  el.querySelector(".yes").addEventListener("click", async () => {
+    await api("api/fixtures", { method: "POST", body: JSON.stringify({ name: s.name, members: s.members }) }).catch((e) => toast(e.message));
+    refresh(true);
+  });
+  el.querySelector(".no").addEventListener("click", async () => {
+    await api("api/fixture_suggestions/dismiss", { method: "POST", body: JSON.stringify({ members: s.members }) }).catch((e) => toast(e.message));
+    refresh(true);
+  });
+  return el;
+}
+
 function render() {
   const inv = state.inventory;
   if (!inv) return;
   const root = $("#floors");
   root.replaceChildren();
-  const tpl = $("#light-row");
-  const readOnly = state.status && state.status.read_only;
-  const busy = new Set((state.status && state.status.touched) || []);
+  const byId = new Map(inv.lights.map((l) => [l.entity_id, l]));
+  const fixtures = new Map((inv.fixtures || []).map((f) => [f.id, f]));
+  // Per area: visible single lights, and fixtures with at least one visible light
   const byArea = new Map();
+  const add = (areaId, item) => {
+    if (!byArea.has(areaId)) byArea.set(areaId, []);
+    byArea.get(areaId).push(item);
+  };
   for (const light of inv.lights) {
-    if (!visible(light)) continue;
-    if (!byArea.has(light.area_id)) byArea.set(light.area_id, []);
-    byArea.get(light.area_id).push(light);
+    if (!visible(light) || (light.fixture && fixtures.has(light.fixture))) continue;
+    add(light.area_id, { name: light.name, lights: [light], light });
+  }
+  for (const f of fixtures.values()) {
+    const members = f.members.map((id) => byId.get(id)).filter(Boolean);
+    if (!members.some(visible)) continue;
+    add(f.area_id, { name: f.name, lights: members, fixture: f });
+  }
+  const suggestions = new Map();
+  if (state.filter === "included" || state.filter === "all") {
+    for (const s of inv.suggestions || []) {
+      if (!suggestions.has(s.area_id)) suggestions.set(s.area_id, []);
+      suggestions.get(s.area_id).push(s);
+    }
   }
   for (const floor of inv.floors) {
     const areas = inv.areas.filter((a) => a.floor_id === floor.id && byArea.has(a.id));
     if (!areas.length) continue;
     const fEl = document.createElement("section");
     fEl.className = "floor";
-    fEl.innerHTML = `<h2></h2>`;
-    fEl.querySelector("h2").textContent = floor.name;
+    const floorLights = areas.flatMap((a) => byArea.get(a.id).flatMap((i) => i.lights));
+    const floorFold = foldHeader("h2", `f:${floor.id}`, floor.name, floorLights);
+    fEl.append(floorFold.header);
+    root.append(fEl);
+    if (!floorFold.open) continue;
     for (const area of areas) {
       const aEl = document.createElement("div");
       aEl.className = "area";
-      aEl.innerHTML = `<h3></h3>`;
-      aEl.querySelector("h3").textContent = area.name;
-      const lights = byArea.get(area.id).sort((a, b) => a.name.localeCompare(b.name));
-      for (const light of lights) {
-        const row = tpl.content.firstElementChild.cloneNode(true);
-        row.classList.toggle("excluded", !light.included);
-        row.querySelector(".name").textContent = light.name;
-        const dot = row.querySelector(".dot");
-        dot.classList.toggle("on", light.state === "on");
-        dot.classList.toggle("unavailable", !light.available);
-        dot.title = light.state;
-        const box = row.querySelector("input");
-        box.checked = light.included;
-        box.disabled = light.kind === "group" || light.kind === "setting";
-        box.addEventListener("change", () => setInclude(light, box.checked));
-        const test = row.querySelector(".test");
-        const testable = light.included && light.available && (light.kind === "light" || light.kind === "switch");
-        test.disabled = !testable || readOnly || busy.has(light.entity_id);
-        test.title = readOnly ? "Read-only mode" : busy.has(light.entity_id) ? "In use" : "On, off, then restore";
-        test.addEventListener("click", () => testLight(light, test));
-        const bEl = row.querySelector(".badges");
-        for (const [text, cls] of badges(light)) {
-          const b = document.createElement("span");
-          b.className = "badge" + (cls ? " " + cls : "");
-          b.textContent = text;
-          bEl.append(b);
-        }
-        row.querySelector(".meta").textContent = meta(light);
-        aEl.append(row);
-      }
+      const items = byArea.get(area.id).sort((a, b) => a.name.localeCompare(b.name));
+      const areaFold = foldHeader("h3", `a:${area.id}`, area.name, items.flatMap((i) => i.lights));
+      aEl.append(areaFold.header);
+      aEl.classList.toggle("closed", !areaFold.open);
       fEl.append(aEl);
+      if (!areaFold.open) continue;
+      for (const s of suggestions.get(area.id) || []) aEl.append(suggestionRow(s, byId));
+      for (const item of items) {
+        aEl.append(item.fixture ? fixtureBlock(item.fixture, item.lights) : lightRow(item.light));
+      }
     }
-    root.append(fEl);
   }
   if (!root.children.length) root.innerHTML = `<p class="muted">Nothing matches.</p>`;
+  renderGroupBar();
+}
+
+function renderGroupBar() {
+  $("#groupbar").hidden = !state.grouping;
+  $("#group-start").textContent = state.grouping ? "Cancel grouping" : "Group lights";
+  if (!state.grouping) return;
+  const n = state.selected.size;
+  $("#group-count").textContent = n ? `${n} selected` : "Tick the lights that share one fixture";
+  $("#group-make").disabled = n < 2;
 }
 
 function renderStatus() {
@@ -153,25 +342,36 @@ async function setInclude(light, include) {
     await api(`api/lights/${encodeURIComponent(light.entity_id)}/include`, {
       method: "PUT", body: JSON.stringify({ include }),
     });
-  } catch (e) { alert(e.message); }
-  await refresh();
+  } catch (e) { toast(e.message); }
+  await refresh(true);
 }
 
 async function testLight(light, button) {
   button.disabled = true;
   try {
     await api(`api/lights/${encodeURIComponent(light.entity_id)}/test`, { method: "POST" });
-  } catch (e) { alert(e.message); }
-  setTimeout(refresh, 300);
+  } catch (e) { toast(e.message); }
+  setTimeout(() => refresh(true), 300);
 }
 
-async function refresh() {
+async function testFixture(fixture, button) {
+  button.disabled = true;
+  try {
+    const r = await api(`api/fixtures/${fixture.id}/test`, { method: "POST" });
+    if (r.skipped && r.skipped.length) toast(`Skipped (unavailable or excluded): ${r.skipped.join(", ")}`);
+  } catch (e) { toast(e.message); }
+  setTimeout(() => refresh(true), 300);
+}
+
+async function refresh(force = false) {
   try {
     const [status, inventory] = await Promise.all([api("api/status"), api("api/inventory")]);
     state.status = status;
     state.inventory = inventory;
     renderStatus();
-    render();
+    // Don't redraw under someone typing a fixture name
+    const typing = document.activeElement && document.activeElement.classList.contains("inline-name");
+    if (force || !typing) render();
   } catch (e) {
     $("#link").textContent = "offline";
     $("#link").className = "pill bad";
@@ -186,14 +386,44 @@ for (const chip of document.querySelectorAll(".chip")) {
   });
 }
 $("#search").addEventListener("input", (e) => { state.search = e.target.value.trim().toLowerCase(); render(); });
+$("#group-start").addEventListener("click", () => {
+  state.grouping = !state.grouping;
+  state.selected.clear();
+  $("#group-name").value = "";
+  render();
+});
+$("#group-make").addEventListener("click", async () => {
+  try {
+    await api("api/fixtures", {
+      method: "POST",
+      body: JSON.stringify({ name: $("#group-name").value.trim(), members: [...state.selected] }),
+    });
+    state.grouping = false;
+    state.selected.clear();
+  } catch (e) { toast(e.message); }
+  refresh(true);
+});
+$("#collapse-all").addEventListener("click", () => {
+  const inv = state.inventory;
+  if (!inv) return;
+  // Floors and rooms both fold, so opening a level shows its rooms closed
+  state.collapsed = new Set([...inv.floors.map((f) => `f:${f.id}`), ...inv.areas.map((a) => `a:${a.id}`)]);
+  saveCollapsed();
+  render();
+});
+$("#expand-all").addEventListener("click", () => {
+  state.collapsed = new Set();
+  saveCollapsed();
+  render();
+});
 $("#stopall").addEventListener("click", async () => {
   try {
     const r = await api("api/stop_all", { method: "POST" });
     $("#stopall").textContent = `Stopped · ${r.restored} restored`;
     setTimeout(() => ($("#stopall").textContent = "Stop all"), 2500);
-  } catch (e) { alert(e.message); }
-  refresh();
+  } catch (e) { toast(e.message); }
+  refresh(true);
 });
 
-refresh();
+refresh(true);
 setInterval(refresh, 3000);

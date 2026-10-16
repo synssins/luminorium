@@ -37,7 +37,7 @@ settings and runs the FastAPI app under uvicorn; the app's lifespan starts and s
 | `settings.py` | `Settings`: HA URL and token, data folders, port, read-only. In the add-on: `SUPERVISOR_TOKEN`, `ws://supervisor/core/websocket`, `/data/options.json`. On a PC: environment variables. `repr` never shows the token. |
 | `ha/client.py` | `HAClient`: one websocket to HA. `command()`, `subscribe_events()` (renewed on every reconnect), `on_connect()` callbacks, `call_service()` returning the context id. Reconnects with backoff (1 s → 30 s); stops retrying on `auth_invalid`. `ReadOnlyError` when read-only. |
 | `store.py` | `JsonStore`: JSON documents in `/data`, written atomically (temp file + `fsync` + rename). A corrupt file is moved aside and the default used. |
-| `inventory/model.py` | Dataclasses: `Floor`, `Area`, `Light`, `Capabilities`, `Profile`, `Inventory`; `Kind` (light, segment, group, switch, setting). |
+| `inventory/model.py` | Dataclasses: `Floor`, `Area`, `Light`, `Fixture`, `FixtureSuggestion`, `Capabilities`, `Profile`, `Inventory`; `Kind` (light, segment, group, switch, setting). |
 | `inventory/builder.py` | `build()`: registries + states + Z-Wave node details + user choices → `Inventory`. No I/O. Rules in [inventory.md](inventory.md). |
 | `inventory/profiles.py` | Network defaults, Z-Wave command-class facts, `build_profile()`. |
 | `inventory/service.py` | `InventoryService`: reload on connect and (debounced, 2 s) on registry events; keeps light states current from `state_changed`; stores include/exclude choices; notifies state listeners. |
@@ -45,7 +45,7 @@ settings and runs the FastAPI app under uvicorn; the app's lifespan starts and s
 | `drivers/ha.py` | `HADriver`: `light.turn_on/turn_off`, `switch.turn_on/turn_off`; only sends attributes the light supports; `transition` only where it's native. |
 | `engine/governor.py` | `Governor.send()`: per-light interval, latest value wins, priorities, network and HA token buckets. See [safety.md](safety.md). |
 | `engine/safety.py` | `Safety`: sessions, snapshots, `command()`, `end_session()`, `stop_all()`, `restore_leftovers()`, outside-change detection. |
-| `engine/testlight.py` | `LightTester`: on (full) → hold → off → hold → restore, as a session named `test:<entity_id>`. |
+| `engine/testlight.py` | `LightTester`: on (full) → hold → off → hold → restore, as a session named `test:<entity_id>`; `start_fixture()` does the same for all of a fixture's lights at once (`test:<fixture id>`). |
 | `web/server.py` | `create_app()`: pages, static files, JSON API ([api.md](api.md)), client allow-list. |
 | `web/static/` | `index.html` + `app.js` + `style.css` (lights page), `camera.html` (phone camera check). No build step. |
 
@@ -54,7 +54,7 @@ settings and runs the FastAPI app under uvicorn; the app's lifespan starts and s
 | File | Contents |
 |---|---|
 | `options.json` | Written by the Supervisor from the add-on options. |
-| `choices.json` | `{"include": {entity_id: true/false}}`: the user's include/exclude decisions. |
+| `choices.json` | The user's decisions: `include` (`{entity_id: true/false}`), `fixtures` (`[{id, name, members}]`) and `dismissed` fixture suggestions (`[[entity_id, …]]`). |
 | `snapshots.json` | Lights currently touched and their state before: `{entity_id: {state, session, taken_at}}`. Absent when nothing is touched. Used to restore after a crash. |
 
 `/config` (the add-on's `addon_config` folder) is mapped for user content (shows, palettes,

@@ -78,6 +78,7 @@ class Light:
     segments: list[str] = field(default_factory=list)
     members: list[str] = field(default_factory=list)  # for groups
     duplicates: list[str] = field(default_factory=list)  # suggested: same light, other integration
+    fixture: str | None = None  # id of the fixture this light is part of
     profile: Profile | None = None
 
     @property
@@ -96,10 +97,38 @@ class Light:
 
 
 @dataclass
+class Fixture:
+    """Lights in one physical fixture (two bulbs in a ceiling fan). Seen from outside they are one
+    light, so they are tested, mapped and driven together."""
+
+    id: str
+    name: str
+    area_id: str
+    floor_id: str
+    members: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class FixtureSuggestion:
+    name: str
+    area_id: str
+    members: list[str]
+    reason: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class Inventory:
     floors: dict[str, Floor] = field(default_factory=dict)
     areas: dict[str, Area] = field(default_factory=dict)
     lights: dict[str, Light] = field(default_factory=dict)
+    fixtures: dict[str, Fixture] = field(default_factory=dict)
+    suggestions: list[FixtureSuggestion] = field(default_factory=list)
 
     def get(self, entity_id: str) -> Light | None:
         return self.lights.get(entity_id)

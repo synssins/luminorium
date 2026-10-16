@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-dev.3
+
+- Levels and rooms fold (tap a heading), with Collapse all / Expand all, remembered per device.
+- **Fixtures:** group lights that share one physical fixture (the two office fan bulbs). A fixture
+  is tested as one (all its lights on, off, restored together) and will be mapped as one.
+  Suggestions for numbered lights of one model in one room; Group lights, Rename, Ungroup.
+- Messages show in the page instead of browser pop-ups (which the HA app may not show).
+
 ## 0.1.0-dev.2
 
 - Fix: the add-on couldn't find `SUPERVISOR_TOKEN` under s6-overlay's init and stopped.

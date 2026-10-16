@@ -17,6 +17,19 @@ then off, then puts it back exactly as it was.
   Don't include a relay that is locked on and feeds smart bulbs: include the bulbs instead.
   A switch on a light's own device (a gradient or sync toggle) is a setting, not a light.
 - Govee strip segments are shown as a count on their light.
+- Levels and rooms fold: tap a heading. **Collapse all** / **Expand all** fold everything; your
+  choice is remembered on that device. A search shows every match, folded or not.
+
+## Fixtures
+
+Several bulbs in one fixture (the two in a ceiling fan) look like one light from outside. Group
+them as a **fixture** and Luminorium tests them together, and later maps them as one.
+
+- **Suggestions** appear in a room when lights of the same model have numbered names ("Office Fan
+  RGB1", "RGB2"). Answer **Group as one** or **Not the same**.
+- **Group lights** (above the list): tick the lights, optionally name the fixture, then **Group
+  as one fixture**.
+- On a fixture: **Rename**, **Ungroup**, and **Test** (all its lights on, off, then restored).
 
 ## Safety
 

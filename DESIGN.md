@@ -425,6 +425,9 @@ stays centred.
      difference then contains exactly one change, the newest light. Every light is restored
      **together** at the end. This halves the time against toggling and restoring each light in
      turn.
+   - **Fixtures toggle as one:** lights the user grouped into a fixture (two bulbs in one ceiling
+     fan) are inverted together in one step; one bulb of a pair wouldn't show on video. The result
+     is one region for the fixture.
    - **Order by speed:** fast lights first (WLED, WiZ, Govee, z2m: about 0.5–0.8 s per step), slow
      lights last (Z-Wave: about 1.5–2.5 s per step).
    - Slow lights are toggled through their direct driver with **transition 0**, so a dimmer snaps

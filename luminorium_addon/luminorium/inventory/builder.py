@@ -5,7 +5,17 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .model import NO_AREA, NO_FLOOR, Area, Floor, Inventory, Kind, Light
+from .model import (
+    NO_AREA,
+    NO_FLOOR,
+    Area,
+    Fixture,
+    FixtureSuggestion,
+    Floor,
+    Inventory,
+    Kind,
+    Light,
+)
 from .profiles import build_profile
 
 # Integrations whose lights are not house lights
@@ -23,14 +33,29 @@ class UserChoices:
     """What the user decided in the UI. Stored in /data, applied over the defaults."""
 
     include: dict[str, bool] = field(default_factory=dict)  # entity_id -> included?
+    # Fixtures: {"id", "name", "members": [entity_id, ...]}
+    fixtures: list[dict] = field(default_factory=list)
+    # Fixture suggestions the user said no to, as sorted member lists
+    dismissed: list[list[str]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict | None) -> UserChoices:
         data = data or {}
-        return cls(include={k: bool(v) for k, v in (data.get("include") or {}).items()})
+        return cls(
+            include={k: bool(v) for k, v in (data.get("include") or {}).items()},
+            fixtures=[
+                {"id": f["id"], "name": f["name"], "members": list(f["members"])}
+                for f in data.get("fixtures") or []
+            ],
+            dismissed=[sorted(m) for m in data.get("dismissed") or []],
+        )
 
     def to_dict(self) -> dict:
-        return {"include": dict(sorted(self.include.items()))}
+        return {
+            "include": dict(sorted(self.include.items())),
+            "fixtures": self.fixtures,
+            "dismissed": self.dismissed,
+        }
 
 
 def _integration(platform: str, device: dict | None) -> str:
@@ -162,7 +187,62 @@ def build(
         node = zwave_nodes.get(light.device_id or "")
         light.profile = build_profile(light, node, relay=light.kind == Kind.SWITCH)
 
+    _apply_fixtures(inv, choices.fixtures)
+    inv.suggestions = _suggest_fixtures(inv, choices.dismissed)
     return inv
+
+
+def fixture_member_ok(light: Light | None) -> bool:
+    """Lights and switches can be in a fixture; segments, groups and settings can't."""
+    return light is not None and light.kind in (Kind.LIGHT, Kind.SWITCH)
+
+
+def _apply_fixtures(inv: Inventory, stored: list[dict]) -> None:
+    for f in stored:
+        members = [
+            eid
+            for eid in f["members"]
+            if fixture_member_ok(inv.get(eid)) and inv.lights[eid].fixture is None
+        ]
+        if len(members) < 2:
+            continue  # members gone from HA; kept in storage in case they come back
+        # The fixture lives in the area most of its lights are in
+        areas = [inv.lights[eid].area_id for eid in members]
+        area_id = max(set(areas), key=lambda a: (areas.count(a), a != NO_AREA))
+        fixture = Fixture(f["id"], f["name"], area_id, inv.areas[area_id].floor_id, members)
+        inv.fixtures[fixture.id] = fixture
+        for eid in members:
+            inv.lights[eid].fixture = fixture.id
+
+
+TRAILING_NUMBER = re.compile(r"[\s_-]*\d+\s*$")
+
+
+def _suggest_fixtures(inv: Inventory, dismissed: list[list[str]]) -> list[FixtureSuggestion]:
+    """Same area, same product, names that differ only by a trailing number
+    ('Office Fan RGB1', 'Office Fan RGB2'). Only a suggestion: the user decides."""
+    groups: dict[tuple, list[Light]] = {}
+    for light in inv.lights.values():
+        if light.kind != Kind.LIGHT or not light.included or light.fixture:
+            continue
+        stem = TRAILING_NUMBER.sub("", light.name).strip()
+        if not stem or stem.lower() == light.name.strip().lower():
+            continue  # no trailing number
+        key = (light.area_id, light.manufacturer, light.model, stem.lower())
+        groups.setdefault(key, []).append(light)
+    dismissed_keys = {tuple(sorted(m)) for m in dismissed}
+    out = []
+    for (area_id, _, model, _), lights in sorted(groups.items(), key=lambda kv: kv[0][3]):
+        members = sorted(lt.entity_id for lt in lights)
+        if len(members) < 2 or tuple(members) in dismissed_keys:
+            continue
+        stem = TRAILING_NUMBER.sub("", lights[0].name).strip()
+        out.append(
+            FixtureSuggestion(
+                stem, area_id, members, f"same room, same model ({model}), numbered names"
+            )
+        )
+    return out
 
 
 def _default_exclusion(

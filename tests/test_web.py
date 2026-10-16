@@ -34,7 +34,7 @@ async def test_include_switch_and_test_it(client, lum, fake_ha):
     eid = "switch.backyard_light_switch"
     r = await client.put(f"/api/lights/{eid}/include", json={"include": True})
     assert r.status_code == 200 and r.json()["included"]
-    assert lum.store.load("choices") == {"include": {eid: True}}
+    assert lum.store.load("choices")["include"] == {eid: True}
     lum.inventory.inventory.get(eid).profile.max_rate_hz = 50
     lum.tester.hold_s = 0
     assert (await client.post(f"/api/lights/{eid}/test")).status_code == 200

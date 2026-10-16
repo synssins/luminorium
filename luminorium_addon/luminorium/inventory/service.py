@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import uuid
 from collections.abc import Callable
 
 from ..ha.client import HAClient, HAError
 from ..store import JsonStore
-from .builder import UserChoices, build
+from .builder import UserChoices, build, fixture_member_ok
 from .model import Inventory, Kind
 
 log = logging.getLogger(__name__)
@@ -120,6 +121,61 @@ class InventoryService:
             self.choices.include.pop(entity_id, None)
         else:
             self.choices.include[entity_id] = include
+        self._save()
+
+    # ---- fixtures -----------------------------------------------------------------------------
+
+    def create_fixture(self, name: str, members: list[str]) -> str:
+        """Group lights in one physical fixture. Returns the new fixture's id."""
+        members = self._check_members(members, allow_fixture=None)
+        fixture_id = "fx_" + uuid.uuid4().hex[:8]
+        self.choices.fixtures.append(
+            {"id": fixture_id, "name": _fixture_name(name, members, self), "members": members}
+        )
+        self._save()
+        return fixture_id
+
+    def update_fixture(
+        self, fixture_id: str, name: str | None = None, members: list[str] | None = None
+    ) -> None:
+        stored = self._stored_fixture(fixture_id)
+        if members is not None:
+            stored["members"] = self._check_members(members, allow_fixture=fixture_id)
+        if name is not None:
+            stored["name"] = _fixture_name(name, stored["members"], self)
+        self._save()
+
+    def delete_fixture(self, fixture_id: str) -> None:
+        stored = self._stored_fixture(fixture_id)
+        self.choices.fixtures.remove(stored)
+        self._save()
+
+    def dismiss_suggestion(self, members: list[str]) -> None:
+        key = sorted(set(members))
+        if key not in self.choices.dismissed:
+            self.choices.dismissed.append(key)
+        self._save()
+
+    def _stored_fixture(self, fixture_id: str) -> dict:
+        for f in self.choices.fixtures:
+            if f["id"] == fixture_id:
+                return f
+        raise KeyError(fixture_id)
+
+    def _check_members(self, members: list[str], allow_fixture: str | None) -> list[str]:
+        members = list(dict.fromkeys(members))  # unique, order kept
+        if len(members) < 2:
+            raise ValueError("a fixture needs at least two lights")
+        for eid in members:
+            light = self.inventory.get(eid)
+            if not fixture_member_ok(light):
+                raise ValueError(f"{eid} can't be part of a fixture")
+            assert light is not None
+            if light.fixture and light.fixture != allow_fixture:
+                raise ValueError(f"{light.name} is already in another fixture")
+        return members
+
+    def _save(self) -> None:
         self.store.save("choices", self.choices.to_dict())
         self._rebuild()
 
@@ -178,3 +234,11 @@ class InventoryService:
                 return
         if new is not None:
             states.append(new)
+
+
+def _fixture_name(name: str, members: list[str], service: InventoryService) -> str:
+    name = (name or "").strip()
+    if name:
+        return name[:80]
+    first = service.inventory.get(members[0])
+    return f"{first.name if first else members[0]} fixture"

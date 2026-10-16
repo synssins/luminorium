@@ -59,6 +59,9 @@ Only for included, available lights and switches that aren't in use. Sequence, a
 
 A relay's toggles are 5 s apart (its rate limit), so testing one takes longer.
 
+A **fixture** is tested as one: session `test:<fixture id>`, each step sent to all its testable
+lights at once, all restored together. A light in a fixture can't be tested on its own.
+
 ## Read-only mode
 
 `read_only` (add-on option, or forced for any PC run against a real HA) makes

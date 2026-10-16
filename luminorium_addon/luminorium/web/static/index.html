@@ -22,7 +22,14 @@
     <button data-filter="all" class="chip">All</button>
     <input id="search" type="search" placeholder="Search" aria-label="Search lights">
   </nav>
-  <p id="counts" class="muted small"></p>
+  <div class="countbar">
+    <p id="counts" class="muted small"></p>
+    <span class="foldall">
+      <button id="group-start" class="link small">Group lights</button>
+      <button id="collapse-all" class="link small">Collapse all</button>
+      <button id="expand-all" class="link small">Expand all</button>
+    </span>
+  </div>
 
   <div id="floors"></div>
 
@@ -35,6 +42,12 @@
 </main>
 
 <footer class="stopbar">
+  <div id="toast" class="toast" role="status" hidden></div>
+  <div id="groupbar" class="groupbar" hidden>
+    <span id="group-count" class="small"></span>
+    <input id="group-name" placeholder="Fixture name (optional)" aria-label="Fixture name">
+    <button id="group-make" class="test">Group as one fixture</button>
+  </div>
   <button id="stopall" class="stop">Stop all</button>
 </footer>
 

@@ -81,3 +81,22 @@ at 2 Hz. **Relays** (included switches) are on/off only, at most one toggle per 
 **Z-Wave details** come from `zwave_js/node_status` and `zwave_js/node_capabilities` (read once
 per device and cached): node id, node status (alive, dead, asleep), security class, Z-Wave Plus
 version, Multilevel Switch and Binary Switch versions, Supervision.
+
+## Fixtures
+
+A **fixture** is several lights in one physical fixture, for example the two bulbs in the office
+ceiling fan (`Office Fan RGB1` + `RGB2`). From outside the house they are one light, so a fixture
+is tested as one, and phone mapping (phase 5) flashes it as one: blinking one bulb of a pair
+wouldn't show up on video.
+
+- Stored in `choices.json` as `{"id": "fx_…", "name", "members": [entity_id, …]}`.
+- Members are lights or included switches (not segments, groups or settings); at least two; a light
+  is in at most one fixture.
+- The fixture is shown in the area most of its lights are in; its lights are listed under it.
+- A stored fixture whose lights have left HA (fewer than two left) isn't applied, but stays stored
+  in case they come back.
+- **Suggestions:** included lights in the same area, of the same manufacturer and model, whose
+  names differ only by a trailing number ("Office Fan RGB1", "Office Fan RGB2"). On this house that
+  also suggests pairs that are separate fixtures (the driveway posts, the entry floods); the user
+  answers each with **Group as one** or **Not the same** (remembered in `choices.json` as
+  `dismissed`).

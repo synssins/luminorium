@@ -26,6 +26,20 @@ class IncludeBody(BaseModel):
     include: bool | None
 
 
+class FixtureBody(BaseModel):
+    name: str = ""
+    members: list[str]
+
+
+class FixtureUpdate(BaseModel):
+    name: str | None = None
+    members: list[str] | None = None
+
+
+class MembersBody(BaseModel):
+    members: list[str]
+
+
 def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -83,6 +97,8 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
             "lights": [
                 light.to_dict() for light in inv.lights.values() if light.kind != Kind.SEGMENT
             ],
+            "fixtures": [f.to_dict() for f in inv.fixtures.values()],
+            "suggestions": [s.to_dict() for s in inv.suggestions],
         }
 
     @app.put("/api/lights/{entity_id}/include")
@@ -101,11 +117,59 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         light = lum.inventory.inventory.get(entity_id)
         if light is None:
             raise HTTPException(404, f"unknown light {entity_id}")
+        if light.fixture:
+            raise HTTPException(409, f"{light.name} is part of a fixture: test the fixture")
         try:
             lum.tester.start(light)
         except LightTestError as err:
             raise HTTPException(409, str(err)) from err
         return {"started": entity_id}
+
+    @app.post("/api/fixtures")
+    async def create_fixture(body: FixtureBody):
+        try:
+            fixture_id = lum.inventory.create_fixture(body.name, body.members)
+        except ValueError as err:
+            raise HTTPException(400, str(err)) from err
+        return lum.inventory.inventory.fixtures[fixture_id].to_dict()
+
+    @app.put("/api/fixtures/{fixture_id}")
+    async def update_fixture(fixture_id: str, body: FixtureUpdate):
+        try:
+            lum.inventory.update_fixture(fixture_id, body.name, body.members)
+        except KeyError as err:
+            raise HTTPException(404, f"unknown fixture {fixture_id}") from err
+        except ValueError as err:
+            raise HTTPException(400, str(err)) from err
+        fixture = lum.inventory.inventory.fixtures.get(fixture_id)
+        return fixture.to_dict() if fixture else {}
+
+    @app.delete("/api/fixtures/{fixture_id}")
+    async def delete_fixture(fixture_id: str):
+        try:
+            lum.inventory.delete_fixture(fixture_id)
+        except KeyError as err:
+            raise HTTPException(404, f"unknown fixture {fixture_id}") from err
+        return {"deleted": fixture_id}
+
+    @app.post("/api/fixtures/{fixture_id}/test")
+    async def test_fixture(fixture_id: str):
+        if lum.settings.read_only:
+            raise HTTPException(409, "Luminorium is read-only: nothing is sent to lights")
+        inv = lum.inventory.inventory
+        fixture = inv.fixtures.get(fixture_id)
+        if fixture is None:
+            raise HTTPException(404, f"unknown fixture {fixture_id}")
+        try:
+            skipped = lum.tester.start_fixture(fixture, [inv.lights[e] for e in fixture.members])
+        except LightTestError as err:
+            raise HTTPException(409, str(err)) from err
+        return {"started": fixture_id, "skipped": skipped}
+
+    @app.post("/api/fixture_suggestions/dismiss")
+    async def dismiss_suggestion(body: MembersBody):
+        lum.inventory.dismiss_suggestion(body.members)
+        return {"dismissed": sorted(set(body.members))}
 
     @app.post("/api/stop_all")
     async def stop_all():
