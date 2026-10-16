@@ -20,6 +20,7 @@ ENV PATH="/opt/venv/bin:${PATH}" \
 RUN python3 -c "import luminorium; print('Luminorium', luminorium.__version__)"
 
 COPY run.sh /run.sh
-RUN chmod a+x /run.sh
+# run.sh runs under s6-overlay's with-contenv; fail the build if the base image lacks it
+RUN chmod a+x /run.sh && test -x /command/with-contenv
 
 CMD [ "/run.sh" ]

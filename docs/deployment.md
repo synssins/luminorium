@@ -1,7 +1,8 @@
 # Deployment
 
 Luminorium is installed as a Home Assistant add-on from this repository
-(`https://github.com/synssins/luminorium`, private for now).
+(`https://github.com/synssins/luminorium`, public). On the house HA its slug is
+`c685dad4_luminorium`.
 
 ## Add-on files
 
@@ -35,11 +36,18 @@ Luminorium is installed as a Home Assistant add-on from this repository
 
 ## Install
 
-1. In HA: Settings → Add-ons → Add-on store → ⋮ → Repositories → add the repository URL. A private
-   repository needs credentials the Supervisor can use (for example a URL with a read-only token).
+1. In HA: Settings → Add-ons → Add-on store → ⋮ → Repositories → add
+   `https://github.com/synssins/luminorium`. (Or through the Supervisor API:
+   `POST /store/repositories {"repository": "<url>"}`.)
 2. Install **Luminorium**. Before the first start, turn on the `read_only` option to look around
    without touching any light.
 3. Start it and open it from the sidebar.
+
+## Updating
+
+Push a commit with a new `version`, then in HA: Add-on store → ⋮ → Check for updates (or
+`POST /store/reload`), then update the add-on (`POST /store/addons/<slug>/update`). The image is
+rebuilt on the host.
 
 ## Options
 

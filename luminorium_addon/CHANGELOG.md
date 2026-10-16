@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-dev.2
+
+- Fix: the add-on couldn't find `SUPERVISOR_TOKEN` under s6-overlay's init and stopped.
+  `run.sh` now runs under `with-contenv`, and the token is also read from s6's container
+  environment. Running as an add-on without a token now stops with a clear error instead of
+  falling back to development settings.
+
 ## 0.1.0-dev.1
 
 Phase 1, first build.

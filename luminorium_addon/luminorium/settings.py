@@ -9,6 +9,7 @@ from pathlib import Path
 
 SUPERVISOR_WS = "ws://supervisor/core/websocket"
 OPTIONS_FILE = Path("/data/options.json")
+S6_TOKEN_FILE = Path("/run/s6/container_environment/SUPERVISOR_TOKEN")
 
 
 @dataclass(frozen=True)
@@ -41,8 +42,20 @@ def _truthy(value: str | None) -> bool:
     return (value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _supervisor_token() -> str:
+    """The Supervisor's token: from the environment, or from s6-overlay's copy of the container
+    environment (a process started under s6's /init doesn't inherit it)."""
+    token = os.environ.get("SUPERVISOR_TOKEN", "")
+    if not token and S6_TOKEN_FILE.exists():
+        token = S6_TOKEN_FILE.read_text(encoding="utf-8").strip()
+    return token
+
+
 def load() -> Settings:
-    supervisor_token = os.environ.get("SUPERVISOR_TOKEN", "")
+    supervisor_token = _supervisor_token()
+    if not supervisor_token and OPTIONS_FILE.exists():
+        # In the add-on but without a token: never fall back to development settings
+        raise SystemExit("Running as an add-on but no SUPERVISOR_TOKEN was found")
     if supervisor_token:
         options: dict = {}
         if OPTIONS_FILE.exists():
