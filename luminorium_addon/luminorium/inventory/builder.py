@@ -37,12 +37,15 @@ class UserChoices:
     fixtures: list[dict] = field(default_factory=list)
     # Fixture suggestions the user said no to, as sorted member lists
     dismissed: list[list[str]] = field(default_factory=list)
+    # entity_id -> driver the user picked ("ha", "z2m", ...); absent means automatic
+    drivers: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict | None) -> UserChoices:
         data = data or {}
         return cls(
             include={k: bool(v) for k, v in (data.get("include") or {}).items()},
+            drivers={k: str(v) for k, v in (data.get("drivers") or {}).items()},
             fixtures=[
                 {"id": f["id"], "name": f["name"], "members": list(f["members"])}
                 for f in data.get("fixtures") or []
@@ -55,6 +58,7 @@ class UserChoices:
             "include": dict(sorted(self.include.items())),
             "fixtures": self.fixtures,
             "dismissed": self.dismissed,
+            "drivers": dict(sorted(self.drivers.items())),
         }
 
 
@@ -152,6 +156,10 @@ def build(
             model=(device or {}).get("model"),
             state=(state or {}).get("state", "unknown"),
             attributes=dict((state or {}).get("attributes") or {}),
+            unique_id=e.get("unique_id"),
+            device_identifiers=[list(i) for i in (device or {}).get("identifiers") or []],
+            device_connections=[list(c) for c in (device or {}).get("connections") or []],
+            device_url=(device or {}).get("configuration_url"),
         )
         reason = _default_exclusion(light, e, device, satellite_devices)
         if (
@@ -186,6 +194,7 @@ def build(
                 light.hint = "looks like a light relay"
         node = zwave_nodes.get(light.device_id or "")
         light.profile = build_profile(light, node, relay=light.kind == Kind.SWITCH)
+        light.profile.driver_override = choices.drivers.get(light.entity_id)
 
     _apply_fixtures(inv, choices.fixtures)
     inv.suggestions = _suggest_fixtures(inv, choices.dismissed)

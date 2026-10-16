@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 
 from ..drivers.base import LightState
 from ..inventory.model import Fixture, Kind, Light
@@ -12,10 +13,30 @@ from .safety import Safety
 log = logging.getLogger(__name__)
 
 HOLD_S = 2.0
+MAX_HOLD_S = 30.0
+MAX_TRANSITION_MS = 10_000
 
 
 class LightTestError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class TestOptions:
+    """Variations of the Test sequence for checking a driver: a fade (transition) on the way on
+    and off, a native effect while on, a longer hold."""
+
+    __test__ = False  # not a pytest class
+
+    transition_ms: int = 0
+    effect: str | None = None
+    hold_s: float | None = None
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.transition_ms <= MAX_TRANSITION_MS:
+            raise LightTestError(f"transition must be 0-{MAX_TRANSITION_MS} ms")
+        if self.hold_s is not None and not 0 <= self.hold_s <= MAX_HOLD_S:
+            raise LightTestError(f"hold must be 0-{MAX_HOLD_S:.0f} s")
 
 
 def _testable(light: Light) -> str | None:
@@ -32,11 +53,15 @@ class LightTester:
         self.safety = safety
         self.hold_s = hold_s
 
-    def start(self, light: Light) -> None:
+    def start(self, light: Light, options: TestOptions | None = None) -> None:
         problem = _testable(light)
         if problem:
             raise LightTestError(problem)
-        self._start(f"test:{light.entity_id}", light.name, [light])
+        options = options or TestOptions()
+        caps = light.profile.capabilities if light.profile else None
+        if options.effect and caps is not None and options.effect not in caps.effects:
+            raise LightTestError(f"{light.name} has no effect {options.effect!r}")
+        self._start(f"test:{light.entity_id}", light.name, [light], options)
 
     def start_fixture(self, fixture: Fixture, members: list[Light]) -> list[str]:
         """Test a fixture's lights together, as one. Returns the members that were skipped."""
@@ -46,7 +71,9 @@ class LightTester:
         self._start(f"test:{fixture.id}", fixture.name, lights)
         return [lt.entity_id for lt in members if lt not in lights]
 
-    def _start(self, name: str, label: str, lights: list[Light]) -> None:
+    def _start(
+        self, name: str, label: str, lights: list[Light], options: TestOptions | None = None
+    ) -> None:
         if name in self.safety.sessions:
             raise LightTestError(f"{label} is already being tested")
         for light in lights:
@@ -55,28 +82,52 @@ class LightTester:
                     f"{light.name} is in use by {self.safety.snapshots[light.entity_id].session}"
                 )
         session = self.safety.session(name)
-        session.run(self._run(session, label, lights))
+        session.run(self._run(session, label, lights, options or TestOptions()))
 
-    async def _step(self, session, lights: list[Light], on: bool) -> bool:
-        """Send one state to every light at once. True if any light took it."""
+    async def _step(
+        self, session, lights: list[Light], on: bool, options: TestOptions | None = None
+    ) -> bool:
+        """Send one state to every light at once (one multicast or z2m group message where the
+        lights allow it). True if any light took it."""
+        options = options or TestOptions()
+        dimmable = [lt for lt in lights if lt.entity_id.startswith("light.")]
+        relays = [lt for lt in lights if not lt.entity_id.startswith("light.")]
+        sends = [
+            self.safety.command_many(
+                session,
+                group,
+                LightState(
+                    on=on,
+                    brightness=255 if on and bri else None,
+                    effect=options.effect if on and bri else None,
+                ),
+                transition_ms=options.transition_ms,
+            )
+            for group, bri in ((dimmable, True), (relays, False))
+            if group
+        ]
+        results = await asyncio.gather(*sends)
+        return any(any(r) for r in results)
 
-        async def one(light: Light) -> bool:
-            brightness = 255 if on and light.entity_id.startswith("light.") else None
-            state = LightState(on=on, brightness=brightness)
-            return await self.safety.command(session, light, state, transition_ms=0)
-
-        results = await asyncio.gather(*(one(lt) for lt in lights))
-        return any(results)
-
-    async def _run(self, session, label: str, lights: list[Light]) -> None:
+    async def _run(self, session, label: str, lights: list[Light], options: TestOptions) -> None:
         safety = self.safety
         ids = [lt.entity_id for lt in lights]
-        safety.note(f"Testing {label}", entity_ids=ids)
+        drivers = sorted({lt.profile.driver for lt in lights if lt.profile})
+        extra = "".join(
+            [
+                f", {options.transition_ms} ms fade" if options.transition_ms else "",
+                f", effect {options.effect}" if options.effect else "",
+            ]
+        )
+        safety.note(f"Testing {label} via {', '.join(drivers) or 'ha'}{extra}", entity_ids=ids)
+        hold = (options.hold_s if options.hold_s is not None else self.hold_s) + (
+            options.transition_ms / 1000
+        )
         try:
-            if await self._step(session, lights, on=True):
-                await asyncio.sleep(self.hold_s)
-            if await self._step(session, lights, on=False):
-                await asyncio.sleep(self.hold_s)
+            if await self._step(session, lights, on=True, options=options):
+                await asyncio.sleep(hold)
+            if await self._step(session, lights, on=False, options=options):
+                await asyncio.sleep(hold)
         except asyncio.CancelledError:
             raise
         except Exception as err:

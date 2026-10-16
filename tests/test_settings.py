@@ -40,3 +40,32 @@ def test_pc_against_real_ha_is_read_only(paths, monkeypatch):
     monkeypatch.setenv("LUMINORIUM_HA_TOKEN", "x")
     monkeypatch.delenv("LUMINORIUM_ALLOW_WRITES", raising=False)
     assert settings.load().read_only
+
+
+def test_direct_drivers_from_options(paths):
+    options, token = paths
+    token.write_text("abc")
+    options.write_text(
+        json.dumps(
+            {
+                "drivers": {"govee": False},
+                "wiz_subnets": ["192.168.10.0/24", "192.168.20.0/24"],
+                "govee_razer_models": ["H7055"],
+            }
+        )
+    )
+    cfg = settings.load()
+    assert cfg.drivers.enabled == {"z2m", "zwave_js", "wiz", "wled"}
+    assert cfg.drivers.wiz_subnets == ("192.168.10.0/24", "192.168.20.0/24")
+    assert cfg.drivers.govee_subnets == ("192.168.10.0/24",)
+    assert cfg.drivers.govee_razer_models == ("H7055",)
+    assert cfg.supervisor_url == "http://supervisor"
+
+
+def test_no_direct_driver_unless_asked(paths, monkeypatch):
+    # Tests and PC runs must never sweep the real LAN by accident
+    assert settings.DriverSettings().enabled == frozenset()
+    monkeypatch.delenv("LUMINORIUM_DRIVERS", raising=False)
+    assert settings.load().drivers.enabled == frozenset()
+    monkeypatch.setenv("LUMINORIUM_DRIVERS", "wiz, nonsense")
+    assert settings.load().drivers.enabled == {"wiz"}

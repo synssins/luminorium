@@ -36,11 +36,16 @@ class InventoryService:
         self._zwave_cache: dict[str, dict] = {}
         self._reload_task: asyncio.Task | None = None
         self._state_listeners: list[StateListener] = []
+        self._rebuild_listeners: list[Callable[[Inventory], None]] = []
         self._raw: dict | None = None
 
     def on_state_change(self, listener: StateListener) -> None:
         """listener(entity_id, old_state, new_state, context_id)"""
         self._state_listeners.append(listener)
+
+    def on_rebuild(self, listener: Callable[[Inventory], None]) -> None:
+        """listener(inventory), after every rebuild (the router re-chooses drivers)."""
+        self._rebuild_listeners.append(listener)
 
     async def start(self) -> None:
         for event in REGISTRY_EVENTS:
@@ -87,6 +92,11 @@ class InventoryService:
             self._zwave_cache,
             self.choices,
         )
+        for listener in self._rebuild_listeners:
+            try:
+                listener(self.inventory)
+            except Exception:
+                log.exception("rebuild listener failed")
 
     async def _load_zwave(self, devices: list[dict], entities: list[dict]) -> None:
         """Node status and command classes for Z-Wave devices that have a light or switch."""
@@ -121,6 +131,16 @@ class InventoryService:
             self.choices.include.pop(entity_id, None)
         else:
             self.choices.include[entity_id] = include
+        self._save()
+
+    def set_driver(self, entity_id: str, driver: str | None) -> None:
+        """Pin a light to a driver (None: automatic). The router checks the name first."""
+        if self.inventory.get(entity_id) is None:
+            raise KeyError(entity_id)
+        if driver is None:
+            self.choices.drivers.pop(entity_id, None)
+        else:
+            self.choices.drivers[entity_id] = driver
         self._save()
 
     # ---- fixtures -----------------------------------------------------------------------------

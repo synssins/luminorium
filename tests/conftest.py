@@ -62,3 +62,13 @@ async def wait_for(predicate, timeout: float = 5.0, interval: float = 0.02):
             return
         await asyncio.sleep(interval)
     raise AssertionError("condition not met in time")
+
+
+@pytest.fixture
+def house(raw):
+    """The real house's inventory, built from the fixtures (no HA, no app)."""
+    from luminorium.inventory.builder import build
+
+    return build(
+        raw["floors"], raw["areas"], raw["devices"], raw["entities"], raw["states"], raw["zwave"]
+    )

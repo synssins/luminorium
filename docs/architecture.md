@@ -1,7 +1,7 @@
 # Architecture (as built)
 
-This describes the code as it is today (phase 1). [DESIGN.md](../DESIGN.md) is the full target
-design; [BRIEF.md](../BRIEF.md) has the phases.
+This describes the code as it is today (phase 2: direct drivers). [DESIGN.md](../DESIGN.md) is
+the full target design; [BRIEF.md](../BRIEF.md) has the phases.
 
 ## Process
 
@@ -18,9 +18,16 @@ One Python process (asyncio) in one add-on container:
                  │                                                                           │
                  │ engine/safety.py     Safety: sessions, snapshots, Stop all, restore,      │
                  │      │               outside-change detection                             │
-                 │ engine/governor.py   Governor: per-light and per-network rate limits      │
-                 │      │                                                                    │
-                 │ drivers/ha.py        HADriver: light.* / switch.* services                 │
+                 │ engine/governor.py   Governor: per-light and per-network rate limits,     │
+                 │      │               batches (multicast / group = one token)              │
+                 │ drivers/router.py    Router: which driver each light uses                 │
+                 │      ├─ drivers/ha.py      HADriver: light.* / switch.* services          │
+ Mosquitto ◄─────┤      ├─ drivers/z2m.py     Z2MDriver: zigbee2mqtt/<name>/set              │
+ Z-Wave JS ◄──ws─┤      ├─ drivers/zwave.py   ZWaveDriver: set_value, multicast, read-back   │
+ WiZ  ◄──udp─────┤      ├─ drivers/wiz.py     WiZDriver: setPilot / getPilot, subnet sweep   │
+ WLED ◄──http/udp┤      ├─ drivers/wled.py    WLEDDriver: JSON API, DDP                      │
+ Govee ◄──udp────┤      └─ drivers/govee.py   GoveeDriver: LAN API, razer (off)              │
+                 │ discovery.py         Supervisor services/mqtt, Z-Wave JS server URL       │
                  │                                                                           │
                  │ engine/testlight.py  LightTester: the Test button                         │
                  │ web/server.py        FastAPI app (Ingress UI + JSON API)                  │
@@ -41,9 +48,15 @@ settings and runs the FastAPI app under uvicorn; the app's lifespan starts and s
 | `inventory/builder.py` | `build()`: registries + states + Z-Wave node details + user choices → `Inventory`. No I/O. Rules in [inventory.md](inventory.md). |
 | `inventory/profiles.py` | Network defaults, Z-Wave command-class facts, `build_profile()`. |
 | `inventory/service.py` | `InventoryService`: reload on connect and (debounced, 2 s) on registry events; keeps light states current from `state_changed`; stores include/exclude choices; notifies state listeners. |
-| `drivers/base.py` | `Driver` interface; `LightState` (on, brightness, colour mode + value, effect) and `LightState.from_ha()` for snapshots. |
+| `drivers/base.py` | `Driver` interface (`set`, `network`, `supports`, `batches`/`set_batch`, `can_stream`/`stream`); `DirectDriver` (start/stop, `handles`, `endpoint`, `status`, read-only guard, change listeners); `LightState` and `LightState.from_ha()` for snapshots. |
 | `drivers/ha.py` | `HADriver`: `light.turn_on/turn_off`, `switch.turn_on/turn_off`; only sends attributes the light supports; `transition` only where it's native. |
-| `engine/governor.py` | `Governor.send()`: per-light interval, latest value wins, priorities, network and HA token buckets. See [safety.md](safety.md). |
+| `drivers/router.py` | `Router`: automatic choice (direct driver when it reaches the light, else HA), user pins, notes, per-command reachability. |
+| `drivers/z2m.py`, `zwave.py`, `wiz.py`, `wled.py`, `govee.py` | The direct drivers. See [drivers.md](drivers.md). |
+| `drivers/color.py` | xy / hs / kelvin → RGB (HA's formulas), brightness → percent. |
+| `net/mqtt.py` | Small asyncio MQTT 3.1.1 client (and the codec the fake broker uses). |
+| `net/udp.py` | JSON-over-UDP socket with request/reply matching; subnet sweeps. |
+| `discovery.py` | Mosquitto from the Supervisor; Z-Wave JS server URLs from HA and the Supervisor. |
+| `engine/governor.py` | `Governor.send()` / `send_many()`: per-light interval, latest value wins, priorities, network and HA token buckets, batches as one message. See [safety.md](safety.md). |
 | `engine/safety.py` | `Safety`: sessions, snapshots, `command()`, `end_session()`, `stop_all()`, `restore_leftovers()`, outside-change detection. |
 | `engine/testlight.py` | `LightTester`: on (full) → hold → off → hold → restore, as a session named `test:<entity_id>`; `start_fixture()` does the same for all of a fixture's lights at once (`test:<fixture id>`). |
 | `web/server.py` | `create_app()`: pages, static files, JSON API ([api.md](api.md)), client allow-list. |
@@ -54,7 +67,7 @@ settings and runs the FastAPI app under uvicorn; the app's lifespan starts and s
 | File | Contents |
 |---|---|
 | `options.json` | Written by the Supervisor from the add-on options. |
-| `choices.json` | The user's decisions: `include` (`{entity_id: true/false}`), `fixtures` (`[{id, name, members}]`) and `dismissed` fixture suggestions (`[[entity_id, …]]`). |
+| `choices.json` | The user's decisions: `include` (`{entity_id: true/false}`), `fixtures` (`[{id, name, members}]`), `dismissed` fixture suggestions (`[[entity_id, …]]`) and `drivers` (`{entity_id: "ha" or a direct driver}`, pinned drivers). |
 | `snapshots.json` | Lights currently touched and their state before: `{entity_id: {state, session, taken_at}}`. Absent when nothing is touched. Used to restore after a crash. |
 
 `/config` (the add-on's `addon_config` folder) is mapped for user content (shows, palettes,
@@ -66,12 +79,16 @@ plugins) in later phases. Both are included in HA backups.
 2. `InventoryService.start()` subscribes to registry events and `state_changed`, and registers
    `reload()` to run on every (re)connect.
 3. Once the inventory is loaded, `Safety.restore_leftovers()` restores anything in
-   `snapshots.json` (skipped in read-only mode, which keeps the file).
-4. On shutdown, if anything is still touched and HA is reachable, `stop_all()` restores it
-   (10 s limit), then the websocket closes.
+   `snapshots.json` (skipped in read-only mode, which keeps the file). Restores go through HA:
+   the direct drivers aren't up yet.
+4. Then `start_drivers()`: discovery, then each enabled direct driver starts connecting and
+   finding devices in the background; the router moves lights to them as they are found.
+5. On shutdown, if anything is still touched and HA is reachable, `stop_all()` restores it
+   (10 s limit), then the drivers stop and the websocket closes.
 
 ## What's not here yet
 
-Direct drivers (z2m, Z-Wave JS, WiZ, WLED, Govee LAN), effects and palettes, shows, triggers,
-views and mapping, plugins, MQTT entities: phases 2–8 in [BRIEF.md](../BRIEF.md). The mapping
-analysis is being prototyped separately in `proto/mapping/`.
+Effects and palettes, shows, triggers, views and mapping, plugins, MQTT entities, a Hue/Bifrost
+driver: phases 3–8 in [BRIEF.md](../BRIEF.md). WLED DDP and Govee razer streaming exist in the
+drivers but have no user until the effects engine. The mapping analysis is being prototyped
+separately in `proto/mapping/`.

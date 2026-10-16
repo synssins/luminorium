@@ -14,7 +14,11 @@ the facts about this house.
 - **Ask Chris first** before: flashing, toggling or running anything on real lights; touching any
   `switch.*` entity; installing or changing anything in HA; creating GitHub repositories.
 - PC runs against the real HA are read-only (`tools/dev.py --real`).
-- Plugins are Python only. Develop and test on Windows with the fake HA.
+- Plugins are Python only. Develop and test on Windows with the fake HA and the fake devices
+  (`tools/fake_*.py`). Tests must never reach the LAN: direct drivers are off unless a test
+  enables one and points it at a fake.
+- On Windows, read and write text files with an explicit `encoding="utf-8"` in Python scripts
+  (the default is cp1252 and corrupts non-ASCII text).
 
 ## Commands
 
@@ -29,7 +33,10 @@ the facts about this house.
 - The front porch, entryway and driveway Z-Wave switches are locked-on relays that feed Hue bulbs.
   They are excluded; the Hue bulbs are the lights.
 - The five GE 12724 dimmers use Multilevel Switch v1 (no transition).
-- govee2mqtt reaches every Govee device through the cloud today; segments are cloud-only.
+- govee2mqtt reaches every Govee device through the cloud today; segments are cloud-only. The
+  Govee LAN driver needs LAN Control on in the Govee app, and port 4002 free.
+- The direct drivers ([docs/drivers.md](docs/drivers.md)) haven't been tried on real lights;
+  [docs/driver-tests.md](docs/driver-tests.md) lists the checks waiting for Chris's OK.
 - Mapping is a guided capture (centre, 45° left, 45° right); there is no real video to work from.
 
 ## Releasing

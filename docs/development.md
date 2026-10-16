@@ -24,6 +24,14 @@ The add-on's own pinned dependencies are in `luminorium_addon/requirements.txt`.
 | `tests/test_governor.py` | Latest value wins, priorities, restore skips the per-light wait, network budget, cancel |
 | `tests/test_safety.py` | Test button sequence and restore, relays, refusals, outside changes, Stop all, crash recovery, read-only, reconnect |
 | `tests/test_web.py` | API endpoints, include/exclude, pages, the ingress-only allow-list |
+| `tests/test_driver_z2m.py` | MQTT client and z2m driver against the fake broker: names by IEEE (trailing space), payloads, groups, bridge offline, reconnect, bad credentials, read-only |
+| `tests/test_driver_zwave.py` | Z-Wave JS driver against the fake server: URL fallback, durations only on v2+, multicast by security class, read-back and resend, latest value wins over a read-back, read-only |
+| `tests/test_driver_wiz.py` | Sweep and MAC match, `setPilot` params, scenes, polling and reachability, read-only |
+| `tests/test_driver_wled.py` | Ids from HA, state bodies, effects and palettes, DDP packets and streaming to a segment, wrong MAC, read-only |
+| `tests/test_driver_govee.py` | Unicast and multicast scan, commands, `devStatus`, scenes through HA, missed polls, razer only when enabled, port in use, read-only |
+| `tests/test_router.py` | Automatic choice, fallback, pins, notes, relays, re-routing on driver changes |
+| `tests/test_drivers_app.py` | The whole app with fake HA, Supervisor, broker, Z-Wave server, WiZ bulb and WLED: discovery, status, Test via z2m, pin to HA, fixture test by multicast, Test with fade and effect, read-only |
+| `tests/test_load.py` | A burst on eight Z-Wave dimmers with the real budget: never exceeded, latest value wins; a multicast takes one token |
 
 `pytest-asyncio` runs in auto mode. `tests/conftest.py` gives a `fake_ha` server and a started
 `lum` app (data in a temp folder, test hold time 0.05 s).
@@ -42,6 +50,18 @@ A websocket server speaking HA's protocol from the fixtures:
 
 Run it alone: `.venv/Scripts/python tools/fake_ha.py --port 8124`.
 
+It also answers `zwave_js/network_status` with `zwave_server_url` (where the Z-Wave driver
+looks first).
+
+## Fake devices for the direct drivers
+
+`tools/fake_mqtt.py` (broker + fake Zigbee2MQTT), `tools/fake_zwave.py` (Z-Wave JS server),
+`tools/fake_lan.py` (WiZ bulb, WLED, Govee), `tools/fake_supervisor.py`. All run on loopback and
+record what they receive with timestamps. Details in [drivers.md](drivers.md#testing-without-the-house).
+
+**Tests never reach the LAN.** `DriverSettings()` enables no direct driver; a test that wants
+one points it at a fake (`wiz_hosts=("127.0.0.1:<port>",)`, `wiz_subnets=()`, …).
+
 ## Running the app
 
 ```bash
@@ -49,13 +69,18 @@ Run it alone: `.venv/Scripts/python tools/fake_ha.py --port 8124`.
 .venv/Scripts/python tools/dev.py --real --port 8198
 ```
 
+The fake run also starts fake devices (broker + z2m, Z-Wave JS server, a WiZ bulb, the WLED
+front pathway), so the UI shows lights going "via Zigbee2MQTT", "via Z-Wave JS" and so on, and
+Test goes through them.
+
 `--real` connects to the house HA **read-only** (forced; there is no switch to turn it off in
 `dev.py`) with the token from `LUMINORIUM_HA_TOKEN_FILE`. `.claude/launch.json` has both as
 `luminorium-fake` and `luminorium-real-readonly`. Dev data goes to `.dev-data/`.
 
 `python -m luminorium` (from `luminorium_addon/`) also works with environment variables:
 `LUMINORIUM_HA_URL`, `LUMINORIUM_HA_TOKEN` or `LUMINORIUM_HA_TOKEN_FILE`, `LUMINORIUM_DATA_DIR`,
-`LUMINORIUM_PORT`, `LUMINORIUM_HOST`, `LUMINORIUM_LOG_LEVEL`. Against anything but `127.0.0.1` it
+`LUMINORIUM_PORT`, `LUMINORIUM_HOST`, `LUMINORIUM_LOG_LEVEL`, and `LUMINORIUM_DRIVERS` (a comma
+list of direct drivers to switch on; none by default, since they reach the real LAN). Against anything but `127.0.0.1` it
 is read-only unless `LUMINORIUM_ALLOW_WRITES=1`.
 
 ## Fixtures

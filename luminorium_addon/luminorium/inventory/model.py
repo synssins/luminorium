@@ -38,6 +38,11 @@ class Profile:
     latency_ms: int = 250
     relay: bool = False  # on/off relay: slow minimum toggle interval, never streamed
     details: dict[str, Any] = field(default_factory=dict)  # driver facts (Z-Wave node, CC version)
+    # Drivers that can reach this light now, the chosen one first; "ha" always reaches it
+    drivers: list[str] = field(default_factory=lambda: ["ha"])
+    driver_override: str | None = None  # the user's choice of driver, if they made one
+    driver_note: str | None = None  # why the chosen driver isn't the preferred one
+    endpoint: str | None = None  # how the chosen driver reaches it ("WiZ 192.168.10.64")
 
 
 @dataclass
@@ -80,6 +85,11 @@ class Light:
     duplicates: list[str] = field(default_factory=list)  # suggested: same light, other integration
     fixture: str | None = None  # id of the fixture this light is part of
     profile: Profile | None = None
+    # How direct drivers find the light: HA's ids for the entity and its device
+    unique_id: str | None = None
+    device_identifiers: list[list[str]] = field(default_factory=list)
+    device_connections: list[list[str]] = field(default_factory=list)
+    device_url: str | None = None  # the device's configuration URL (WLED: its address)
 
     @property
     def available(self) -> bool:
@@ -92,7 +102,8 @@ class Light:
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["available"] = self.available
-        data.pop("attributes")
+        for key in ("attributes", "device_identifiers", "device_connections", "device_url"):
+            data.pop(key)
         return data
 
 

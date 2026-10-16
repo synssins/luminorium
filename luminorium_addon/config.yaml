@@ -1,6 +1,6 @@
 name: Luminorium
 # Give every build its own version: HA reuses a cached image when the tag is unchanged.
-version: "0.1.0-dev.3"
+version: "0.2.0-dev.1"
 slug: luminorium
 description: "Light effects, shows and sequences across every light in Home Assistant"
 url: https://github.com/synssins/luminorium
@@ -15,8 +15,11 @@ stage: experimental
 
 # Registries, states, events and services over HA's websocket (SUPERVISOR_TOKEN)
 homeassistant_api: true
-# Find other add-ons (Z-Wave JS, Mosquitto) and their addresses
+# Find other add-ons (Z-Wave JS) and their addresses
 hassio_api: true
+# Mosquitto credentials of our own, for Zigbee2MQTT (Supervisor services API)
+services:
+  - mqtt:need
 
 ingress: true
 # Not 8099: Zigbee2MQTT publishes 8099 on the host, and phase 2 moves this add-on to host networking.
@@ -25,9 +28,9 @@ panel_icon: mdi:lightbulb-group
 panel_title: Luminorium
 panel_admin: true
 
-# Phase 1 talks only to HA, so it stays on the add-on network. Phase 2 (WiZ, WLED, Govee over
-# UDP) switches this on; the web server already accepts only the Supervisor's ingress proxy.
-host_network: false
+# The direct drivers reach WiZ, WLED and Govee over UDP on the LAN (Govee replies to port 4002,
+# discovery uses multicast). The web server still accepts only the Supervisor's ingress proxy.
+host_network: true
 
 map:
   # Shows, palettes and plugins (user content); /data holds runtime state. Both are backed up.
@@ -36,7 +39,34 @@ map:
 options:
   log_level: info
   read_only: false
+  # Direct drivers; a light whose driver is off or can't reach it goes through HA
+  drivers:
+    z2m: true
+    zwave_js: true
+    wiz: true
+    wled: true
+    govee: true
+  wiz_subnets:
+    - 192.168.10.0/24
+  govee_subnets:
+    - 192.168.10.0/24
+  # Govee models whose segment streaming (razer) has been tested, e.g. H7055. Off until then.
+  govee_razer_models: []
 
 schema:
   log_level: list(debug|info|warning|error)
   read_only: bool
+  drivers:
+    z2m: bool
+    zwave_js: bool
+    wiz: bool
+    wled: bool
+    govee: bool
+  wiz_subnets:
+    - str
+  govee_subnets:
+    - str
+  govee_razer_models:
+    - str
+  z2m_base_topic: str?
+  zwave_url: str?

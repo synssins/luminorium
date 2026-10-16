@@ -117,6 +117,47 @@ class Safety:
         self._remember(context)
         return True
 
+    async def command_many(
+        self,
+        session: Session,
+        lights: list[Light],
+        state: LightState,
+        *,
+        transition_ms: int | None = None,
+        priority: Priority = Priority.SHOW,
+    ) -> list[bool]:
+        """One state to several lights at once (one multicast or group message where the
+        driver can). Per light: False if it was dropped or superseded."""
+        targets = []
+        for light in lights:
+            if light.entity_id in session.dropped:
+                continue
+            snap = self.snapshots.get(light.entity_id)
+            if snap is not None and snap.session != session.name:
+                raise LightBusy(f"{light.entity_id} is in use by {snap.session}")
+            targets.append(light)
+        for light in targets:
+            if light.entity_id not in self.snapshots:
+                self.snapshots[light.entity_id] = Snapshot(
+                    LightState.from_ha(light.state, light.attributes), session.name, time.time()
+                )
+            self.snapshots[light.entity_id].expected = state
+        if targets:
+            self._persist()
+        results = await self.governor.send_many(
+            targets, state, transition_ms=transition_ms, priority=priority
+        )
+        by_id: dict[str, bool] = {}
+        for light, result in zip(targets, results, strict=True):
+            if isinstance(result, Superseded):
+                by_id[light.entity_id] = False
+            elif isinstance(result, BaseException):
+                raise result
+            else:
+                self._remember(result)
+                by_id[light.entity_id] = True
+        return [by_id.get(light.entity_id, False) for light in lights]
+
     async def end_session(self, session: Session, *, restore: bool = True) -> None:
         current = asyncio.current_task()
         for task in list(session.tasks):

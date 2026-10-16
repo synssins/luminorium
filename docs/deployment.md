@@ -9,7 +9,7 @@ Luminorium is installed as a Home Assistant add-on from this repository
 | File | What |
 |---|---|
 | `repository.yaml` | Makes the repository an add-on repository |
-| `luminorium_addon/config.yaml` | Add-on manifest: version, slug `luminorium`, `arch: [amd64]`, Ingress on 8199, `homeassistant_api`, `hassio_api`, `addon_config` map, options |
+| `luminorium_addon/config.yaml` | Add-on manifest: version, slug `luminorium`, `arch: [amd64]`, Ingress on 8199, `homeassistant_api`, `hassio_api`, `services: [mqtt:need]`, `host_network: true`, `addon_config` map, options |
 | `luminorium_addon/build.yaml` | `build_from`: `ghcr.io/home-assistant/amd64-base-debian:trixie-2026.10.0` |
 | `luminorium_addon/Dockerfile` | Python 3.13 from Debian in `/opt/venv`, requirements, the `luminorium` package; `CMD /run.sh` |
 | `luminorium_addon/run.sh` | `exec python3 -m luminorium` |
@@ -20,9 +20,14 @@ Luminorium is installed as a Home Assistant add-on from this repository
 
 - **Debian base, not Alpine:** `opencv-python-headless` (phase 5 mapping) has no musllinux wheels.
 - **amd64 only:** the HA host is generic x86-64. Add aarch64 when there's a reason.
-- **No host networking yet:** phase 1 only talks to HA. Phase 2 (WiZ, WLED, Govee over UDP)
-  turns on `host_network`; the web server already refuses anything but the ingress proxy, and the
-  Ingress port (8199) avoids Zigbee2MQTT's 8099 on the host.
+- **Host networking** (since 0.2.0): the WiZ, WLED and Govee drivers use UDP on the LAN, and
+  Govee devices answer to port 4002 of the sender. The web server listens on the host's 8199 but
+  refuses anything but the ingress proxy (`172.30.32.2`) and localhost; 8199 avoids
+  Zigbee2MQTT's 8099 on the host. With host networking the add-on hostname `core-zwave-js` may not
+  resolve, so the Z-Wave driver falls back to the add-on's IP ([drivers.md](drivers.md)).
+- **`services: [mqtt:need]`:** the Supervisor gives the add-on its own Mosquitto user (read from
+  `services/mqtt`), so no MQTT credentials are configured by hand. The add-on won't start
+  without an MQTT service.
 - **Built on the HA host:** there is no prebuilt image (`image:` is not set), so the Supervisor
   builds the Dockerfile on install and update.
 
@@ -54,7 +59,13 @@ rebuilt on the host.
 | Option | Default | What |
 |---|---|---|
 | `log_level` | `info` | `debug`, `info`, `warning`, `error` |
-| `read_only` | `false` | Never send anything to any light |
+| `read_only` | `false` | Never send anything to any light (direct drivers still discover) |
+| `drivers` | all `true` | `z2m`, `zwave_js`, `wiz`, `wled`, `govee`: switch a direct driver off and its lights go through HA |
+| `wiz_subnets` | `[192.168.10.0/24]` | Swept for WiZ bulbs (`/22` at most each) |
+| `govee_subnets` | `[192.168.10.0/24]` | Swept for Govee devices, besides the multicast scan |
+| `govee_razer_models` | `[]` | Govee models (e.g. `H7055`) whose segment streaming has been tested and may be used |
+| `z2m_base_topic` | `zigbee2mqtt` | Optional |
+| `zwave_url` | (discovered) | Optional: the Z-Wave JS server, e.g. `ws://core-zwave-js:3000` |
 
 ## Logs
 

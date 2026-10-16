@@ -16,7 +16,8 @@ from pydantic import BaseModel
 
 from .. import __version__
 from ..app import Luminorium
-from ..engine.testlight import LightTestError
+from ..drivers.router import DriverChoiceError
+from ..engine.testlight import LightTestError, TestOptions
 from ..inventory.model import Kind
 
 STATIC = Path(__file__).parent / "static"
@@ -24,6 +25,16 @@ STATIC = Path(__file__).parent / "static"
 
 class IncludeBody(BaseModel):
     include: bool | None
+
+
+class DriverBody(BaseModel):
+    driver: str | None
+
+
+class TestBody(BaseModel):
+    transition_ms: int = 0
+    effect: str | None = None
+    hold_s: float | None = None
 
 
 class FixtureBody(BaseModel):
@@ -86,7 +97,13 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
             "sessions": sorted(lum.safety.sessions),
             "touched": sorted(lum.safety.snapshots),
             "activity": list(lum.safety.activity)[:30],
+            "drivers": lum.driver_status(),
         }
+
+    def light_dict(light) -> dict:
+        data = light.to_dict()
+        data["driver_options"] = lum.router.options(light)
+        return data
 
     @app.get("/api/inventory")
     async def inventory():
@@ -95,7 +112,7 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
             "floors": [vars(f) for f in inv.floors.values()],
             "areas": [vars(a) for a in inv.areas.values()],
             "lights": [
-                light.to_dict() for light in inv.lights.values() if light.kind != Kind.SEGMENT
+                light_dict(light) for light in inv.lights.values() if light.kind != Kind.SEGMENT
             ],
             "fixtures": [f.to_dict() for f in inv.fixtures.values()],
             "suggestions": [s.to_dict() for s in inv.suggestions],
@@ -108,10 +125,23 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         except KeyError as err:
             raise HTTPException(404, f"unknown light {entity_id}") from err
         light = lum.inventory.inventory.get(entity_id)
-        return light.to_dict() if light else {}
+        return light_dict(light) if light else {}
+
+    @app.put("/api/lights/{entity_id}/driver")
+    async def set_driver(entity_id: str, body: DriverBody):
+        light = lum.inventory.inventory.get(entity_id)
+        if light is None or light.kind not in (Kind.LIGHT, Kind.SWITCH):
+            raise HTTPException(404, f"unknown light {entity_id}")
+        try:
+            lum.router.check_choice(light, body.driver)
+        except DriverChoiceError as err:
+            raise HTTPException(400, str(err)) from err
+        lum.inventory.set_driver(entity_id, body.driver)
+        light = lum.inventory.inventory.get(entity_id)
+        return light_dict(light) if light else {}
 
     @app.post("/api/lights/{entity_id}/test")
-    async def test_light(entity_id: str):
+    async def test_light(entity_id: str, body: TestBody | None = None):
         if lum.settings.read_only:
             raise HTTPException(409, "Luminorium is read-only: nothing is sent to lights")
         light = lum.inventory.inventory.get(entity_id)
@@ -120,7 +150,8 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         if light.fixture:
             raise HTTPException(409, f"{light.name} is part of a fixture: test the fixture")
         try:
-            lum.tester.start(light)
+            options = TestOptions(**body.model_dump()) if body else None
+            lum.tester.start(light, options)
         except LightTestError as err:
             raise HTTPException(409, str(err)) from err
         return {"started": entity_id}

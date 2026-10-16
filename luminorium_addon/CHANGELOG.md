@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.0-dev.1
+
+Phase 2: direct drivers. Not yet tried on real lights (see docs/driver-tests.md).
+
+- **Drivers:** Zigbee2MQTT over MQTT (device names from z2m, groups for simultaneous changes),
+  Z-Wave JS server (fade durations where the dimmer supports them, multicast by security class
+  with read-back), WiZ over UDP (subnet sweep, MAC match, scenes), WLED (JSON API, effects and
+  palettes, DDP streaming), Govee LAN (unicast and multicast scan, `devStatus`; segment streaming
+  off until tested per model). Home Assistant stays the fallback for every light.
+- Each light uses the best driver that can reach it, shown as a **via …** badge; pin a light to
+  Home Assistant or its direct driver from the **Driver** select. A driver status line under the
+  counts.
+- Rate governor: budgets follow the network a command really uses; a Z-Wave multicast or a z2m
+  group message counts as one; latest value still wins for every light of a batch.
+- Fixtures are tested with one multicast or group message where their lights allow it.
+- The Test API takes a fade, an effect and a hold time, for checking drivers.
+- Add-on: `host_network: true`, `services: [mqtt:need]`, options `drivers`, `wiz_subnets`,
+  `govee_subnets`, `govee_razer_models`, `z2m_base_topic`, `zwave_url`.
+
 ## 0.1.0-dev.3
 
 - Levels and rooms fold (tap a heading), with Collapse all / Expand all, remembered per device.
