@@ -7,3 +7,4 @@ __pycache__/
 proto/mapping/.venv/
 proto/mapping/out/
 .ruff_cache/
+proto/mapping/prof

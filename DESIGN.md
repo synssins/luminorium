@@ -432,35 +432,50 @@ stays centred.
      lights last (Z-Wave: about 1.5–2.5 s per step).
    - Slow lights are toggled through their direct driver with **transition 0**, so a dimmer snaps
      instead of ramping.
-   - Each step is only as long as that light's **latency plus a few frames**. The pass moves on as
-     soon as the change is detected; the timeout is only a fallback.
+   - Each step lasts **latency + ramp + exposure + a settled window (~0.25 s)**: the analysis
+     compares "settled before" with "settled after". Advance **adaptively**: send the next command
+     once the live detector has seen the change settle for about 3 frames, with a per-driver timeout
+     of about 2× the profile latency (fast 0.8 s, Z-Wave 2.5 s on a first mapping). The prototype
+     worked at fixed 0.6 s / 1.6 s steps and broke at 0.5 s / 1.2 s.
    - Rough budget: 15 fast lights × 0.7 s + 6 Z-Wave × 2 s ≈ **25 s per station**, plus the
      restore; about 2 minutes for three stations including the walking.
-4. **Sync marker:** at the start, one fast light blinks twice, which lines up the video's clock with
-   the app's command log (for latency).
+4. **Clock:** the phone timestamps its frames, and the app estimates the phone↔add-on clock offset
+   over the websocket (NTP-style ping). A **sync blink** (one fast light toggling 4 times, within a
+   few seconds of the reference photo) is a check, not the only source: with the blink alone, every
+   latency inherits the sync light's own latency. The sync light is not the first light of the pass
+   (or a pause follows the blink), and its latency is measured once and stored.
 5. **Handheld robustness** (analysis in the add-on, Python with OpenCV):
    - **Frame alignment:** every frame is aligned to the reference. It tracks stable features
-     (house edges, windows that stay lit, streetlights), estimates a transform with outlier
-     rejection, and warps the frame before comparing. That absorbs normal hand shake and slow
-     drift.
+     (house edges, windows that stay lit, streetlights), rejects outliers with RANSAC, and fits a
+     **rotation + scale model** (`S·K·R·K⁻¹`), not a free homography (which bends at feature-poor
+     edges and makes false lights).
    - **Shake-aware differences:** shake leaves thin bright edges in a difference image, while a
      light change makes a filled region that rises or falls together. So: morphological
      open/close, minimum area, a "filled vs. edge" test, and the change must start within the
-     expected latency window after the command.
+     expected latency window after the command (at least 30 ms after it). The decisive check is the
+     **shift test**: if shifting the "before" frame by up to ±4 px removes most of the difference,
+     it is shake or parallax, not a light. Parallax from hand *translation* (near trees and lamps
+     move 1–4 px against the house) is the main residual; no global transform removes it.
    - **Motion sensor assist:** the page reads the phone's motion sensor (`DeviceMotionEvent`). A
-     big jolt during a step marks that step "retake", and the pass repeats it automatically at the
-     end. It doesn't restart the whole pass.
+     big jolt during a step (smoothed rotation rate > 45 °/s or acceleration > 4 m/s²), or a step
+     whose frames align badly, is marked "retake". At the end the pass **reverts that light once**
+     (one more single-light change). It doesn't restart the whole pass.
    - **Live feedback:** a steadiness indicator and "hold still" prompts. Lights detected with low
      confidence turn amber and are retried at the end, in the same pass.
-   - **Exposure:** the camera's exposure and white balance are locked after the reference photo
-     (where the browser allows), so the camera's own adjustment isn't mistaken for a light change.
+   - **Exposure:** normalised in software on every frame, from flat mid-tone reference pixels,
+     with near-saturated pixels treated as clipped. This handles auto-exposure reacting to every
+     light change. A browser exposure or white-balance lock is a bonus, not a requirement (iOS has
+     no exposure lock).
 6. **Results per light:** region, confidence, measured **latency** (stored in the profile), and
-   whether it rose or fell.
+   whether it rose or fell. The light's image position is the bright core of its region (≥ 50 % of
+   the peak change); plain centroids are pulled by glows and ground light pools.
 7. **Grouping suggestions:**
    - Regions that **overlap strongly** (several lights in a small room behind one small window) →
      **one element** (`single`).
    - Regions side by side within a larger region (a long room with a long window) → one element in
-     **`segments`** mode, ordered along the window. The user can switch it to `single`.
+     **`segments`** mode, ordered along the window, when they are of similar size, share a long
+     boundary and their union fills a rectangle (adjacency alone would merge neighbouring lamps).
+     The user can switch it to `single`.
    - **No visible change** → "not visible from this view". Place by hand, or leave out.
 8. **Review screen:** the photo with element outlines; drag, merge, split, reorder, rename, assign
    planes. Re-map one element, one room, or the whole view.
@@ -489,6 +504,11 @@ those at varying heights off any plane (trees, posts, pergolas):
   effects still work.
 - Twinkly's 3D modes use the same idea: scans from several angles with already-mapped lights as
   shared points.
+- **Expected accuracy** (synthetic prototype, `proto/mapping/`, 16 lights at ~15 m): light
+  positions to about 1 % of the scene (2–10 cm); one known distance gives metres to about 5 cm
+  (10 cm under heavy shake). The focal length is pinned only to about ±5 % and station poses to
+  1–3° (depth range is small against the stand-off), so seed the focal length from the phone model
+  where possible. Three stations matter: centre + one side gave 1.7 % mean / 4.3 % max error.
 
 **Manual yard plan.** A simple top-down editor for anything the camera can't place: drag lights
 onto a sketch or photo of the property.
