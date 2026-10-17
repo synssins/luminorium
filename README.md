@@ -5,9 +5,12 @@ Zigbee (Zigbee2MQTT), Z-Wave dimmers and relays, WiZ, WLED, Govee, ESPHome and M
 Assistant stays the source of truth for lights, areas and floors; Luminorium adds effects,
 palettes, spatial shows mapped with a phone camera, and automations on top.
 
-**Status:** phase 1 of 8 (skeleton add-on). It reads the house's lights from HA, shows them by
+**Status:** phase 2 of 8 (direct drivers). It reads the house's lights from HA, shows them by
 floor and area with what each can do, and has a safe Test button, Stop all, and crash recovery.
-Nothing here runs effects yet.
+Lights are driven directly where that is better (Zigbee2MQTT over MQTT, Z-Wave JS with
+multicast, WiZ, WLED and Govee over the LAN), through HA otherwise, under per-network rate
+budgets. None of the direct drivers has been tried on the real lights yet
+([docs/driver-tests.md](docs/driver-tests.md)). Nothing here runs effects yet.
 
 ## Documentation
 
@@ -18,7 +21,9 @@ Nothing here runs effects yet.
 | [SPIKES.md](SPIKES.md) | Research results (2026-10-16): the real inventory, Z-Wave, z2m, Govee, WiZ, phone camera, image size; open questions |
 | [docs/architecture.md](docs/architecture.md) | How the code is organised today |
 | [docs/inventory.md](docs/inventory.md) | How HA entities become lights: kinds, exclusions, segments, duplicates, profiles |
-| [docs/safety.md](docs/safety.md) | Rate governor, snapshots, Stop all, crash restore, outside changes, read-only |
+| [docs/drivers.md](docs/drivers.md) | The drivers (HA, z2m, Z-Wave JS, WiZ, WLED, Govee LAN), how each light's driver is chosen, discovery, fakes |
+| [docs/driver-tests.md](docs/driver-tests.md) | Short real-light checks of the direct drivers, waiting for approval (none run) |
+| [docs/safety.md](docs/safety.md) | Rate governor, batches, snapshots, Stop all, crash restore, outside changes, read-only |
 | [docs/api.md](docs/api.md) | The HTTP API |
 | [docs/development.md](docs/development.md) | Setup, tests, the fake HA, running on a PC, fixtures |
 | [docs/deployment.md](docs/deployment.md) | Add-on packaging, versioning rules, installing on HA |
@@ -32,7 +37,7 @@ Nothing here runs effects yet.
 | `repository.yaml` | HA add-on repository |
 | `luminorium_addon/` | The add-on: `config.yaml`, `build.yaml`, `Dockerfile`, `run.sh`, and the `luminorium` Python package |
 | `tests/` | pytest suite; `tests/fixtures/ha/` is scrubbed data captured from the real HA |
-| `tools/` | `fake_ha.py` (fake HA server), `dev.py` (run on a PC), `capture_ha.mjs` + `make_fixtures.py` (refresh fixtures) |
+| `tools/` | `fake_ha.py` (fake HA server), fake devices (`fake_mqtt.py`, `fake_zwave.py`, `fake_lan.py`, `fake_supervisor.py`), `dev.py` (run on a PC), `capture_ha.mjs` + `make_fixtures.py` (refresh fixtures) |
 | `docs/` | Documentation |
 | `proto/mapping/` | Offline prototype of the phone-mapping analysis on synthetic data (added separately) |
 

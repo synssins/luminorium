@@ -69,14 +69,22 @@ except for segments and settings.
 | `zigbee` | zigbee2mqtt | 200 ms | 5 Hz |
 | `wiz` | wiz | 120 ms | 15 Hz |
 | `wled` | wled | 30 ms | 40 Hz |
-| `govee_cloud` | govee2mqtt (no LAN path today) | 1000 ms | 0.5 Hz |
+| `govee_cloud` | govee2mqtt, through HA (the cloud) | 1000 ms | 0.5 Hz |
+| `govee_lan` | govee2mqtt devices reached by the Govee LAN driver | 100 ms | 10 Hz |
 | `esphome` | esphome | 100 ms | 10 Hz |
 | `matter` | matter | 300 ms | 2 Hz |
 | `mqtt` | other MQTT | 200 ms | 5 Hz |
 | `other` | anything else | 250 ms | 2 Hz |
 
-Phase 1 drives everything through HA, so each profile's latency adds 50 ms and its rate is capped
-at 2 Hz. **Relays** (included switches) are on/off only, at most one toggle per 5 s (0.2 Hz).
+Through the HA driver a profile's latency adds 50 ms and its rate is capped at 2 Hz. A direct
+driver uses its network's values as they are. The builder starts every profile on `ha`; the
+router ([drivers.md](drivers.md)) then sets `driver`, `network`, `latency_ms` and `max_rate_hz`
+for the driver each light actually uses. **Relays** (included switches) are on/off only, at most
+one toggle per 5 s (0.2 Hz), whatever the driver.
+
+The builder also keeps the ids direct drivers match on: the entity's `unique_id` and its
+device's `identifiers`, `connections` and `configuration_url` (not in the API output), and the
+user's pinned driver (`choices.json` `drivers`) as `profile.driver_override`.
 
 **Z-Wave details** come from `zwave_js/node_status` and `zwave_js/node_capabilities` (read once
 per device and cached): node id, node status (alive, dead, asleep), security class, Z-Wave Plus

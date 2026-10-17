@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..ha.client import HAClient
 from ..inventory.model import Light
+from ..inventory.profiles import INTEGRATION_NETWORK
 from .base import COLOR_ATTR, Driver, LightState
 
 
@@ -12,6 +13,13 @@ class HADriver(Driver):
 
     def __init__(self, ha: HAClient):
         self.ha = ha
+
+    def network(self, light: Light) -> str:
+        # Through HA a light uses its integration's own path (govee2mqtt: the cloud), whichever
+        # driver its profile prefers
+        if light.integration in INTEGRATION_NETWORK:
+            return INTEGRATION_NETWORK[light.integration]
+        return super().network(light)
 
     async def set(
         self, light: Light, state: LightState, transition_ms: int | None = None

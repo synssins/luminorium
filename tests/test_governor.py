@@ -93,3 +93,35 @@ async def test_cancel_all_drops_waiting_show_commands():
     with pytest.raises(Superseded):
         await waiting
     assert len(driver.sent) == 1
+
+
+class BatchingDriver(RecordingDriver):
+    """Sends any group as one message, like a Z-Wave multicast."""
+
+    def batches(self, lights, state):
+        return [list(lights)]
+
+    async def set_batch(self, lights, state, transition_ms=None):
+        for light in lights:
+            self.sent.append((time.monotonic(), light.entity_id, state))
+        return "batch"
+
+
+async def test_batch_is_one_token_and_latest_value_wins(monkeypatch):
+    monkeypatch.setitem(gov.NETWORK_BUDGETS, "zwave", (5.0, 1))
+    driver = BatchingDriver()
+    g = Governor(lambda _: driver)
+    a, b, c = (make_light(f"light.{n}", network="zwave", rate=100.0) for n in "abc")
+    assert await g.send_many([a, b, c], LightState(True, 10)) == ["batch"] * 3
+    assert g.batches_sent == 1
+    # The next batch waits ~0.2 s for a token; meanwhile b gets a newer value of its own
+    batch = asyncio.create_task(g.send_many([a, b, c], LightState(True, 20)))
+    await asyncio.sleep(0.05)
+    newer = asyncio.create_task(g.send(b, LightState(True, 30)))
+    results = await batch
+    assert results[0] == results[2] == "batch" and isinstance(results[1], Superseded)
+    await newer
+    last = {eid: s.brightness for _, eid, s in driver.sent}
+    assert last == {"light.a": 20, "light.b": 30, "light.c": 20}
+    order = [(eid, s.brightness) for _, eid, s in driver.sent if eid == "light.b"]
+    assert order == [("light.b", 10), ("light.b", 30)]  # the stale 20 never went out

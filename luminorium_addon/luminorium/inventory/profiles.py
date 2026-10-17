@@ -24,6 +24,8 @@ NETWORKS: dict[str, NetworkDefaults] = {
     "wled": NetworkDefaults(30, 40.0),
     # govee2mqtt reaches every Govee device here through the cloud (no LAN path yet)
     "govee_cloud": NetworkDefaults(1000, 0.5),
+    # Luminorium's own Govee LAN driver (UDP 4003)
+    "govee_lan": NetworkDefaults(100, 10.0),
     "esphome": NetworkDefaults(100, 10.0),
     "matter": NetworkDefaults(300, 2.0),
     "mqtt": NetworkDefaults(200, 5.0),
@@ -45,6 +47,23 @@ INTEGRATION_NETWORK = {
     "esphome": "esphome",
     "matter": "matter",
     "mqtt": "mqtt",
+}
+
+# Direct drivers: the integration each one serves, and the network its commands travel on.
+# Latency and rate come from that network's defaults (no HA hop, so no HA overhead or 2 Hz cap).
+INTEGRATION_DRIVER = {
+    "zigbee2mqtt": "z2m",
+    "zwave_js": "zwave_js",
+    "wiz": "wiz",
+    "wled": "wled",
+    "govee2mqtt": "govee",
+}
+DRIVER_NETWORK = {
+    "z2m": "zigbee",
+    "zwave_js": "zwave",
+    "wiz": "wiz",
+    "wled": "wled",
+    "govee": "govee_lan",
 }
 
 # Z-Wave security classes as zwave-js numbers them
@@ -112,8 +131,6 @@ def zwave_details(node: dict | None) -> dict:
 
 def build_profile(light: Light, zwave_node: dict | None = None, relay: bool = False) -> Profile:
     caps = capabilities_from_attributes(light)
-    network = INTEGRATION_NETWORK.get(light.integration, "other")
-    defaults = NETWORKS[network]
     details: dict = {}
 
     if light.integration == "zwave_js":
@@ -127,17 +144,25 @@ def build_profile(light: Light, zwave_node: dict | None = None, relay: bool = Fa
 
     if relay or light.entity_id.startswith("switch."):
         caps = Capabilities(on_off=True)
-        max_rate = RELAY_MAX_RATE_HZ
         relay = True
-    else:
-        max_rate = min(defaults.max_rate_hz, HA_DRIVER_MAX_RATE_HZ)
 
-    return Profile(
-        capabilities=caps,
-        network=network,
-        driver="ha",
-        max_rate_hz=max_rate,
-        latency_ms=defaults.latency_ms + HA_DRIVER_OVERHEAD_MS,
-        relay=relay,
-        details=details,
-    )
+    profile = Profile(capabilities=caps, network="other", relay=relay, details=details)
+    apply_driver(profile, "ha", light.integration)
+    return profile
+
+
+def apply_driver(profile: Profile, driver: str, integration: str) -> None:
+    """Set a profile's driver, and the network, latency and rate that come with it."""
+    if driver == "ha":
+        network = INTEGRATION_NETWORK.get(integration, "other")
+        defaults = NETWORKS[network]
+        latency = defaults.latency_ms + HA_DRIVER_OVERHEAD_MS
+        rate = min(defaults.max_rate_hz, HA_DRIVER_MAX_RATE_HZ)
+    else:
+        network = DRIVER_NETWORK[driver]
+        defaults = NETWORKS[network]
+        latency, rate = defaults.latency_ms, defaults.max_rate_hz
+    profile.driver = driver
+    profile.network = network
+    profile.latency_ms = latency
+    profile.max_rate_hz = RELAY_MAX_RATE_HZ if profile.relay else rate

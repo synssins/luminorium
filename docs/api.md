@@ -25,11 +25,26 @@ per-session prefix, so the UI uses relative URLs. In the add-on only the Supervi
   "counts": {"lights": 41, "segments": 94, "switches": 0, "excluded": 179},
   "sessions": ["test:light.front_porch_light"],
   "touched": ["light.front_porch_light"],
-  "activity": [{"at": 1792166234.5, "message": "Testing Front Porch Light", "entity_id": "light.front_porch_light"}]
+  "activity": [{"at": 1792166234.5, "message": "Testing Front Porch Light via z2m", "entity_ids": ["light.front_porch_light"]}],
+  "drivers": {
+    "ha": {"enabled": true, "connected": true},
+    "z2m": {"enabled": true, "connected": true, "error": null, "devices": 20, "groups": 4, "bridge_online": true},
+    "zwave_js": {"enabled": true, "connected": true, "error": null, "url": "ws://core-zwave-js:3000",
+                 "server": "3.10.2", "nodes": 29, "multicasts": 0, "read_back_misses": 0},
+    "wiz": {"enabled": true, "connected": true, "error": null, "bulbs": 2, "subnets": ["192.168.10.0/24"],
+            "found": [{"mac": "…", "ip": "192.168.10.64", "module": "ESP01_SHRGB1C_31", "online": true}]},
+    "wled": {"enabled": true, "connected": true, "error": null, "devices": 1},
+    "govee": {"enabled": true, "connected": true, "error": null, "devices": 1, "subnets": ["192.168.10.0/24"],
+              "razer_models": [], "found": [{"device": "…", "sku": "H7055", "ip": "…", "online": true,
+                                             "status": {"onOff": 1, "brightness": 100, "color": {…}, "colorTemInKelvin": 0}}]}
+  }
 }
 ```
 
-`activity` is the latest 30 events, newest first.
+`activity` is the latest 30 events, newest first. `drivers` has one entry per direct driver:
+`{"enabled": false}` when switched off in the options; `connected` is the link to its hub (or
+its UDP socket); `error` the last problem ("no MQTT broker (Mosquitto not found)", "can't listen
+on UDP 4002: …").
 
 ## `GET /api/inventory`
 
@@ -73,11 +88,20 @@ Segments are not listed; their parent's `segments` holds their entity ids. A lig
     "capabilities": {"on_off": true, "dimming": true, "white": [2000, 6535],
                      "color_modes": ["xy"], "effects": ["blink", "candle", …],
                      "transition": "native", "segments": 0},
-    "network": "zigbee", "driver": "ha", "max_rate_hz": 2.0, "latency_ms": 250,
-    "relay": false, "details": {}
-  }
+    "network": "zigbee", "driver": "z2m", "max_rate_hz": 5.0, "latency_ms": 200,
+    "relay": false, "details": {},
+    "drivers": ["z2m", "ha"], "driver_override": null, "driver_note": null,
+    "endpoint": "z2m 'Front Porch Light '"
+  },
+  "driver_options": ["ha", "z2m"]
 }
 ```
+
+`profile.driver` is the driver used now, with the `network`, `latency_ms` and `max_rate_hz` that
+come with it; `drivers` is every driver that reaches the light now (the chosen one first);
+`driver_override` the user's pin (`null`: automatic); `driver_note` why a pinned driver isn't
+used ("Zigbee2MQTT can't reach it now: using HA"); `endpoint` how it is reached.
+`driver_options` are the values `PUT …/driver` accepts besides `null`.
 
 For Z-Wave, `profile.details` has `node_id`, `node_status`, `security`, `zwave_plus`,
 `multilevel_switch_version` or `binary_switch_version`, and `supervision`.
@@ -87,10 +111,18 @@ For Z-Wave, `profile.details` has `node_id`, `node_status`, `security`, `zwave_p
 Body `{"include": true}`, `{"include": false}`, or `{"include": null}` to go back to the default.
 Returns the updated light. `404` for unknown entities, segments and settings.
 
+## `PUT /api/lights/{entity_id}/driver`
+
+Body `{"driver": "z2m"}` (any of the light's `driver_options`) to pin a driver, or
+`{"driver": null}` for automatic. Stored in `choices.json`. Returns the light. `400` for a
+driver the light can't use, `404` for unknown entities.
+
 ## `POST /api/lights/{entity_id}/test`
 
-Starts the Test sequence. `{"started": entity_id}`; `409` if read-only, excluded, unavailable,
-part of a fixture (test the fixture), already testing, or in use; `404` if unknown.
+Starts the Test sequence. Optional body `{"transition_ms": 3000, "effect": "candle",
+"hold_s": 3}` (fade 0–10000 ms on the way on and off, an effect the light lists while on, hold
+0–30 s). `{"started": entity_id}`; `409` if read-only, excluded, unavailable, part of a fixture
+(test the fixture), already testing, in use, or the options are out of range; `404` if unknown.
 
 ## Fixtures
 

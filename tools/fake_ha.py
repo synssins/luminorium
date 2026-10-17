@@ -48,6 +48,8 @@ class FakeHA:
     # Seconds between a service call and its state change (per entity id, else the default).
     latency: dict = field(default_factory=dict)
     default_latency: float = 0.0
+    # What zwave_js/network_status reports as the Z-Wave JS server HA uses
+    zwave_server_url: str = "ws://core-zwave-js:3000"
     _clients: list = field(default_factory=list)
     _runner: web.AppRunner | None = None
     port: int = 0
@@ -155,6 +157,8 @@ class FakeHA:
             else:
                 key = "status" if kind.endswith("status") else "capabilities"
                 await ok(copy.deepcopy(node[key]))
+        elif kind == "zwave_js/network_status":
+            await ok({"client": {"ws_server_url": self.zwave_server_url, "connected": True}})
         elif kind == "call_service":
             await self._call_service(msg, ok, fail)
         else:

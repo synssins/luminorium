@@ -75,11 +75,20 @@ const INTEGRATION = {
   esphome: "ESPHome", matter: "Matter", mqtt: "MQTT", group: "Group", browser_mod: "Browser",
 };
 
+const DRIVER = {
+  ha: "HA", z2m: "Zigbee2MQTT", zwave_js: "Z-Wave JS", wiz: "WiZ LAN", wled: "WLED", govee: "Govee LAN",
+};
+
 function badges(light) {
   const out = [];
   const p = light.profile || {};
   const c = p.capabilities || {};
   out.push([INTEGRATION[light.integration] || light.integration]);
+  if (p.driver && (light.kind === "light" || light.kind === "switch")) {
+    const direct = p.driver !== "ha";
+    out.push([`via ${DRIVER[p.driver] || p.driver}${p.driver_override ? " (pinned)" : ""}`, direct ? "drv" : "drv-ha"]);
+    if (p.driver_note) out.push([p.driver_note, "warn"]);
+  }
   if (light.kind === "group") out.push(["group"]);
   if (p.relay) out.push(["relay (on/off)"]);
   else {
@@ -103,6 +112,7 @@ function meta(light) {
   const parts = [light.entity_id];
   if (light.manufacturer || light.model) parts.push([light.manufacturer, light.model].filter(Boolean).join(" "));
   if (p.network) parts.push(`${p.network}, ~${p.latency_ms} ms, ≤${p.max_rate_hz} Hz`);
+  if (p.endpoint) parts.push(p.endpoint);
   if (p.details && p.details.multilevel_switch_version) parts.push(`Multilevel Switch v${p.details.multilevel_switch_version}`);
   if (!light.included && light.exclude_reason) parts.push(`excluded: ${light.exclude_reason}`);
   return parts.join(" · ");
@@ -169,7 +179,45 @@ function lightRow(light, { member = false } = {}) {
     bEl.append(b);
   }
   row.querySelector(".meta").textContent = meta(light);
+  const options = light.driver_options || [];
+  if (options.length > 1 && (light.kind === "light" || light.kind === "switch")) {
+    row.querySelector(".meta").after(driverPicker(light, options));
+  }
   return row;
+}
+
+// Automatic (the best driver that reaches the light), or pinned to HA or the direct driver
+function driverPicker(light, options) {
+  const wrap = document.createElement("label");
+  wrap.className = "driver-pick small muted";
+  wrap.textContent = "Driver ";
+  const select = document.createElement("select");
+  const p = light.profile || {};
+  const auto = document.createElement("option");
+  auto.value = "";
+  auto.textContent = `Automatic (${DRIVER[p.driver_override ? (p.drivers || ["ha"]).find((d) => d !== p.driver_override) || "ha" : p.driver] || p.driver})`;
+  if (!p.driver_override) auto.textContent = `Automatic (now ${DRIVER[p.driver] || p.driver})`;
+  else auto.textContent = "Automatic";
+  select.append(auto);
+  for (const name of options) {
+    const o = document.createElement("option");
+    o.value = name;
+    o.textContent = `Always ${DRIVER[name] || name}`;
+    select.append(o);
+  }
+  select.value = p.driver_override || "";
+  select.addEventListener("change", () => setDriver(light, select.value || null));
+  wrap.append(select);
+  return wrap;
+}
+
+async function setDriver(light, driver) {
+  try {
+    await api(`api/lights/${encodeURIComponent(light.entity_id)}/driver`, {
+      method: "PUT", body: JSON.stringify({ driver }),
+    });
+  } catch (e) { toast(e.message); }
+  await refresh(true);
 }
 
 function fixtureBlock(fixture, members) {
@@ -328,6 +376,7 @@ function renderStatus() {
   $("#counts").textContent =
     `${c.lights} lights (+${c.segments} segments), ${c.switches} switches included, ${c.excluded} excluded` +
     (s.touched.length ? ` · ${s.touched.length} in use` : "");
+  renderDrivers(s.drivers || {});
   const ul = $("#activity");
   ul.replaceChildren();
   for (const a of s.activity) {
@@ -335,6 +384,20 @@ function renderStatus() {
     li.textContent = `${new Date(a.at * 1000).toLocaleTimeString()} ${a.message}`;
     ul.append(li);
   }
+}
+
+function renderDrivers(drivers) {
+  const parts = [];
+  for (const [name, d] of Object.entries(drivers)) {
+    if (name === "ha") continue;
+    const label = DRIVER[name] || name;
+    if (!d.enabled) { parts.push(`${label}: off`); continue; }
+    const count = d.devices ?? d.bulbs ?? d.nodes ?? 0;
+    const what = name === "zwave_js" ? "node" : name === "wiz" ? "bulb" : "device";
+    if (d.connected) parts.push(`${label}: ${count} ${what}${count === 1 ? "" : "s"}`);
+    else parts.push(`${label}: ${d.error || "not connected"}`);
+  }
+  $("#drivers").textContent = parts.length ? `Drivers · ${parts.join(" · ")}` : "";
 }
 
 async function setInclude(light, include) {
@@ -369,8 +432,9 @@ async function refresh(force = false) {
     state.status = status;
     state.inventory = inventory;
     renderStatus();
-    // Don't redraw under someone typing a fixture name
-    const typing = document.activeElement && document.activeElement.classList.contains("inline-name");
+    // Don't redraw under someone typing a fixture name or picking a driver
+    const active = document.activeElement;
+    const typing = active && (active.classList.contains("inline-name") || !!active.closest(".driver-pick"));
     if (force || !typing) render();
   } catch (e) {
     $("#link").textContent = "offline";

@@ -159,6 +159,9 @@ the guided capture in phase 5.
 
 ## Tests I'd like to run on real lights (need your OK)
 
+(Superseded for the phase 2 drivers by [docs/driver-tests.md](docs/driver-tests.md), which
+covers these and a few more, run from Luminorium itself.)
+
 None of these has been done.
 
 1. **Z-Wave multicast:** one `multicast_set_value` to two insecure GE 12724s (for example basement

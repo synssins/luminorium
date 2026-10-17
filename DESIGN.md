@@ -120,6 +120,11 @@ Govee segment mode.
 
 ### Drivers
 
+*Built in phase 2 (0.2.0): HA, z2m, Z-Wave JS, WiZ, WLED and Govee LAN. As built, the interface
+is `set` / `batches` + `set_batch` / `stream` plus `supports` and `handles`; native effects go
+through `LightState.effect` (and driver-specific `effect()` with parameters). See
+[docs/drivers.md](docs/drivers.md).*
+
 All drivers implement one interface:
 
 ```python
