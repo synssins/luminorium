@@ -82,6 +82,9 @@ Lights whose bulbs only give white, whatever colour they're sent (like the white
 pathway), can be marked **White only** on their page, under **Its bulbs**. Palettes leave them
 alone unless you tick **Include white lights** next to **Play on**.
 
+**Cans and other lights on one switch:** pick the light, tick **Multiple fixtures on this switch**
+and say how many. Then place each fixture where it is; a dashed line joins them.
+
 Starter palettes: Forest, Ocean, Fire, Aurora, Sunset, Team colours, Warm white, Halloween (purple
 and deep orange, each light blending on its own every few seconds). Your own go in
 the add-on's config folder (`/addon_configs/<slug>/palettes/<id>.yaml`); one with the same id as

@@ -158,6 +158,7 @@ window.House3D = class House3D {
       const top = P(l.x, l.y, l.z), base = P(l.x, l.y, l.floorZ);
       if (!top) continue;
       if (l.aim && !l.dim) this.beam(items, P, l);
+      if (l.linked) { this.fixtures(items, P, l, col); continue; }
       for (const p of l.parts) {
         const pp = P(p.x, p.y, p.z);
         if (pp) items.push({ depth: pp.depth, draw: () => this.dot(pp, Math.max(2.5, 0.09 * pp.scale), p.sel ? col.accent : col.info, l.dim) });
@@ -300,6 +301,41 @@ window.House3D = class House3D {
     }
   }
 
+  // A light that is several fixtures on one switch: each fixture an orb with its drop line, all
+  // joined by a dashed line in order
+  fixtures(items, P, l, col) {
+    const pts = l.parts.map((p) => ({ p, top: P(p.x, p.y, p.z), base: P(p.x, p.y, l.floorZ) })).filter((q) => q.top);
+    l._screen = null;
+    l._parts = [];
+    if (pts.length > 1) items.push({ depth: avgDepth(pts.map((q) => q.top)) - 0.02, draw: () => {
+      const ctx = this.ctx;
+      ctx.save(); ctx.globalAlpha = l.dim ? 0.3 : 0.9; ctx.setLineDash([6, 5]); ctx.lineWidth = l.sel ? 2 : 1.5;
+      ctx.strokeStyle = l.sel ? col.accent : "#d9a441";
+      ctx.beginPath(); pts.forEach((q, i) => (i ? ctx.lineTo(q.top.x, q.top.y) : ctx.moveTo(q.top.x, q.top.y))); ctx.stroke();
+      ctx.restore();
+    } });
+    for (const q of pts) {
+      items.push({ depth: q.top.depth, draw: () => {
+        const ctx = this.ctx, top = q.top, sel = l.sel && q.p.sel;
+        ctx.globalAlpha = l.dim ? 0.3 : 1;
+        if (q.base) this.line(q.base, top, sel ? col.accent : col.faint, 1, [3, 3]);
+        const r = Math.max(4, (sel ? 0.24 : 0.17) * top.scale);
+        if (l.on || l.sel) {
+          const glow = ctx.createRadialGradient(top.x, top.y, 0, top.x, top.y, r * 2.6);
+          glow.addColorStop(0, hexA(l.sel ? col.accent : "#f5c25a", 0.4)); glow.addColorStop(1, hexA(l.sel ? col.accent : "#f5c25a", 0));
+          ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(top.x, top.y, r * 2.6, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.beginPath(); ctx.arc(top.x, top.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = sel ? col.accent : l.sel ? "#e6a466" : l.on ? "#d9a441" : col.faint; ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = col.bg; ctx.stroke();
+        ctx.globalAlpha = 1;
+        l._parts.push({ index: q.p.index, x: top.x, y: top.y, r: r + 6 });
+      } });
+    }
+    const first = pts[0];
+    if (first && (l.sel || this.scene.labels)) items.push({ depth: first.top.depth - 0.03, draw: () => this.text(l.label, first.top.x, first.top.y - 16, col.text, 12, "center", true) });
+  }
+
   // What a screen point looks at: the nearest of the ground, a house block's walls, a tree or
   // bush. Returns { p: {x, y, z}, what } or null.
   raycast(sx, sy) {
@@ -408,6 +444,10 @@ window.House3D = class House3D {
       if (d <= l._screen.r && (!best || d < best.d)) best = { id: l.id, d };
     }
     if (best) return { id: best.id, part: null };
+    for (const l of this.scene.lights) {
+      if (!l.linked || l.dim || !l._parts) continue;
+      for (const q of l._parts) if (Math.hypot(pt.x - q.x, pt.y - q.y) <= q.r) return { id: l.id, part: q.index };
+    }
     // parts of the picked light
     const sel = this.scene.lights.find((l) => l.sel);
     if (sel) for (const p of sel.parts) {

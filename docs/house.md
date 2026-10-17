@@ -37,7 +37,7 @@ Code: `luminorium/house.py` (`HouseService`), the API in `web/server.py`, the pa
   - wall: 1.8 m
   - floor lamp: 1.5 m
   - tabletop: 0.8 m
-  - under cabinet: 1.4 m
+  - under cabinet: 54" (a 36" counter, 18" above it)
   - strip: 1.0 m
   - path or post: 0.5 m
   - in the ground: 0 m
@@ -53,6 +53,12 @@ Code: `luminorium/house.py` (`HouseService`), the API in `web/server.py`, the pa
   - **Govee (govee2mqtt):** the strip's segment entities.
 
   A light with parts sits at the middle of its parts.
+- **Several fixtures on one switch** (cans on one dimmer): tick **Multiple fixtures on this
+  switch** on a placed light and say **How many** (2-50). Each becomes a part, "Fixture 1"…,
+  starting in a row from the light, 4 ft apart; place or drag each where it is. The light sits in
+  the middle of them. In 3D and from above they're joined by a dashed line: one switch. Stored as
+  `fixtures` (the count) and `parts` on the item; `PUT /api/house/items/{target}/fixtures`
+  `{count}` (0 for one fixture again). Not for lights whose parts are their own segments.
 
 Stored in the add-on's config folder as `house.json` (so it's in HA backups):
 

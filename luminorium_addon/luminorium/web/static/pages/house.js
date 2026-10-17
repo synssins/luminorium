@@ -77,7 +77,7 @@
       const sel = t.id === ui.sel;
       const here = t.item.floor === ui.floor || t.item.floor === house.outside;
       return {
-        id: t.id, label: t.name, x: t.world.x, y: t.world.y, z: t.world.z, floorZ: floorZ(t.item.floor), aim: t.item.aim || null, floor: t.item.floor,
+        id: t.id, label: t.name, x: t.world.x, y: t.world.y, z: t.world.z, floorZ: floorZ(t.item.floor), aim: t.item.aim || null, floor: t.item.floor, linked: t.fixtures > 0,
         on: t.state === "on", sel, dim: !here && !sel,
         parts: t.parts.filter((p) => p.world).map((p) => ({ index: p.index, x: p.world.x, y: p.world.y, z: p.world.z, sel: sel && ui.part === p.index })),
       };
@@ -235,6 +235,12 @@
     await placeItem({ x, y, floor, ...(t.item && t.item.floor === floor ? {} : { h: null, mount: t.item?.mount || (floor === house.outside ? "post" : "ceiling") }) });
     toast(`${t.name}: ${floorName(floor)}`);
   }
+  async function setFixtures(t, count) {
+    await run(() => api(`api/house/items/${encodeURIComponent(t.id)}/fixtures`, { method: "PUT", body: { count } }));
+    ui.part = count ? 0 : null;
+    await reload();
+    if (count) toast(`Now drag each fixture of ${t.name} to where it is`);
+  }
   async function aimLight(id, aim) {
     await run(() => api(`api/house/items/${encodeURIComponent(id)}/aim`, { method: "PUT", body: aim }));
     house = await api("api/house");
@@ -354,18 +360,29 @@
           if (Number.isNaN(v)) { toast(`Couldn't read “${e.target.value}” as a length`); e.target.value = L.fmtLen(value); return; }
           placeItem({ [key]: v });
         } } }));
-    const parts = t.parts.length ? el("section", { style: { display: "flex", flexDirection: "column", gap: "6px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
-      el("div.card-head", el("h3", `Parts (${t.parts.length})`),
+    const multi = t.fixtures > 0;
+    // a light whose parts aren't its own segments can be several fixtures on one switch
+    const canMulti = t.kind === "light" && item && (multi || !t.parts.length);
+    const fixturesBox = canMulti ? el("section", { "aria-label": "Fixtures", style: { display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
+      el("label.check", el("input", { type: "checkbox", checked: multi, on: { change: (e) => setFixtures(t, e.target.checked ? 2 : 0) } }),
+        "Multiple fixtures on this switch"),
+      multi ? el("label.field", el("span", "How many fixtures"),
+        el("input.input", { type: "number", min: 2, max: 50, step: 1, value: t.fixtures, style: { width: "100px" },
+          on: { change: (e) => { const n = Math.round(Number(e.target.value)); if (!(n >= 2 && n <= 50)) { toast("2 to 50 fixtures"); e.target.value = t.fixtures; return; } setFixtures(t, n); } } }))
+        : el("span.small.muted", "For cans or other lights that one switch or dimmer turns on together: place each one where it is.")) : null;
+    const parts = t.parts.length ? el("section", { style: { display: "flex", flexDirection: "column", gap: "6px", borderTop: multi ? "0" : "1px solid var(--line)", paddingTop: multi ? "0" : "12px" } },
+      el("div.card-head", el("h3", multi ? `Fixtures (${t.parts.length})` : `Parts (${t.parts.length})`),
         el("button.btn.small", { type: "button", disabled: !item && false, "aria-pressed": String(!!ui.mode),
           on: { click: () => { ui.mode = ui.mode ? null : "line-start"; ui.lineStart = null; paint(); if (ui.mode) toast("In 3D, tap where the first one is"); } } },
           ui.mode ? "Cancel line" : "Lay out along a line")),
-      el("span.small.muted", "Select a part, then tap where it goes in 3D or the Top view. Flash shows which one it is."),
+      el("span.small.muted", multi ? "Select a fixture, then tap where it is in 3D or the Top view, or drag it in 3D. The dashed line shows they're on one switch."
+        : "Select a part, then tap where it goes in 3D or the Top view. Flash shows which one it is."),
       t.parts.map((p) => el("div.row", { style: { gap: "8px", padding: "6px 8px", borderRadius: "10px", flexWrap: "nowrap",
         background: ui.part === p.index ? "var(--accent-soft)" : "var(--card2)" } },
         el("button", { type: "button", "aria-pressed": String(ui.part === p.index), on: { click: () => { ui.part = ui.part === p.index ? null : p.index; paint(); } },
           style: { flex: "1", minWidth: "0", textAlign: "left", border: 0, background: "none", color: "var(--text)", cursor: "pointer", minHeight: "36px", display: "flex", alignItems: "center", gap: "8px" } },
           el("span", { style: { width: "8px", height: "8px", borderRadius: "50%", flex: "none", ...(p.placed ? { background: "var(--info)" } : { border: "2px solid var(--faint)" }) } }), p.label),
-        el("button.btn.small", { type: "button", disabled: status?.read_only, on: { click: () => identify(p.index) } }, "Flash")))) : null;
+        multi ? null : el("button.btn.small", { type: "button", disabled: status?.read_only, on: { click: () => identify(p.index) } }, "Flash")))) : null;
 
     return el("aside.card.accent.hm-insp", { "aria-label": "Selected light" },
       el("div", el("h2", t.name), el("span.small.muted", [t.kind === "fixture" ? "Fixture" : L.INTEGRATION[t.integration] || t.integration, item ? `placed on ${floorName(item.floor)}` : "not placed yet"].join(" · "))),
@@ -385,6 +402,7 @@
       el("div.row", { style: { gap: "8px" } },
         el("button.btn.primary", { type: "button", disabled: status?.read_only, style: { flex: "1" }, on: { click: () => identify(undefined) } }, "Flash it"),
         item ? el("button.btn", { type: "button", on: { click: removeItem } }, "Remove") : null),
+      fixturesBox,
       parts);
   }
 

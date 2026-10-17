@@ -51,7 +51,7 @@ MOUNTS: dict[str, dict[str, Any]] = {
     "wall": {"label": "Wall", "h": 1.8},
     "floor_lamp": {"label": "Floor lamp", "h": 1.5},
     "table": {"label": "Tabletop", "h": 0.8},
-    "under_cabinet": {"label": "Under cabinet", "h": 1.4},
+    "under_cabinet": {"label": "Under cabinet", "h": 1.3716},  # 36" counter + 18"
     "soffit": {"label": "Under the eaves", "h": 2.6},
     "strip": {"label": "Strip", "h": 1.0},
     "post": {"label": "Path or post", "h": 0.5},
@@ -204,7 +204,13 @@ class HouseService:
                 continue
             out.append(
                 self._target(
-                    lt.entity_id, "light", lt.name, lt.area_id, lt.floor_id, lt, self.parts_for(lt)
+                    lt.entity_id,
+                    "light",
+                    lt.name,
+                    lt.area_id,
+                    lt.floor_id,
+                    lt,
+                    self.parts_for(lt) or self._fixture_parts(lt.entity_id),
                 )
             )
         out.sort(key=lambda t: t["name"].lower())
@@ -218,6 +224,8 @@ class HouseService:
         return {
             "id": tid,
             "kind": kind,
+            # several fixtures run by one switch (cans on one dimmer): each is a part
+            "fixtures": (item or {}).get("fixtures", 0),
             "name": name,
             "area_id": area_id,
             "floor_id": floor_id,
@@ -323,6 +331,45 @@ class HouseService:
             raise KeyError(tid)
         self._save()
 
+    def _fixture_parts(self, tid: str) -> list[Part]:
+        n = (self.data["items"].get(tid) or {}).get("fixtures", 0)
+        return [Part(i, f"Fixture {i + 1}") for i in range(n)]
+
+    def set_fixtures(self, tid: str, count: int) -> dict:
+        """A light that is several fixtures on one switch (cans on one dimmer): `count` parts,
+        each placed on its own. New ones start in a row from the light, 4 ft apart; 0 makes it
+        one fixture again."""
+        target = self._check_target(tid)
+        if target["kind"] != "light":
+            raise HouseError("only a light can be several fixtures")
+        if any(p["entity_id"] or not p["label"].startswith("Fixture") for p in target["parts"]):
+            raise HouseError("this light's parts are its own segments")
+        item = self.data["items"].get(tid)
+        if item is None:
+            raise HouseError("place the light first")
+        count = int(_num(count))
+        if count != 0 and not 2 <= count <= 50:
+            raise HouseError("2 to 50 fixtures")
+        parts = item.setdefault("parts", {})
+        if count == 0:
+            item.pop("fixtures", None)
+            item.pop("parts", None)
+        else:
+            had = item.get("fixtures", 0)
+            for i in range(count):
+                if str(i) not in parts:
+                    # the first one where the light is, the rest in a row beside it
+                    parts[str(i)] = {
+                        "x": round(item["x"] + 1.2192 * i, 3),
+                        "y": item["y"],
+                        "h": item["h"],
+                    }
+            for i in range(count, max(had, count)):
+                parts.pop(str(i), None)
+            item["fixtures"] = count
+        self._save()
+        return item
+
     def place_part(self, tid: str, index: int, x: float, y: float, h: float | None) -> None:
         target = self._check_target(tid)
         if not any(p["index"] == index for p in target["parts"]):
@@ -336,6 +383,10 @@ class HouseService:
             "y": _num(y),
             "h": max(0.0, _num(item["h"] if h is None else h)),
         }
+        if item.get("fixtures"):
+            # one switch, several fixtures: the light itself is in the middle of them
+            item["x"] = round(sum(q["x"] for q in parts.values()) / len(parts), 3)
+            item["y"] = round(sum(q["y"] for q in parts.values()) / len(parts), 3)
         self._save()
 
     def remove_part(self, tid: str, index: int) -> None:

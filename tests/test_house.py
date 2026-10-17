@@ -650,3 +650,33 @@ async def test_aiming_at_a_spot_and_keeping_it(client, lum):
     assert "at" not in r.json()["aim"]
     bad = {"kind": "flood", "at": lum.house.world(PORCH)}  # where the light is
     assert (await client.put(f"/api/house/items/{PORCH}/aim", json=bad)).status_code == 400
+
+
+async def test_one_switch_several_fixtures(client, lum):
+    kitchen = "light.kitchen_cabinet_light_switch"
+    r = await client.put(f"/api/house/items/{kitchen}/fixtures", json={"count": 3})
+    assert r.status_code == 400  # place it first
+    await client.put(f"/api/house/items/{kitchen}", json={"floor": "main_level", "x": 4, "y": 3})
+    r = await client.put(f"/api/house/items/{kitchen}/fixtures", json={"count": 3})
+    assert r.json()["fixtures"] == 3
+    t = next(t for t in (await client.get("/api/house")).json()["targets"] if t["id"] == kitchen)
+    assert t["fixtures"] == 3
+    assert [p["label"] for p in t["parts"]] == ["Fixture 1", "Fixture 2", "Fixture 3"]
+    assert all(p["placed"] for p in t["parts"])  # a row of three, 4 ft apart
+    assert [round(p["world"]["x"], 2) for p in t["parts"]] == [4, 5.22, 6.44]
+    # placing one moves the light to the middle of them
+    await client.put(f"/api/house/items/{kitchen}/parts/2", json={"x": 10, "y": 3})
+    assert lum.house.data["items"][kitchen]["x"] == pytest.approx((4 + 5.219 + 10) / 3, abs=0.01)
+    # fewer: the extra one goes; none: one fixture again
+    r = await client.put(f"/api/house/items/{kitchen}/fixtures", json={"count": 2})
+    assert sorted(r.json()["parts"]) == ["0", "1"]
+    r = await client.put(f"/api/house/items/{kitchen}/fixtures", json={"count": 0})
+    assert "parts" not in r.json() and "fixtures" not in r.json()
+    assert (
+        await client.put(f"/api/house/items/{kitchen}/fixtures", json={"count": 1})
+    ).status_code == 400
+    # a Govee strip's parts are its own segments
+    await client.put(f"/api/house/items/{STRING}", json={"floor": OUTSIDE, "x": 1, "y": 1})
+    assert (
+        await client.put(f"/api/house/items/{STRING}/fixtures", json={"count": 2})
+    ).status_code == 400

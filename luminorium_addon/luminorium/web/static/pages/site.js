@@ -724,7 +724,14 @@ window.SiteEditor = class SiteEditor {
       ctx.fillStyle = sel ? "#ff8a3d" : t.state === "on" ? "#f5c25a" : "#cfd6de"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#111"; ctx.stroke();
       ctx.globalAlpha = 1;
       if (sel) label(ctx, t.name, p.x, p.y - 12, "#fff", col, "center");
-      for (const part of t.parts) if (part.world) { const q = this.h2s(part.world.x, part.world.y); ctx.beginPath(); ctx.arc(q.x, q.y, 3, 0, Math.PI * 2); ctx.fillStyle = "#9ad0f5"; ctx.fill(); }
+      if (t.fixtures > 0) {
+        // several fixtures on one switch: each a dot, joined by a dashed line
+        const q = t.parts.filter((pt) => pt.world).map((pt) => this.h2s(pt.world.x, pt.world.y));
+        ctx.save(); ctx.globalAlpha = here || sel ? 1 : 0.3; ctx.setLineDash([6, 5]); ctx.strokeStyle = sel ? "#ff8a3d" : "#d9a441"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); q.forEach((pt, i) => (i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y))); ctx.stroke(); ctx.setLineDash([]);
+        for (const pt of q) { ctx.beginPath(); ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2); ctx.fillStyle = sel ? "#ff8a3d" : t.state === "on" ? "#f5c25a" : "#cfd6de"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#111"; ctx.stroke(); }
+        ctx.restore();
+      } else for (const part of t.parts) if (part.world) { const q = this.h2s(part.world.x, part.world.y); ctx.beginPath(); ctx.arc(q.x, q.y, 3, 0, Math.PI * 2); ctx.fillStyle = "#9ad0f5"; ctx.fill(); }
     }
     // calibration lines
     if (d.square && (this.tool === "square" || isSel("square"))) this.photoLine(ctx, [d.square.a, d.square.b], "#ffd166", "Square");

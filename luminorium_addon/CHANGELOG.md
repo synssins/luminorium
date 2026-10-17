@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-dev.16
+
+- **Several fixtures on one switch:** tick **Multiple fixtures on this switch** on a light (cans
+  on one dimmer), say how many, and place each one. They're joined by a dashed line in 3D and from
+  above; the light sits in the middle of them.
+- **Under cabinet** lights default to 54" (a 36" counter, 18" above it).
+
 ## 0.3.0-dev.15
 
 - **3D: slide the view.** Drag with the right mouse button or the wheel (or Shift and the left
