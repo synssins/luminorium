@@ -6,11 +6,12 @@ In the add-on, only the Supervisor's ingress proxy may connect.
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -19,6 +20,7 @@ from ..app import Luminorium
 from ..drivers.router import DriverChoiceError
 from ..engine.engine import ShowError
 from ..engine.testlight import LightTestError, TestOptions
+from ..house import HouseError
 from ..inventory.model import Kind
 from ..library import LibraryError
 from . import mapping_api, spatial_api
@@ -97,9 +99,45 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         response.headers["Cache-Control"] = "no-store"
         return response
 
+    # Pages built from the shared shell: (title, script). Views, capture and the camera check are
+    # their own HTML files, which load the same shell.
+    pages = {
+        "": ("Overview", "overview"),
+        "lights": ("Lights", "lights"),
+        "light": ("Light", "light"),
+        "palettes": ("Palettes & shows", "palettes"),
+        "house": ("House map", "house"),
+        "drivers": ("Drivers", "drivers"),
+        "activity": ("Activity", "activity"),
+        "settings": ("Settings", "settings"),
+    }
+
+    def page_html(key: str) -> HTMLResponse:
+        title, script = pages[key]
+        wide = ' data-wide="1"' if key == "house" else ""
+        crumbs = ' data-crumbs="Lights@lights"' if key == "light" else ""
+        return HTMLResponse(
+            f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{title} · Luminorium</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap">
+<link rel="stylesheet" href="static/style.css?v={__version__}">
+</head>
+<body data-page="{script}" data-title="{title.replace("&", "&amp;")}"{wide}{crumbs}>
+<script src="static/shell.js?v={__version__}"></script>
+<script src="static/pages/{script}.js?v={__version__}"></script>
+</body>
+</html>
+"""
+        )
+
     @app.get("/")
     async def index():
-        return FileResponse(STATIC / "index.html")
+        return page_html("")
 
     @app.get("/camera")
     async def camera():
@@ -112,6 +150,13 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
     @app.get("/capture")
     async def capture_page():
         return FileResponse(STATIC / "capture.html")
+
+    for _key in [k for k in pages if k]:
+
+        async def _page(key: str = _key) -> HTMLResponse:
+            return page_html(key)
+
+        app.add_api_route(f"/{_key}", _page, methods=["GET"], include_in_schema=False)
 
     app.include_router(spatial_api.router(lum))
     app.include_router(mapping_api.router(lum))
@@ -137,6 +182,20 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
     def light_dict(light) -> dict:
         data = light.to_dict()
         data["driver_options"] = lum.router.options(light)
+        attrs = light.attributes or {}
+        # What it looks like now, for the cards (the full attributes stay server-side)
+        data["look"] = {
+            k: attrs.get(k)
+            for k in (
+                "brightness",
+                "color_mode",
+                "rgb_color",
+                "hs_color",
+                "color_temp_kelvin",
+                "effect",
+            )
+            if attrs.get(k) is not None
+        }
         return data
 
     @app.get("/api/inventory")
@@ -361,6 +420,109 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
     async def stop_shows():
         """End every running show, each as its on_end says (Stop all restores everything)."""
         return {"stopped": await lum.engine.stop_shows()}
+
+    # ---- house map ------------------------------------------------------------------------
+
+    def _house_errors(fn):
+        try:
+            return fn()
+        except KeyError as err:
+            raise HTTPException(404, f"unknown {err.args[0]}") from err
+        except HouseError as err:
+            raise HTTPException(400, str(err)) from err
+
+    @app.get("/api/house")
+    async def house():
+        return lum.house.view()
+
+    @app.put("/api/house/settings")
+    async def house_settings(body: dict):
+        _house_errors(lambda: lum.house.settings(body.get("size"), body.get("floors")))
+        return lum.house.view()
+
+    @app.put("/api/house/items/{target}")
+    async def house_place(target: str, body: dict):
+        return _house_errors(
+            lambda: lum.house.place(
+                target,
+                str(body.get("floor", "")),
+                body.get("x", 0),
+                body.get("y", 0),
+                body.get("h"),
+                body.get("mount"),
+            )
+        )
+
+    @app.delete("/api/house/items/{target}")
+    async def house_remove(target: str):
+        _house_errors(lambda: lum.house.remove(target))
+        return {"removed": target}
+
+    @app.put("/api/house/items/{target}/parts/{index}")
+    async def house_part(target: str, index: int, body: dict):
+        _house_errors(
+            lambda: lum.house.place_part(
+                target, index, body.get("x", 0), body.get("y", 0), body.get("h")
+            )
+        )
+        return {"placed": index}
+
+    @app.delete("/api/house/items/{target}/parts/{index}")
+    async def house_part_remove(target: str, index: int):
+        _house_errors(lambda: lum.house.remove_part(target, index))
+        return {"removed": index}
+
+    @app.post("/api/house/items/{target}/line")
+    async def house_line(target: str, body: dict):
+        n = _house_errors(
+            lambda: lum.house.line(
+                target, body.get("start") or {}, body.get("end") or {}, body.get("parts")
+            )
+        )
+        return {"placed": n}
+
+    @app.post("/api/house/identify")
+    async def house_identify(body: dict):
+        """Flash a light, a fixture, or one part of a segmented light so it can be spotted."""
+        if lum.settings.read_only:
+            raise HTTPException(409, "Luminorium is read-only: nothing is sent to lights")
+        inv = lum.inventory.inventory
+        target, part = str(body.get("target", "")), body.get("part")
+        try:
+            if target in inv.fixtures:
+                if part is not None:
+                    raise HTTPException(400, "a fixture has no parts")
+                lum.tester.start_fixture(
+                    inv.fixtures[target], [inv.lights[e] for e in inv.fixtures[target].members]
+                )
+                return {"flashing": target}
+            light = inv.get(target)
+            if light is None:
+                raise HTTPException(404, f"unknown light {target}")
+            if part is None:
+                lum.tester.identify(light)
+                return {"flashing": target}
+            parts = lum._parts_for(light)
+            found = next((p for p in parts if p.index == int(part)), None)
+            if found is None:
+                raise HTTPException(404, f"{light.name} has no part {part}")
+            if found.entity_id:
+                segment = inv.get(found.entity_id)
+                if segment is None:
+                    raise HTTPException(404, f"unknown segment {found.entity_id}")
+                lum.tester.identify(segment)
+            else:
+                lum.safety.note(
+                    f"Flashing {found.label} of {light.name} to identify it",
+                    entity_id=light.entity_id,
+                )
+                task = asyncio.create_task(lum.flash_pixel(light, found.index))
+                task.add_done_callback(
+                    lambda t: t.exception() and lum.safety.note(f"Identify failed: {t.exception()}")
+                )
+            return {"flashing": target, "part": found.index}
+        except LightTestError as err:
+            raise HTTPException(409, str(err)) from err
 
     @app.post("/api/stop_all")
     async def stop_all():

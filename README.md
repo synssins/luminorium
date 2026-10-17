@@ -28,6 +28,8 @@ and camera mapping haven't been tried on the real lights yet
 | [docs/engine.md](docs/engine.md) | The show engine: colour, layers, palettes, effect resolution, the planner, shows, storage |
 | [docs/safety.md](docs/safety.md) | Rate governor, batches, snapshots, Stop all, crash restore, outside changes, read-only |
 | [docs/mapping.md](docs/mapping.md) | Views, planes, elements; manual placement; the guided camera capture, live step detection, analysis, results, raw sessions |
+| [docs/ui.md](docs/ui.md) | The web UI: the shell, pages, helpers, phones |
+| [docs/house.md](docs/house.md) | The house map: placing lights in 3D by floor, height and mount; segmented lights' parts; identify |
 | [docs/api.md](docs/api.md) | The HTTP API |
 | [docs/development.md](docs/development.md) | Setup, tests, the fake HA, running on a PC, fixtures |
 | [docs/deployment.md](docs/deployment.md) | Add-on packaging, versioning rules, installing on HA |

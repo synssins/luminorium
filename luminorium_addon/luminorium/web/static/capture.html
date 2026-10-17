@@ -4,14 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Map with the camera · Luminorium</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap">
 <link rel="stylesheet" href="static/style.css">
 <link rel="stylesheet" href="static/spatial.css">
 </head>
-<body>
-<header class="top">
-  <div class="brand">Map with the camera</div>
-  <nav class="toplinks small"><a href="./">Lights</a> <a id="to-view" href="views">Views</a></nav>
-</header>
+<body data-page="capture" data-title="Map with camera" data-legacy="1" data-own-stop="1">
 
 <main class="spatial">
   <section id="banner" class="banner" hidden></section>
@@ -76,10 +74,7 @@
   </section>
 </main>
 
-<footer class="stopbar">
-  <div id="toast" class="toast" role="status" hidden></div>
-  <button id="stopall" class="stop">Stop all</button>
-</footer>
+<script src="static/shell.js"></script>
 <script src="static/capture.js"></script>
 </body>
 </html>

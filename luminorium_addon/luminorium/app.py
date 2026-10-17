@@ -20,6 +20,7 @@ from .engine.governor import Governor
 from .engine.safety import Safety
 from .engine.testlight import LightTester
 from .ha.client import HAClient
+from .house import HouseService, Part
 from .inventory.model import Inventory, Light
 from .inventory.service import InventoryService
 from .library import Library
@@ -61,9 +62,51 @@ class Luminorium:
             read_only=settings.read_only,
             clock=mapping_clock,
         )
+        self.house = HouseService(JsonStore(settings.config_dir), self.inventory, self._parts_for)
         self._startup: asyncio.Task | None = None
         self.router.attach(lambda: self.inventory.inventory)
         self.inventory.on_rebuild(self._rebuilt)
+
+    def _parts_for(self, light: Light) -> list[Part]:
+        """A segmented light's parts for the house map: a WLED light's LEDs (labelled with the
+        WLED segment each is in), or a Govee strip's segment entities."""
+        if light.integration == "wled":
+            wled = self.router.drivers.get("wled")
+            found = wled.device_for(light) if isinstance(wled, WLEDDriver) else None
+            if not found:
+                return []
+            device, seg = found
+            count = wled.pixel_count(light)
+            start = next((s["start"] for s in device.segments if s["id"] == seg), 0)
+            parts = []
+            for i in range(count):
+                pixel = start + i
+                in_seg = next(
+                    (s["id"] for s in device.segments if s["start"] <= pixel < s["stop"]), None
+                )
+                label = f"LED {i + 1}"
+                if seg is None and len(device.segments) > 1 and in_seg is not None:
+                    label += f" · segment {in_seg}"
+                parts.append(Part(i, label))
+            return parts
+        if light.segments:
+            return [Part(i, f"Segment {i + 1}", eid) for i, eid in enumerate(light.segments)]
+        return []
+
+    async def flash_pixel(self, light: Light, index: int, seconds: float = 2.0) -> None:
+        """Light one LED of a WLED light white for a moment (realtime frames); WLED goes back to
+        its own state by itself a few seconds after the frames stop."""
+        wled = self.router.drivers.get("wled")
+        if not isinstance(wled, WLEDDriver):
+            raise ConnectionError("the WLED driver isn't running")
+        count = wled.pixel_count(light)
+        if not 0 <= index < count:
+            raise ValueError(f"{light.name} has no LED {index + 1}")
+        frame = [(0, 0, 0)] * count
+        frame[index] = (255, 255, 255)
+        for _ in range(max(1, int(seconds / 0.2))):
+            await wled.stream(light, frame)
+            await asyncio.sleep(0.2)
 
     def driver_for(self, light: Light) -> Driver:
         return self.router.driver_for(light)

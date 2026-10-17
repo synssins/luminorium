@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0-dev.1
+
+A new UI, and the house map.
+
+- **The UI is redesigned** after the Zigbee2MQTT frontend: a left menu, a top bar with the
+  Home Assistant status and Stop all on every page, summary tiles and card grids, an HA-like dark
+  theme (and a light one), and phone layouts.
+- **New pages:**
+  - **Overview:** what's on, what's playing, the drivers, each level, activity.
+  - **Lights:** cards by level and room, fixtures, grouping, suggestions.
+  - **Light detail:** capabilities, driver choice and timing, test with a fade, an effect and a
+    hold time, effects on this light.
+  - **Palettes & shows**, **Drivers**, **Activity** and **Settings** (appearance).
+  - Views and camera mapping now sit in the same shell.
+- **House map:** place every light in 3D by hand, no camera or floorplan needed.
+  - Floors come from HA. You set each floor's height above the ground (split levels too), its
+    ceiling, and which part of the house it covers.
+  - Pick a light, tap where it is from above, and drag its height in the view from the street.
+  - Mount types (ceiling, pendant, wall, floor lamp, tabletop, under cabinet, strip, path or
+    post, in the ground) set the height.
+  - Segmented lights stay one light, and their parts can be placed one by one or along a line:
+    WLED LEDs (a device's segment lights fold into its main light) and Govee segments.
+  - **Flash** identifies a light, a fixture or one part. WLED LEDs flash through realtime
+    frames, Govee segments through their own entities, and everything is put back.
+- Cards show brightness, colour temperature and effect (`look` in the inventory API).
+
 ## 0.2.0-dev.3
 
 From the first checks on the real lights (docs/driver-tests.md):

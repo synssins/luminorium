@@ -5,6 +5,8 @@
 "use strict";
 
 const $ = (s) => document.querySelector(s);
+// The shell has no page links of its own: put "Views" in its top bar
+if (window.L) L.topExtra().append(L.el("a.btn.small#to-view", { href: "views" }, L.icon("views", 16), "Views"));
 const FPS = 15;
 const WIDTH = 640;
 const MAX_IN_FLIGHT = 3; // frames sent but not yet acknowledged

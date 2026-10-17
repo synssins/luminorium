@@ -88,7 +88,8 @@ settings and runs the FastAPI app under uvicorn; the app's lifespan starts and s
 | `mapping/service.py` | `MappingService`: create, list, delete, re-analyse, apply; latency write-back. |
 | `mapping/clock.py` | The capture's clock (simulated in tests). |
 | `web/server.py` | `create_app()`: pages, static files, JSON API ([api.md](api.md)), client allow-list. Includes `web/spatial_api.py` and `web/mapping_api.py`. |
-| `web/static/` | `index.html` + `app.js` + `style.css` (lights page), `shows.js` (the Palettes panel), `views.html` + `views.js` (views and review), `capture.html` + `capture.js` (camera mapping), `spatial.css`, `camera.html` (phone camera check). No build step. |
+| `web/static/` | The UI ([ui.md](ui.md)): `style.css`, `shell.js` (menu, top bar, helpers), `pages/*.js` (one per page), plus `views.html`/`views.js`, `capture.html`/`capture.js`, `camera.html` and `spatial.css`. No build step. |
+| `house.py` | `HouseService`: the house map (floors with heights, items with floor, position, height and mount; parts of segmented lights). See [house.md](house.md). |
 
 ## Data in `/data`
 

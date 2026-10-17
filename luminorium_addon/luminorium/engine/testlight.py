@@ -141,3 +141,45 @@ class LightTester:
                 session.tasks.discard(asyncio.current_task())  # type: ignore[arg-type]
                 await asyncio.shield(safety.end_session(session, restore=True))
                 safety.note(f"Test of {label} done; restored", entity_ids=ids)
+
+    # ---- identify: a short white flash, to spot one light or one segment ----------------------
+
+    def identify(self, light: Light, hold_s: float = 1.5) -> None:
+        """Flash a light (or one segment of a strip) white, then put it back. Unlike Test this
+        also takes segment entities, so a strip's segments can be told apart."""
+        if light.kind not in (Kind.LIGHT, Kind.SWITCH, Kind.SEGMENT):
+            raise LightTestError("only lights and segments can be identified")
+        if not light.available:
+            raise LightTestError(f"{light.name} is {light.state}")
+        name = f"identify:{light.entity_id}"
+        if name in self.safety.sessions:
+            raise LightTestError(f"{light.name} is already flashing")
+        if light.entity_id in self.safety.snapshots:
+            raise LightTestError(
+                f"{light.name} is in use by {self.safety.snapshots[light.entity_id].session}"
+            )
+        session = self.safety.session(name)
+        session.run(self._flash(session, light, hold_s))
+
+    async def _flash(self, session, light: Light, hold_s: float) -> None:
+        safety = self.safety
+        caps = light.profile.capabilities if light.profile else None
+        colour = bool(caps and caps.color_modes) or light.kind == Kind.SEGMENT
+        state = LightState(
+            on=True,
+            brightness=255 if light.entity_id.startswith("light.") else None,
+            color_mode="rgb" if colour else None,
+            color=[255, 255, 255] if colour else None,
+        )
+        safety.note(f"Flashing {light.name} to identify it", entity_id=light.entity_id)
+        try:
+            if await safety.command(session, light, state, transition_ms=0):
+                await asyncio.sleep(hold_s)
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:
+            safety.note(f"Identify {light.name} failed: {err}", entity_id=light.entity_id)
+        finally:
+            if safety.sessions.get(session.name) is session:
+                session.tasks.discard(asyncio.current_task())  # type: ignore[arg-type]
+                await asyncio.shield(safety.end_session(session, restore=True))

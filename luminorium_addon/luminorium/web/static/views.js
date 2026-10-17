@@ -4,6 +4,8 @@
 "use strict";
 
 const $ = (s) => document.querySelector(s);
+// The shell has no page links of its own: put "Map with the camera" in its top bar
+if (window.L) L.topExtra().append(L.el("a.btn.small#to-capture", { href: "capture" }, L.icon("camera", 16), "Map with the camera"));
 const S = {
   views: [],
   view: null,

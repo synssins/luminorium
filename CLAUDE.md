@@ -20,6 +20,13 @@ the facts about this house.
 - On Windows, read and write text files with an explicit `encoding="utf-8"` in Python scripts
   (the default is cp1252 and corrupts non-ASCII text).
 
+## UI
+
+The UI ([docs/ui.md](docs/ui.md)) follows the Claude Design canvas "Luminorium UI redesign"
+(https://claude.ai/artifact/UgtH5jrsDpMmcyhjQEiuQ8), modelled on the Zigbee2MQTT frontend. Chris
+expects that quality: design a new screen on the canvas first, then build it in the same shell
+(`shell.js`, `style.css` tokens). No `alert()`/`confirm()`/`prompt()` (the HA app's webview).
+
 ## Commands
 
 ```bash

@@ -7,13 +7,13 @@ per-session prefix, so the UI uses relative URLs. In the add-on only the Supervi
 
 ## Pages
 
-| Path | What |
-|---|---|
-| `GET /` | Lights page |
-| `GET /camera` | Phone camera and motion-sensor check |
-| `GET /views` | Views: photo, manual placement, planes, review editor |
-| `GET /capture` | Camera mapping on the phone |
-| `GET /static/…` | `app.js`, `style.css` |
+The UI pages are listed in [ui.md](ui.md): `/`, `/lights`, `/light`, `/palettes`, `/house`, `/drivers`,
+`/activity`, `/settings`, `/views`, `/capture`, `/camera`. The house map API is in
+[house.md](house.md#api).
+
+
+Static files are under `GET /static/…` (`style.css`, `shell.js`, `pages/*.js`, the Views and camera
+scripts).
 
 ## `GET /api/status`
 

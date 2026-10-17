@@ -4,13 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Camera check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap">
 <link rel="stylesheet" href="static/style.css">
 </head>
-<body>
-<header class="top">
-  <div class="brand">Camera check</div>
-  <a class="pill" href="./">Back</a>
-</header>
+<body data-page="settings" data-title="Camera check" data-legacy="1" data-crumbs="Settings@settings">
 <main class="cam">
   <p class="small muted">Checks what phone mapping (phase 5) can use here: the rear camera, its
   exposure and white-balance controls, and the motion and orientation sensors. Nothing is
@@ -23,6 +21,7 @@
   <video id="video" playsinline muted autoplay></video>
   <pre id="out">Tap "Start camera".</pre>
 </main>
+<script src="static/shell.js"></script>
 <script>
 "use strict";
 const out = document.getElementById("out");

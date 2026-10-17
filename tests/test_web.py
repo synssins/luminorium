@@ -55,9 +55,26 @@ async def test_stop_all_endpoint(client):
 
 
 async def test_pages_served(client):
-    assert "Luminorium" in (await client.get("/")).text
-    assert "Camera check" in (await client.get("/camera")).text
-    assert (await client.get("/static/app.js")).status_code == 200
+    pages = {
+        "/": "overview",
+        "/lights": "lights",
+        "/light": "light",
+        "/palettes": "palettes",
+        "/house": "house",
+        "/drivers": "drivers",
+        "/activity": "activity",
+        "/settings": "settings",
+    }
+    for path, script in pages.items():
+        r = await client.get(path)
+        assert r.status_code == 200, path
+        assert "static/shell.js" in r.text and f"static/pages/{script}.js" in r.text
+        assert (await client.get(f"/static/pages/{script}.js")).status_code == 200
+    for path in ("/views", "/capture", "/camera"):
+        r = await client.get(path)
+        assert r.status_code == 200 and "static/shell.js" in r.text, path
+    assert (await client.get("/static/shell.js")).status_code == 200
+    assert (await client.get("/static/style.css")).status_code == 200
 
 
 async def test_only_ingress_clients_allowed(fake_ha, tmp_path):

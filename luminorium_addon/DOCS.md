@@ -5,11 +5,21 @@ Light effects, shows and sequences across every light Home Assistant knows about
 Luminorium reads your floors, areas and lights from Home Assistant and shows each light with what
 it can do, and drives each light the fastest way it can reach it. A **Test** button turns one
 light on, then off, then puts it back exactly as it was. **Palettes** play slowly changing colours
-in a room, and the API plays effects and shows (early days: the designer comes later). **Views**
-place your lights on a photo of the house, by hand or with the phone camera.
+in a room, and the API plays effects and shows (early days: the designer comes later). The
+**House map** places every light in 3D, and **Views** place them on a photo of the house, by
+hand or with the phone camera.
+
+The menu on the left (behind the ☰ button on a phone) has every page. **Stop all**, top right on
+every page, ends everything and puts every light back.
 
 ## Lights
 
+- Each light is a card: its state, the driver it uses and how quickly it reacts, what it can do,
+  and any warnings. **Test** turns it on, off, then back as it was; **Details** opens its own
+  page.
+- On a light's page: what it can do; which driver it uses (**Automatic**, or pin one); **Test
+  with options** (a fade, an effect, a hold time); its place on the house map; what each effect
+  name becomes on it.
 - Lights are grouped by HA floor and area. Areas without a floor (outdoor areas, usually) are
   under **Outside / no floor**.
 - Some lights are left out by default, with the reason shown: browser screens, light groups,
@@ -35,11 +45,10 @@ light's own hub or the light itself instead:
 | WLED | **WLED** (JSON API, DDP) | Effects and palettes by name; per-LED streaming |
 | Govee (govee2mqtt) | **Govee LAN** (UDP) | No cloud round trip; needs "LAN Control" on in the Govee app |
 
-Each light shows **via …** with the driver it uses now. It is chosen automatically: the direct
-driver when it can reach the light, otherwise Home Assistant. Under each light, **Driver** lets
-you pin it to Home Assistant or to its direct driver instead. A pinned direct driver that can't
-reach the light falls back to Home Assistant and says so. The line under the counts shows each
-driver's state.
+Each light's card shows the driver it uses now. It is chosen automatically: the direct driver
+when it can reach the light, otherwise Home Assistant. On the light's page you can pin it to Home
+Assistant or to its direct driver instead. A pinned direct driver that can't reach the light
+falls back to Home Assistant and says so. The **Drivers** page shows each driver's state.
 
 Govee scenes always go through Home Assistant (they aren't in Govee's LAN API).
 
@@ -51,12 +60,13 @@ them as a **fixture** and Luminorium tests them together, and later maps them as
 - **Suggestions** appear in a room when lights of the same model have numbered names ("Office Fan
   RGB1", "RGB2"). Answer **Group as one** or **Not the same**.
 - **Group lights** (above the list): tick the lights, optionally name the fixture, then **Group
-  as one fixture**.
+  as one fixture** in the bar at the bottom.
 - On a fixture: **Rename**, **Ungroup**, and **Test** (all its lights on, off, then restored).
 
 ## Palettes
 
-Unfold **Palettes** under the lights, pick a palette and a room (or every light), and **Play**.
+On **Palettes & shows**, choose where to play (every light, a whole level, or a room), then
+**Play** on a palette. **Quick play** on the Overview does the same.
 Each light wanders through the palette's colours on its own, with long fades. **Stop** puts the
 lights back as they were.
 
@@ -67,6 +77,27 @@ a starter palette replaces it. Saved shows go in `shows/`, extra effect names in
 Effects use a light's own built-in effect where it has one (a Hue "fireplace", a WiZ
 "Fireplace", a WLED "Fire 2012"), and otherwise run in software within what the light and its
 network can take. Z-Wave dimmers get slow fades, never a flood of commands.
+
+## House map
+
+Place every light where it really is, in 3D, without a floorplan or the camera.
+
+1. **Floors & size:** give the house's width and depth, and for each floor (from Home
+   Assistant) its height above the ground outside and its ceiling height. Split levels are floors
+   half a storey apart. If a floor is only part of the house (one side of a split level), say
+   which stretch, left to right.
+2. Pick a light on the list. Tap where it is in the view **From above**, and drag it to
+   fine-tune.
+3. Choose its **Type** (ceiling, pendant, wall, floor lamp, tabletop, under cabinet, strip, path or
+   post, in the ground). That sets a height, which you can change with the slider or by dragging
+   it in the view **From the street**.
+4. **Flash it** lights it up for a moment, so you can check from outside that you picked the
+   right one.
+
+Strips stay one light, and their parts can be placed too. A WLED device's LEDs (its segment
+lights fold into it) and a Govee strip's segments are listed under the light. Select a part and
+tap where it is, or use **Lay out along a line** and tap where the first and the last are.
+**Flash** on a part lights only that LED or segment. Everything goes back as it was afterwards.
 
 ## Views
 

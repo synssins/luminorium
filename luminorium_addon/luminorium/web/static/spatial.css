@@ -42,7 +42,7 @@
 .palette-area .muted { font-weight: 400; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
 .chip.placed { background: color-mix(in srgb, var(--ok) 25%, var(--chip)); }
-.chip.armed { background: var(--accent); color: #fff; }
+.chip.armed { background: var(--accent); color: var(--on-accent); }
 .danger { color: var(--bad); }
 
 /* Capture */
@@ -69,5 +69,5 @@
 .pickers .area-box { margin: 4px 0 8px; }
 .pickers label { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
 .big { width: 100%; max-width: 420px; padding: 12px; font-size: 16px; font-weight: 650;
-  border-radius: 12px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+  border-radius: 12px; border: 0; background: var(--accent); color: var(--on-accent); cursor: pointer; }
 .big:disabled { opacity: .45; cursor: default; }
