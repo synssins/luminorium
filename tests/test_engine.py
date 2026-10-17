@@ -174,13 +174,19 @@ async def test_stop_all_ends_shows_and_restores(lum, fake_ha):
     await lum.safety.stop_all()
 
 
-async def test_outside_change_drops_the_light(lum, fake_ha):
+async def test_outside_change_drops_the_light(lum, fake_ha, monkeypatch):
+    from luminorium.engine import safety as safety_mod
+
+    monkeypatch.setattr(safety_mod, "SETTLE_MARGIN_S", 0.2)
     show = await lum.engine.play(
         {"layers": [{"type": "palette", "palette": "team_colours", "fade_in_s": 0}]},
         targets={"lights": [PORCH, CLOSET]},
     )
     await wait_for(lambda: fake_ha.calls_for(PORCH) and fake_ha.calls_for(CLOSET))
-    await fake_ha.external_change(PORCH, "on", brightness=33)
+    # Once the command has settled (latency + margin), someone switches the porch off at the
+    # wall, in the middle of the palette's fade: an on/off flip counts even while fading
+    await asyncio.sleep(lum.inventory.inventory.get(PORCH).profile.latency_ms / 1000 + 0.4)
+    await fake_ha.external_change(PORCH, "off")
     await wait_for(lambda: PORCH not in show.lights)
     sent = len(fake_ha.calls_for(PORCH))
     await asyncio.sleep(1.0)
@@ -188,7 +194,7 @@ async def test_outside_change_drops_the_light(lum, fake_ha):
     assert CLOSET in show.lights
     await lum.engine.stop(show.id)
     await _idle(lum)
-    assert fake_ha.states[PORCH]["attributes"]["brightness"] == 33  # their change stands
+    assert fake_ha.states[PORCH]["state"] == "off"  # their change stands
 
 
 async def test_on_end_hold_leaves_lights(lum, fake_ha):

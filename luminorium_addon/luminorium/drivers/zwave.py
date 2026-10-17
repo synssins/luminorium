@@ -111,6 +111,9 @@ class ZWaveDriver(DirectDriver):
         self._ids = itertools.count(1)
         self._seq: dict[int, int] = {}  # node -> sequence number of the last value sent
         self._verifiers: set[asyncio.Task] = set()
+        # Nodes that missed a multicast: multicast frames aren't routed, so a node out of the
+        # controller's direct range never hears them. These get unicast from then on.
+        self.unicast_only: set[int] = set()
         if not self.urls:
             self.error = "no Z-Wave JS server found"
 
@@ -229,6 +232,11 @@ class ZWaveDriver(DirectDriver):
 
     # ---- Driver -------------------------------------------------------------------------------
 
+    @property
+    def settle_s(self) -> float:  # type: ignore[override]
+        # A multicast's read-back, then a corrective unicast
+        return self.verify_after_s + 2.0 if self.verify_multicast else 0.0
+
     def handles(self, light: Light) -> bool:
         if not self.connected:
             return False
@@ -263,7 +271,7 @@ class ZWaveDriver(DirectDriver):
         for light in lights:
             value = value_of(light)
             security = (light.profile.details if light.profile else {}).get("security")
-            if value is None or security in NO_MULTICAST:
+            if value is None or security in NO_MULTICAST or value[0] in self.unicast_only:
                 singles.append([light])
                 continue
             key = (
@@ -366,7 +374,16 @@ class ZWaveDriver(DirectDriver):
                 if _reached(current, target) or self._seq.get(node) != seq:
                     continue
                 self.read_back_misses += 1
-                log.info("Z-Wave node %s missed a multicast (%s, wanted %s)", node, current, target)
+                if node not in self.unicast_only:
+                    self.unicast_only.add(node)
+                    log.info(
+                        "Z-Wave node %s missed a multicast (%s, wanted %s); "
+                        "it gets unicast from now on",
+                        node,
+                        current,
+                        target,
+                    )
+                    self.changed()
                 if self.acquire:
                     await self.acquire()
                 if self._seq.get(node) == seq and not self.read_only:
@@ -384,6 +401,7 @@ class ZWaveDriver(DirectDriver):
             nodes=len(self.nodes),
             multicasts=self.multicasts,
             read_back_misses=self.read_back_misses,
+            unicast_only=sorted(self.unicast_only),
         )
         return out
 

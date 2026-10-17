@@ -26,6 +26,8 @@ log = logging.getLogger(__name__)
 SNAPSHOTS = "snapshots"
 # Brightness difference (0-255) that counts as someone else's change
 BRIGHTNESS_TOLERANCE = 51
+# Added to latency + the driver's settle time before a disagreeing report counts as a person
+SETTLE_MARGIN_S = 1.0
 OUR_CONTEXTS_KEPT = 2000
 
 
@@ -39,6 +41,12 @@ class Snapshot:
     session: str
     taken_at: float
     expected: LightState | None = None
+    # Until this time (monotonic) reports that disagree with `expected` are the device still
+    # settling (latency, a fade, a driver's read-back and correction), not a person
+    settle_until: float = 0.0
+    # Until this time a fade is still running: brightness in between is expected, but an on/off
+    # flip that disagrees is still a person
+    fade_until: float = 0.0
 
     def to_dict(self) -> dict:
         return {
@@ -108,12 +116,15 @@ class Safety:
         elif snap.session != session.name:
             raise LightBusy(f"{light.entity_id} is in use by {snap.session}")
         snap.expected = state
+        snap.settle_until = snap.fade_until = float("inf")  # queued: nothing sent yet
         try:
             context = await self.governor.send(
                 light, state, transition_ms=transition_ms, priority=priority
             )
         except Superseded:
             return False
+        finally:
+            self._settling(snap, light, transition_ms)
         self._remember(context)
         return True
 
@@ -142,11 +153,19 @@ class Safety:
                     LightState.from_ha(light.state, light.attributes), session.name, time.time()
                 )
             self.snapshots[light.entity_id].expected = state
+            self.snapshots[light.entity_id].settle_until = float("inf")
+            self.snapshots[light.entity_id].fade_until = float("inf")
         if targets:
             self._persist()
-        results = await self.governor.send_many(
-            targets, state, transition_ms=transition_ms, priority=priority
-        )
+        try:
+            results = await self.governor.send_many(
+                targets, state, transition_ms=transition_ms, priority=priority
+            )
+        finally:
+            for light in targets:
+                snap = self.snapshots.get(light.entity_id)
+                if snap is not None:
+                    self._settling(snap, light, transition_ms)
         by_id: dict[str, bool] = {}
         for light, result in zip(targets, results, strict=True):
             if isinstance(result, Superseded):
@@ -258,6 +277,16 @@ class Safety:
 
     # ---- outside changes ----------------------------------------------------------------------
 
+    def _settling(self, snap: Snapshot, light: Light, transition_ms: int | None) -> None:
+        """Start the window in which disagreeing reports are the device catching up."""
+        latency = (light.profile.latency_ms if light.profile else 250) / 1000
+        try:
+            driver_settle = self.governor.driver_for(light).settle_s
+        except Exception:
+            driver_settle = 0.0
+        snap.settle_until = time.monotonic() + latency + driver_settle + SETTLE_MARGIN_S
+        snap.fade_until = snap.settle_until + (transition_ms or 0) / 1000
+
     def _remember(self, context: str | None) -> None:
         if not context:
             return
@@ -276,6 +305,18 @@ class Safety:
             return
         if snap.expected is not None and _matches(snap.expected, new):
             return  # a late report of our own change (HA gives reports after ~5 s a new context)
+        now = time.monotonic()
+        if now < snap.settle_until:
+            # Still settling: a Z-Wave node that missed a multicast reads back its old value
+            # before the driver corrects it. Not a person.
+            log.debug("%s reported %s while settling; ignored", entity_id, new.get("state"))
+            return
+        if (
+            now < snap.fade_until
+            and snap.expected is not None
+            and (new.get("state") == "on") == snap.expected.on
+        ):
+            return  # a level part-way through our fade
         # Someone else changed it: keep their change, forget ours
         self.snapshots.pop(entity_id, None)
         self._persist()

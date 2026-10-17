@@ -82,6 +82,11 @@ All discovery is reading: nothing found is changed. In `read_only` mode drivers 
   polls each node's `currentValue` and resends by unicast to any node that missed it. Nodes that
   got a newer command meanwhile are skipped (latest value wins). Polls and resends take tokens
   from the same budget (`driver.acquire` = `Governor.network_token("zwave")`).
+- **Unicast after a miss:** multicast frames aren't routed, so a node outside the stick's direct
+  radio range never hears them (on the house, the lower hallway GE dimmer, node 22). A node that
+  misses a multicast is added to `unicast_only` (shown in the driver status) and gets its own
+  unicast from then on; the others keep sharing a multicast. The list is relearned after a
+  restart, at the cost of one more miss and correction.
 - Dead nodes (`start_listening` status, then `dead`/`alive` events) go to HA (which will fail
   too, but visibly).
 

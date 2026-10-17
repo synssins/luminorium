@@ -61,6 +61,9 @@ class LightState:
 
 class Driver(ABC):
     name: str
+    # Seconds after a command (beyond the light's latency) during which the driver may still be
+    # checking and correcting it; Safety doesn't count disagreeing reports as a person until then
+    settle_s: float = 0.0
 
     @abstractmethod
     async def set(

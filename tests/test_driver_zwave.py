@@ -110,6 +110,19 @@ async def test_multicast_is_one_frame_and_read_back_fixes_misses(driver, server,
     resend = [c.payload for c in server.commands if c.command == "node.set_value"]
     assert [r["nodeId"] for r in resend] == [12]
     assert driver.read_back_misses == 1
+    # From now on node 12 gets unicast; the other two still share a multicast
+    assert driver.unicast_only == {12}
+    groups = driver.batches(lights, LightState(True, 77))
+    assert sorted(sorted(lt.entity_id for lt in g) for g in groups) == sorted(
+        [sorted([GE[0], GE[2]]), [GE[1]]]
+    )
+    assert driver.status()["unicast_only"] == [12]
+
+
+def test_settle_time_covers_read_back(server):
+    d = ZWaveDriver([server.url])
+    assert d.settle_s == pytest.approx(d.verify_after_s + 2.0)
+    assert ZWaveDriver([server.url], verify_multicast=False).settle_s == 0.0
 
 
 async def test_read_back_skips_nodes_with_newer_commands(driver, server, house):

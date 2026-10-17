@@ -7,6 +7,7 @@ import asyncio
 import pytest
 
 from luminorium.app import Luminorium
+from luminorium.drivers.base import LightState
 from luminorium.engine.testlight import LightTestError
 from luminorium.ha.client import ReadOnlyError
 
@@ -66,11 +67,15 @@ async def test_excluded_and_unavailable_lights_cannot_be_tested(lum):
         lum.tester.start(inv.get("light.living_room_floor_lamp_switch"))  # unavailable
 
 
-async def test_outside_change_drops_the_light(lum, fake_ha):
-    lum.tester.hold_s = 1.0
+async def test_outside_change_drops_the_light(lum, fake_ha, monkeypatch):
+    from luminorium.engine import safety as safety_mod
+
+    monkeypatch.setattr(safety_mod, "SETTLE_MARGIN_S", 0.2)
+    lum.tester.hold_s = 2.0
     lum.tester.start(lum.inventory.inventory.get(PORCH))
     await wait_for(lambda: fake_ha.states[PORCH]["state"] == "on")
-    # Someone turns it off at the wall switch, at a different brightness than we sent
+    # Once the light has settled, someone dims it at the wall
+    await asyncio.sleep(lum.inventory.inventory.get(PORCH).profile.latency_ms / 1000 + 0.4)
     await fake_ha.external_change(PORCH, "on", brightness=40)
     await wait_for(lambda: not lum.safety.sessions, timeout=10)
     # Our turn_off and restore were skipped: their change stands
@@ -132,3 +137,45 @@ async def test_reconnect_reloads_and_resubscribes(lum, fake_ha):
     await asyncio.sleep(0.2)
     await fake_ha.external_change(PORCH, "on", brightness=99)
     await wait_for(lambda: lum.inventory.inventory.get(PORCH).state == "on")
+
+
+async def test_disagreeing_report_while_settling_is_not_a_person(lum, fake_ha, monkeypatch):
+    """A Z-Wave node that missed a multicast reads back its old value before the driver corrects
+    it. Within the settling window that must not drop the light (it would then never be
+    restored); after it, the same report is someone else's change."""
+    from luminorium.engine import safety as safety_mod
+
+    monkeypatch.setattr(safety_mod, "SETTLE_MARGIN_S", 0.5)
+    session = lum.safety.session("check")
+    light = lum.inventory.inventory.get(PORCH)
+    assert await lum.safety.command(session, light, LightState(on=True, brightness=255))
+    # The device "reads back" off right away: still settling
+    await fake_ha.external_change(PORCH, "off")
+    await asyncio.sleep(0.05)
+    assert PORCH in lum.safety.snapshots and PORCH not in session.dropped
+    # Well after latency + margin, a disagreeing change is a person's
+    await asyncio.sleep(light.profile.latency_ms / 1000 + 0.6)
+    await fake_ha.external_change(PORCH, "on", brightness=20)
+    await wait_for(lambda: PORCH in session.dropped)
+    assert PORCH not in lum.safety.snapshots
+    await lum.safety.end_session(session)
+
+
+async def test_levels_during_a_fade_are_ours_but_a_flip_is_not(lum, fake_ha, monkeypatch):
+    from luminorium.engine import safety as safety_mod
+
+    monkeypatch.setattr(safety_mod, "SETTLE_MARGIN_S", 0.2)
+    session = lum.safety.session("fade")
+    light = lum.inventory.inventory.get(PORCH)
+    assert await lum.safety.command(
+        session, light, LightState(on=True, brightness=255), transition_ms=5000
+    )
+    await asyncio.sleep(light.profile.latency_ms / 1000 + 0.4)
+    # Part-way through the fade: a lower level is expected
+    await fake_ha.external_change(PORCH, "on", brightness=90)
+    await asyncio.sleep(0.05)
+    assert PORCH not in session.dropped
+    # A wall switch turning it off during the fade is a person
+    await fake_ha.external_change(PORCH, "off")
+    await wait_for(lambda: PORCH in session.dropped)
+    await lum.safety.end_session(session)

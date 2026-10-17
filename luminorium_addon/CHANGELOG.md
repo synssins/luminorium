@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0-dev.3
+
+From the first checks on the real lights (docs/driver-tests.md):
+- **Z-Wave:** a dimmer that misses a multicast (multicast isn't routed, so a node out of the
+  stick's direct range never hears it) is corrected by unicast as before, and from then on gets
+  unicast; the others keep sharing a multicast. Shown as `unicast_only` in the driver status.
+- **Safety:** while a command is still settling (latency, the driver's read-back, 1 s), a report
+  that disagrees is the device catching up, not a person. Before, the missed multicast's
+  read-back got the hallway dimmer dropped and left unrestored. During the rest of a fade only an
+  on/off flip counts as a person.
+
 ## 0.2.0-dev.2
 
 The first build with direct drivers, the show engine core, and views with camera mapping

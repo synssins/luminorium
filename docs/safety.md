@@ -63,6 +63,15 @@ its context id is one we got back, or if it matches what we last asked for (same
 brightness within 51/255). HA gives device reports that arrive more than ~5 s after a call a new
 context, so the second check stops those being mistaken for someone else's change.
 
+Reports that arrive while a command is still **settling** don't count either:
+- for the light's latency, plus the driver's own check time (`settle_s`: Z-Wave's multicast
+  read-back and correction, about 3.5 s), plus 1 s, **any** disagreeing report is ignored. On the
+  real house a GE dimmer out of the stick's direct range missed a multicast; the read-back showed
+  its old level, and before this window that was taken for a person, so the light was dropped and
+  never restored;
+- for the rest of a fade, a level in between is expected, but an **on/off flip** that disagrees
+  still counts as a person (a wall switch turning a light off mid-palette).
+
 Anything else (a wall switch, an automation, the HA app) means a person changed it: the light is
 dropped from its session, its snapshot is deleted, and **it is not restored**: their change stands.
 `unavailable` and `unknown` states are ignored.
