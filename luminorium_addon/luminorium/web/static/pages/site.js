@@ -553,6 +553,7 @@ window.SiteEditor = class SiteEditor {
       const st = stairInfo(s, floors);
       const fmt = L.fmtLen;
       body = el("div.fc-sum", el("h3", "Stairs"),
+        s.level !== this.level ? el("span.small.muted", `Drawn on the ${from ? from.name : "other"} plan; they lead here, so here they go the other way. Changes here change them there.`) : null,
         el("label.field", el("span", "From"), el("span", from ? from.name : "?")),
         el("label.field", el("span", "Up or down to"), el("select", { on: { change: (e) => edit(() => { s.to = e.target.value; }) } },
           floors.filter((f) => f.id !== s.level).map((f) => el("option", { value: f.id, selected: s.to === f.id ? "" : null }, f.name)))),
@@ -792,7 +793,11 @@ window.SiteEditor = class SiteEditor {
         }
         if (sel) this.handles(ctx, [w.a, w.b], "#ff8a3d");
       }
-      for (const t of d.stairs) if (t.level === this.level) this.drawStairs(ctx, t, isSel("stairs", t.id), col);
+      for (const t of d.stairs) {
+        if (t.level === this.level) this.drawStairs(ctx, t, isSel("stairs", t.id), col);
+        // stairs from another level that lead here: the same stairs, the other way
+        else if (t.to === this.level) this.drawStairs(ctx, stairsSeenFrom(t), isSel("stairs", t.id), col);
+      }
       for (const r of d.rooms) {
         if (r.level !== this.level) continue;
         const p = this.h2s(r.at[0], r.at[1]);
@@ -1031,7 +1036,7 @@ window.SiteEditor = class SiteEditor {
       if (Math.hypot(c[0] - x, c[1] - y) < dr.width / 2) return { kind: "door", id: dr.id };
     }
     for (const w of d.walls) if (w.level === this.level && segDist([x, y], w.a, w.b) <= this.wallThick(w) / 2 + tol) return { kind: "wall", id: w.id };
-    for (const t of d.stairs) if (t.level === this.level && x >= t.x0 && x <= t.x1 && y >= t.y0 && y <= t.y1) return { kind: "stairs", id: t.id };
+    for (const t of d.stairs) if ((t.level === this.level || t.to === this.level) && x >= t.x0 && x <= t.x1 && y >= t.y0 && y <= t.y1) return { kind: "stairs", id: t.id };
     for (const yd of [...d.yard].reverse()) {
       if (yd.c && Math.hypot(yd.c[0] - x, yd.c[1] - y) <= yd.r) return { kind: "yard", id: yd.id };
       if (yd.kind === "path" && yd.pts.some((q, i) => i && segDist([x, y], yd.pts[i - 1], q) <= (yd.width ?? 1.2) / 2 + tol)) return { kind: "yard", id: yd.id };
@@ -1493,6 +1498,10 @@ function setStair(s, { width, tread, steps }, floors) {
   s.steps = n;
   const run = n * tr;
   if (s.dir[1] === "+") s[`${along}1`] = round3(s[`${along}0`] + run); else s[`${along}0`] = round3(s[`${along}1`] - run);
+}
+// Stairs as seen from the level they lead to: from there they go the other way
+function stairsSeenFrom(t) {
+  return { ...t, level: t.to, to: t.level, dir: { "x+": "x-", "x-": "x+", "y+": "y-", "y-": "y+" }[t.dir] };
 }
 // The middle of each side of a stair rectangle: drag handles
 function stairEdges(t) {

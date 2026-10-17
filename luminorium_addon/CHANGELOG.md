@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.28
+
+- **Stairs on both levels:** stairs drawn on one level show on the plan of the level they lead
+  to as well, going the other way (DOWN where the first says UP). Picking them there edits the
+  same stairs.
+
 ## 0.3.0-dev.27
 
 - **Dragging a whole wall snaps:** with Select, drag a wall by its middle and whichever end comes
