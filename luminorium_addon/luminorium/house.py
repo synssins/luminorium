@@ -517,6 +517,31 @@ class HouseService:
         openings = [{"kind": o["kind"], **world(o)} for o in f.get("openings") or []]
         return {"blocks": blocks, "openings": openings}
 
+    def master_of(self, entity_id: str) -> str | None:
+        """The house-map target a light is placed as: itself, or a WLED segment light's main
+        light (segment lights fold into it)."""
+        if entity_id in self.data["items"]:
+            return entity_id
+        inv: Inventory = self.inventory.inventory
+        light = inv.lights.get(entity_id)
+        if light is None or light.integration != "wled" or _wled_seg(light) is None:
+            return None
+        mac = _wled_mac(light)
+        for other in inv.lights.values():
+            if (
+                other.kind == Kind.LIGHT
+                and other.integration == "wled"
+                and _wled_seg(other) is None
+                and _wled_mac(other) == mac
+            ):
+                return other.entity_id
+        return None
+
+    def position_of(self, element: str) -> dict | None:
+        """Where a show element (a light or a fixture) is, for animations; None if not placed."""
+        target = self.master_of(element) or element
+        return self.world(target)
+
     def view(self) -> dict:
         inv: Inventory = self.inventory.inventory
         floors = self.floors()

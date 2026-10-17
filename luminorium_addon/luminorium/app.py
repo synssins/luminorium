@@ -63,6 +63,11 @@ class Luminorium:
             clock=mapping_clock,
         )
         self.house = HouseService(JsonStore(settings.config_dir), self.inventory, self._parts_for)
+        # Animations use the house map, and stream WLED LEDs whose places are known
+        self.engine.positions = self.house.position_of
+        self.engine.pixel_positions = self._pixel_positions
+        self.engine.streamer = self._stream_leds
+        self.engine.carrier = self._is_carrier
         self._startup: asyncio.Task | None = None
         # HA's own settings (unit system, time zone), read on every (re)connect
         self.ha_config: dict = {}
@@ -95,6 +100,35 @@ class Luminorium:
         if light.segments:
             return [Part(i, f"Segment {i + 1}", eid) for i, eid in enumerate(light.segments)]
         return []
+
+    def _pixel_positions(self, entity_id: str) -> list[dict | None]:
+        """Where each of a WLED light's own LEDs is on the house map (None for unplaced ones),
+        from the parts placed on its main light; empty when none are placed."""
+        light = self.inventory.inventory.get(entity_id)
+        wled = self.router.drivers.get("wled")
+        if light is None or light.integration != "wled" or not isinstance(wled, WLEDDriver):
+            return []
+        master = self.house.master_of(entity_id)
+        if master is None or self._is_carrier(entity_id):
+            return []
+        out = [self.house.part_world(master, led) for led in wled.leds(light)]
+        return out if any(p is not None for p in out) else []
+
+    def _is_carrier(self, entity_id: str) -> bool:
+        """A WLED main light of a device with several segments: it only switches the device
+        on and sets its brightness, so a sweep holds it steady."""
+        light = self.inventory.inventory.get(entity_id)
+        wled = self.router.drivers.get("wled")
+        if light is None or light.integration != "wled" or not isinstance(wled, WLEDDriver):
+            return False
+        found = wled.device_for(light)
+        return bool(found and found[1] is None and len(found[0].segments) > 1)
+
+    async def _stream_leds(self, light: Light, frame: list[tuple[int, int, int]]) -> None:
+        wled = self.router.drivers.get("wled")
+        if not isinstance(wled, WLEDDriver):
+            raise ConnectionError("the WLED driver isn't running")
+        await wled.stream(light, frame)
 
     async def flash_pixel(self, light: Light, index: int, seconds: float = 2.0) -> None:
         """Light one LED of a WLED light white for a moment (realtime frames); WLED goes back to

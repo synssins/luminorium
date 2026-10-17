@@ -70,6 +70,14 @@ On **Palettes & shows**, choose where to play (every light, a whole level, or a 
 Each light wanders through the palette's colours on its own, with long fades. **Stop** puts the
 lights back as they were.
 
+**Animations** sweeps colour from one end of the house to the other, using where each light is
+on the **House map**: only placed lights join in. Pick the colours (a palette, or your own), the
+style (**Wipe**: each pass paints the next colour across; **Band**: a band of colour moves over a
+dim glow), the direction and the seconds per pass, then **Play**, or **Save as a show**. On a WLED
+strip whose LEDs are placed (like the pathway), the colour moves LED by LED.
+
+Playing a palette or an animation replaces whatever was playing on those lights before.
+
 Lights whose bulbs only give white, whatever colour they're sent (like the white LEDs on a WLED
 pathway), can be marked **White only** on their page, under **Its bulbs**. Palettes leave them
 alone unless you tick **Include white lights** next to **Play on**.

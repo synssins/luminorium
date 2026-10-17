@@ -20,7 +20,7 @@ import logging
 import random
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from ..drivers.base import LightState
@@ -38,6 +38,8 @@ log = logging.getLogger(__name__)
 TICK_HZ = 20.0
 SESSION = "engine"
 ON_END = ("restore", "fade", "hold")
+# Layers that play on top of whatever is there rather than replacing it
+OVERLAYS = ("dip", "flash")
 
 
 class ShowError(ValueError):
@@ -131,6 +133,7 @@ class RunningShow:
     # entity_id -> [(layer, element id)], in composition order
     stack: dict[str, list[tuple[Layer, str]]] = field(default_factory=dict)
     order: int = 0
+    streamed: set[str] = field(default_factory=set)  # lights sent LED frames, not commands
 
     @property
     def lights(self) -> set[str]:
@@ -180,6 +183,12 @@ class Engine:
         self._loop_task: asyncio.Task | None = None
         self._order = 0
         self.commands_sent = 0
+        # Set by the app: where lights are on the house map, and per-LED streaming (WLED)
+        self.positions: Callable[[str], dict | None] = lambda element: None
+        self.pixel_positions: Callable[[str], list[dict | None]] = lambda entity_id: []
+        self.streamer: Callable[[Light, list[tuple[int, int, int]]], Awaitable[None]] | None = None
+        # A light that carries others (a WLED main light: on and brightness for its segments)
+        self.carrier: Callable[[str], bool] = lambda entity_id: False
 
     @property
     def session(self):
@@ -203,7 +212,7 @@ class Engine:
         if not layer_specs:
             raise ShowError("a show needs at least one layer")
         seed = str(spec.get("seed") or random.randrange(1, 10**9))
-        ctx = LayerContext(self.effects, self.palettes(), seed)
+        ctx = LayerContext(self.effects, self.palettes(), seed, self.positions)
         try:
             layers = [build_layer(dict(ls), ctx, i) for i, ls in enumerate(layer_specs)]
         except LayerError as err:
@@ -216,15 +225,25 @@ class Engine:
             layer_targets = (layer.targets if not targets else None) or show_targets
             elements.append(resolve_targets(inv, layer_targets))
 
-        # Colour palettes leave white-only lights alone (they'd just glow white) unless asked
+        # Colour layers leave white-only lights alone (they'd just glow white) unless asked
         if not (spec.get("include_white") or (show_targets or {}).get("include_white")):
             for layer, els in zip(layers, elements, strict=True):
-                if layer.kind != "palette":
+                if not layer.colour:
                     continue
                 for el in list(els.values()):
                     el.members = [m for m in el.members if not inv.lights[m].white_only]
                     if not el.members:
                         del els[el.id]
+
+        # A sweep needs to know where each light is: lights not on the house map are left out
+        for layer, els in zip(layers, elements, strict=True):
+            if layer.kind != "sweep":
+                continue
+            for el in list(els.values()):
+                if len(el.members) == 1 and self.carrier(el.members[0]):
+                    layer.carriers.add(el.id)  # kept on, steady, while its segments sweep
+                elif self.positions(el.id) is None:
+                    del els[el.id]
 
         # Lights another session (a test) is using are left out
         busy = {eid for eid, snap in self.safety.snapshots.items() if snap.session != SESSION}
@@ -266,6 +285,12 @@ class Engine:
             layer.bind(now)
             for el in els.values():
                 layer.setup(el.id, [inv.lights[m] for m in el.members])
+                # A WLED light whose LEDs are placed is streamed LED by LED, not commanded
+                if layer.kind == "sweep" and self.streamer and len(el.members) == 1:
+                    leds = self.pixel_positions(el.members[0])
+                    if any(p is not None for p in leds):
+                        layer.stream(el.id, inv.lights[el.members[0]], leds)
+                        show.streamed.add(el.members[0])
                 for m in el.members:
                     show.stack.setdefault(m, []).append((layer, el.id))
         for entries in show.stack.values():
@@ -283,6 +308,27 @@ class Engine:
                 light = inv.lights[eid]
                 self.base[eid] = LightState.from_ha(light.state, light.attributes)
                 self.planner.seed(eid, self.base[eid])
+        # A new look replaces what earlier shows at the same priority were playing on the same
+        # lights (an overlay, a dip or a flash, plays on top instead; a higher-priority show
+        # plays over them and they resume after). The lights stay held, so stopping the new show
+        # still puts them back as they were before any show.
+        if spec.get("replace", not all(layer.kind in OVERLAYS for layer in layers)):
+            for old in list(self.shows.values()):
+                if old.priority != show.priority:
+                    continue
+                taken = old.lights & show.lights
+                for eid in taken:
+                    old.stack.pop(eid, None)
+                    old.streamed.discard(eid)
+                    for els in old.elements:
+                        for el in list(els.values()):
+                            if eid in el.members:
+                                el.members.remove(eid)
+                            if not el.members:
+                                del els[el.id]
+                if taken and not old.stack:
+                    self.shows.pop(old.id, None)
+                    self.safety.note(f"{old.name} replaced by {name}", show=old.id)
         self.shows[run_id] = show
         self.safety.note(f"Playing {name} on {len(show.lights)} light(s)", show=run_id)
         self._ensure_loop()
@@ -353,9 +399,12 @@ class Engine:
             return []
 
         inv = self.inventory.inventory
+        streamed = self._stream_frames(now)
         stacks: dict[str, list[tuple[Layer, str, RunningShow]]] = {}
         for show in sorted(self.shows.values(), key=lambda s: (s.priority, s.order)):
             for eid, entries in show.stack.items():
+                if eid in streamed:
+                    continue
                 stacks.setdefault(eid, []).extend((layer, el, show) for layer, el in entries)
 
         items = []
@@ -377,6 +426,31 @@ class Engine:
             if light is not None:
                 self.session.run(self._send(light, cmd))
         return commands
+
+    def _stream_frames(self, now: float) -> set[str]:
+        """Send this tick's LED frames; returns the lights that were streamed."""
+        sent: set[str] = set()
+        if self.streamer is None:
+            return sent
+        for show in sorted(self.shows.values(), key=lambda s: (-s.priority, -s.order)):
+            for layer in show.layers:
+                streams = getattr(layer, "streamed", None)
+                if not streams or not layer.active(now):
+                    continue
+                for element, (light, _) in streams.items():
+                    if light.entity_id in sent:
+                        continue  # a higher show already has it
+                    sent.add(light.entity_id)
+                    self.session.run(self._stream(light, layer.frame(element, now)))
+        return sent
+
+    async def _stream(self, light: Light, frame: list[tuple[int, int, int]]) -> None:
+        try:
+            await self.streamer(light, frame)
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:
+            log.debug("Frame to %s failed: %s", light.entity_id, err)
 
     def _composer(self, eid: str, stack: list[tuple[Layer, str, RunningShow]]):
         base_look = look_from_state(self.base.get(eid) or LightState(on=False))

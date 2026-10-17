@@ -15,6 +15,7 @@ from __future__ import annotations
 import bisect
 import math
 import random
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -303,10 +304,13 @@ class LayerContext:
     effects: EffectLibrary
     palettes: dict[str, Palette]
     seed: str
+    # element id -> where it is on the house map ({x, y, z} in metres), or None
+    position: Callable[[str], dict | None] | None = None
 
 
 class Layer:
     kind = ""
+    colour = False  # a colour layer: white-only lights are left out of it unless asked
 
     def __init__(self, spec: dict, ctx: LayerContext, index: int):
         self.spec = spec
@@ -388,6 +392,7 @@ class StaticLayer(Layer):
 
 class PaletteLayer(Layer):
     kind = "palette"
+    colour = True
 
     def __init__(self, spec, ctx, index):
         super().__init__(spec, ctx, index)
@@ -583,6 +588,145 @@ class FlashLayer(Layer):
         return Span(OFF, t, phase_start + period, crisp=True)
 
 
+class SweepLayer(Layer):
+    """Colour that travels across the house, by where each light is on the house map.
+
+    - `wipe`: each pass paints the next colour from one end to the other, blending over `soft_s`
+    - `band`: a band of colour `width` wide (a fraction of the run) moves over a dim glow
+    `axis` is x (across the front), y (from the street back) or z (up); `direction` is forward,
+    reverse or bounce; `period_s` is one pass. Elements need a position (the engine leaves out
+    the ones that have none); a WLED light whose LEDs are placed is streamed LED by LED.
+    """
+
+    kind = "sweep"
+    colour = True
+    BAND_STEP_S = 0.2
+
+    def __init__(self, spec, ctx, index):
+        super().__init__(spec, ctx, index)
+        ref = spec.get("palette")
+        if ref:
+            if ref not in ctx.palettes:
+                raise LayerError(f"unknown palette {ref!r}")
+            colors = [c for c, _ in ctx.palettes[ref].colors]
+        else:
+            colors = [parse_color(c) for c in spec.get("colors", ["#7a1fff", "#ff4500"]) or []]
+        if not colors:
+            raise LayerError("a sweep needs at least one colour")
+        self.colors = colors
+        self.mode = str(spec.get("mode", "wipe"))
+        if self.mode not in ("wipe", "band"):
+            raise LayerError("sweep mode must be wipe or band")
+        self.axis = str(spec.get("axis", "x"))
+        if self.axis not in ("x", "y", "z"):
+            raise LayerError("sweep axis must be x, y or z")
+        self.direction = str(spec.get("direction", "forward"))
+        if self.direction not in ("forward", "reverse", "bounce"):
+            raise LayerError("sweep direction must be forward, reverse or bounce")
+        self.period_s = min(600.0, max(1.0, float(spec.get("period_s", 8))))
+        self.width = min(1.0, max(0.05, float(spec.get("width", 0.25))))
+        self.soft_s = min(self.period_s * 0.9, max(0.0, float(spec.get("soft_s", 1.5))))
+        self.brightness = _fraction(spec.get("brightness", 100))
+        self.glow = _fraction(spec.get("glow", 12))  # the band's background, % of brightness
+        self.position = ctx.position
+        self.values: dict[str, float] = {}  # element -> its place along the axis (m)
+        self.extra: list[float] = []  # LED positions that widen the run
+        self.streamed: dict[str, tuple[Any, list[float | None]]] = {}  # element -> (light, LEDs)
+        self.carriers: set[str] = set()  # WLED main lights: held on at full brightness
+
+    def default_fade_in(self) -> float:
+        return 1.5
+
+    def setup(self, element, lights):
+        p = self.position(element) if self.position else None
+        if p is not None:
+            self.values[element] = float(p[self.axis])
+
+    def stream(self, element: str, light: Any, leds: list[dict | None]) -> None:
+        """Drive this element LED by LED (positions as {x, y, z}, None for unplaced LEDs)."""
+        vals = [None if p is None else float(p[self.axis]) for p in leds]
+        self.streamed[element] = (light, vals)
+        self.extra.extend(v for v in vals if v is not None)
+
+    def u(self, value: float) -> float:
+        all_values = [*self.values.values(), *self.extra]
+        lo, hi = min(all_values), max(all_values)
+        return 0.5 if hi - lo < 1e-6 else (value - lo) / (hi - lo)
+
+    def _forward(self, n: int) -> bool:
+        if self.direction == "bounce":
+            return n % 2 == 0
+        return self.direction == "forward"
+
+    def _look(self, n: int) -> Look:
+        return Look(self.colors[n % len(self.colors)], self.brightness)
+
+    # wipe: pass n reaches a spot at start + (n + where) * period, blending in over soft_s
+    def _window(self, n: int, u: float) -> tuple[float, float]:
+        where = u if self._forward(n) else 1 - u
+        end = self.start + (n + where) * self.period_s
+        return end - self.soft_s, end
+
+    def _wipe(self, u: float, t: float) -> Span:
+        n = math.floor((t - self.start) / self.period_s)
+        for m in (n + 1, n, n - 1):
+            hb, he = self._window(m, u)
+            if hb <= t < he:
+                k = (t - hb) / (he - hb)
+                return Span(self._look(m - 1).mix(self._look(m), k), t, he, to=self._look(m))
+            if t >= he:
+                nxt = self._window(m + 1, u)[0]
+                return Span(self._look(m), t, max(t + 0.05, nxt))
+        return Span(self._look(-1), t, max(t + 0.05, self._window(0, u)[0]))
+
+    def _band(self, u: float, t: float) -> Look:
+        T = (t - self.start) / self.period_s
+        n = math.floor(T)
+        f = T - n
+        w = self.width
+        centre = -w + f * (1 + 2 * w)
+        if not self._forward(n):
+            centre = 1 - centre
+        k = max(0.0, 1 - abs(u - centre) / w)
+        k = 0.5 - 0.5 * math.cos(math.pi * k)  # soft edges
+        fg = self._look(n)
+        return fg.scaled(self.glow).mix(fg, k)
+
+    def sample(self, value: float, t: float) -> Look:
+        u = self.u(value)
+        return self._wipe(u, t).look if self.mode == "wipe" else self._band(u, t)
+
+    def content(self, element, t, below):
+        if element in self.carriers:
+            return Span(Look(self.colors[0], self.brightness), t)
+        value = self.values.get(element)
+        if value is None:
+            return Span(below.at(t), t, below.until)
+        u = self.u(value)
+        if self.mode == "wipe":
+            return self._wipe(u, t)
+        step = self.BAND_STEP_S
+        return Span(self._band(u, t), t, t + step, to=self._band(u, t + step), busy=True)
+
+    def frame(self, element: str, t: float) -> list[tuple[int, int, int]]:
+        """One frame for a streamed element: an RGB value per LED."""
+        light, vals = self.streamed[element]
+        fallback = self.values.get(element)
+        out = []
+        for v in vals:
+            v = fallback if v is None else v
+            look = OFF if v is None else self.sample(v, t)
+            if self.active(t) and t < self.start + self.fade_in_s:
+                look = look.scaled((t - self.start) / self.fade_in_s)
+            c = look.color
+            b = 0.0 if look.color.is_black else look.brightness
+            out.append(tuple(round(255 * ch * b) for ch in (c.r, c.g, c.b)))
+        return out
+
+    def describe(self):
+        return {**super().describe(), "mode": self.mode, "axis": self.axis}
+
+
 LAYER_TYPES: dict[str, type[Layer]] = {
     cls.kind: cls
     for cls in (
@@ -592,6 +736,7 @@ LAYER_TYPES: dict[str, type[Layer]] = {
         NativeEffectLayer,
         DipLayer,
         FlashLayer,
+        SweepLayer,
     )
 }
 

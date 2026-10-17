@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0-dev.5
+
+- **Animations: sweep.** Colour travels from one end of the house to the other, by where each
+  light is on the house map (only placed lights join in). Wipe (each pass paints the next colour
+  across) or band (a band of colour over a dim glow); left to right, right to left, back and
+  forth, house to street, or bottom to top; seconds per pass, band width, brightness. A WLED strip
+  whose LEDs are placed is swept LED by LED. Play it, or save it as a show.
+- **A new palette or show replaces the one before** on the same lights, instead of stacking on
+  it. Stopping it still puts the lights back as they were.
+
 ## 0.3.0-dev.4
 
 - **White only lights:** mark a light whose bulbs only give white (the pathway's white LEDs) on

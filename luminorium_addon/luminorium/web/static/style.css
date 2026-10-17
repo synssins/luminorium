@@ -282,6 +282,12 @@ a.tile:hover { border-color: var(--line2); text-decoration: none; }
   .hm { grid-template-columns: minmax(0, 1fr); grid-template-areas: "views" "insp" "list"; }
 }
 
+/* ---- palettes: the animation preview ---- */
+.anim-preview { height: 18px; border-radius: 9px; overflow: hidden; background: var(--field); }
+.anim-run { height: 100%; background-size: 300% 100%; animation: anim-run 8s linear infinite; }
+@keyframes anim-run { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .anim-run { animation: none; } }
+
 /* ---- house map: the front photo editor ---- */
 .fc { display: flex; flex-direction: column; gap: 12px; }
 .fc-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }

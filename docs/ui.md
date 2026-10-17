@@ -50,7 +50,7 @@ Errors go to toasts, and names are typed inline.
 | **Overview** | Summary tiles (lights, on now, fixtures, playing, drivers), now playing with quick play, the drivers, each level's lights and how many are on, recent activity |
 | **Lights** | Search; filters (included, switches, excluded, all); levels and rooms that fold (remembered); fixture suggestions; **Group lights** mode; a card per light or fixture with state, driver and latency, capabilities, warnings, an include checkbox, **Test** and **Details** |
 | **Light** (`light?id=…` or `light?fixture=…`) | What it can do; driver choice (Automatic or a pinned driver) and timing; **Test with options** (fade, effect, hold); its place on the house map and its fixture; Home Assistant ids; what each effect name becomes on it |
-| **Palettes & shows** | Playing now, with Stop; tabs for Palettes (a **Play on** target: every light, a level or a room), Shows and Effects |
+| **Palettes & shows** | Playing now, with Stop; tabs for Palettes (a **Play on** target: every light, a level or a room; **Include white lights**), Animations (a sweep: colours from a palette or picked, wipe or band, direction, seconds per pass, band width, brightness, a moving preview; **Play** or **Save as a show**), Shows and Effects |
 | **House map** | Placing lights in 3D: a volumetric view, the front photo with its drawing tools, and a plan and a side view ([house.md](house.md)) |
 | **Views**, **Map with camera** | The photo views editor and the guided camera capture ([mapping.md](mapping.md)) |
 | **Drivers** | A card per driver: status, endpoint, counts, notes (Z-Wave nodes on unicast, Govee LAN Control) and how many lights use it |

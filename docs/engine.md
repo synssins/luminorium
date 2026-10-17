@@ -79,9 +79,34 @@ Percentages are 0–100.
 | `software_effect` | `effect`: `flicker` (`speed_hz` 6, `depth` 50 %), `candle` (`speed_hz` 3, `depth` 40 %, colour 1900 K), `breathe` (`period_s` 4, `low` 15 %), `lightning` (`interval_s` 6); `color`, `brightness` | Deterministic functions of time, seeded per element. Lightning shows the layer below between strikes. |
 | `dip` | `level` (20), `fade_s` (0.5), `hold_s` (3), `restore_s` (1) | Dim to a fraction of each element's own level (whatever is below: a palette, or the light's own state), hold, come back to it. Off lights stay off. |
 | `flash` | `color`, `brightness`, `count` (1), `on_s` (0.3), `off_s` (0.3) | Flash, dark between, then whatever is below. Never faster than 3 per second (photosensitivity). |
+| `sweep` | `colors` (or `palette`: its colours), `mode` (`wipe` or `band`), `axis` (`x` across the front, `y` from the street back, `z` up), `direction` (`forward`, `reverse`, `bounce`), `period_s` (8, one pass), `soft_s` (1.5, a wipe's blend), `width` (0.25 of the run, band), `glow` (12 %, the band's background), `brightness` | Colour travelling across the house by where each element is on the house map (below) |
 
 Default priorities: static and palette 10, effects 20, dip 50, flash 60. A show's `priority`
 comes first: a priority-1 show is above every layer of a priority-0 show.
+
+### Sweeps
+
+A sweep places each element along its axis from the house map (`HouseService.position_of`: the
+light's or fixture's place; a WLED segment light uses its main light's), scaled 0–1 between the
+first and the last. Elements that aren't placed are left out of the layer when the show starts.
+
+- **wipe:** pass *n* paints colour *n* (round the list). A spot `u` along the run is reached at
+  `start + (n + u) × period_s` (`1 − u` on a reverse pass) and blends from the last colour over
+  `soft_s` before that, as one planned fade.
+- **band:** a band `width` wide runs from just before one end to just past the other each pass,
+  with soft edges, over a glow of the same colour at `glow`. It changes continuously, so its
+  spans are `busy` (0.2 s steps) and the planner samples them within each light's rate.
+
+**LED by LED:** a WLED light whose LEDs are placed on the house map (the parts of its main light)
+is streamed instead of commanded: every tick (20 per second) the engine renders each of its own
+LEDs at its own place and sends a DDP frame (`Engine.streamer`; the app's `_stream_leds`). The
+light gets no commands from that show, so Safety doesn't snapshot it; WLED goes back to its own
+state a few seconds after the frames stop. The device's main light (only on and brightness when
+there are several segments) is a **carrier**: held on, steady, so its global brightness doesn't
+pulse with the band.
+
+Colour layers (`palette` and `sweep`) leave out White only lights unless the play or show sets
+`include_white`.
 
 ### The palette cycler
 
@@ -166,8 +191,12 @@ layers:
 Only included, available lights are used. A light in a fixture brings the whole fixture, and the
 fixture is one element: all its lights get the same look (each at its own latency).
 
-**Overlap:** all shows share one Safety session (`engine`). Where shows overlap on a light, the
-higher priority wins; when it ends, the lower one shows again. Lights a test is using are left
+**Overlap:** all shows share one Safety session (`engine`). A new show **replaces** earlier shows
+of the same priority on the lights they share: they lose those lights, and one left with none
+ends ("replaced by …"). The lights stay held, so stopping the new show still puts them back as
+they were before any show. A show made only of overlays (`dip`, `flash`) plays on top instead,
+and `replace: false` in a spec keeps the old one under it. Where shows of different priorities
+overlap, the higher wins; when it ends, the lower one shows again. Lights a test is using are left
 out of a new show.
 
 **Handing back:** a light is released when no running show covers it any more, as the show that
