@@ -55,6 +55,8 @@ class FakeHA:
     _clients: list = field(default_factory=list)
     _runner: web.AppRunner | None = None
     port: int = 0
+    # What get_config reports as HA's unit system (length 'km' = metric, 'mi' = imperial)
+    unit_system: dict = field(default_factory=lambda: {"length": "km", "temperature": "°C"})
 
     def __post_init__(self) -> None:
         def load(name: str):
@@ -145,6 +147,14 @@ class FakeHA:
         }
         if kind in simple:
             await ok(copy.deepcopy(simple[kind]))
+        elif kind == "get_config":
+            await ok(
+                {
+                    "unit_system": dict(self.unit_system),
+                    "time_zone": "America/Chicago",
+                    "version": "2026.9.2",
+                }
+            )
         elif kind == "get_states":
             await ok(copy.deepcopy(list(self.states.values())))
         elif kind == "ping":

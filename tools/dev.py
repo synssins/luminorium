@@ -74,6 +74,7 @@ async def main(real: bool, port: int) -> None:
     else:
         fake = FakeHA()
         fake.default_latency = 0.15
+        fake.unit_system = {"length": "mi", "temperature": "°F"}  # like the house's HA
         drivers = await fake_devices(fake)
         url = await fake.start(8124)
         token, read_only = TOKEN, False

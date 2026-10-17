@@ -82,15 +82,19 @@ network can take. Z-Wave dimmers get slow fades, never a flood of commands.
 
 Place every light where it really is, in 3D, without a floorplan or the camera.
 
+Sizes and heights are in feet and inches when Home Assistant uses imperial units (Settings ›
+Units changes it). Type them as `8' 6"`, `8 ft 6 in`, `102 in`, or just `8.5`.
+
 1. **Floors & size:** give the house's width and depth, and for each floor (from Home
    Assistant) its height above the ground outside and its ceiling height. Split levels are floors
    half a storey apart. If a floor is only part of the house (one side of a split level), say
    which stretch, left to right.
-2. Pick a light on the list. Tap where it is in the view **From above**, and drag it to
-   fine-tune.
+2. Pick a light on the list, or tap it in the **3D** view. Tap the floor where it is, then drag
+   it to fine-tune (**Move**). Drag empty space to turn the view, and scroll or pinch to zoom.
+   **Plan & side** has a flat view from above and from the street, for exact positions.
 3. Choose its **Type** (ceiling, pendant, wall, floor lamp, tabletop, under cabinet, strip, path or
-   post, in the ground). That sets a height, which you can change with the slider or by dragging
-   it in the view **From the street**.
+   post, in the ground). That sets a height, which you can change with the slider, or with **Raise** in the 3D view
+   (drag it up or down).
 4. **Flash it** lights it up for a moment, so you can check from outside that you picked the
    right one.
 

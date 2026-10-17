@@ -263,6 +263,45 @@
     return bits.join(" · ");
   }
 
+  // ---- lengths: stored in metres, shown and typed in the user's units ---------------------
+  const FT = 0.3048, IN = 0.0254;
+  // 'imperial' or 'metric': the user's choice in Settings, else what Home Assistant uses
+  function units() {
+    const pref = store("units", "auto");
+    if (pref === "imperial" || pref === "metric") return pref;
+    return (data.status && data.status.units) || "metric";
+  }
+  // 2.4 -> 7' 10" (imperial) or 2.40 m (metric)
+  function fmtLen(m, { signed = false } = {}) {
+    if (m === null || m === undefined || Number.isNaN(Number(m))) return "–";
+    const v = Number(m);
+    const sign = v < 0 ? "−" : signed && v > 0 ? "+" : "";
+    if (units() === "metric") return `${sign}${Math.abs(v).toFixed(2)} m`;
+    const total = Math.round(Math.abs(v) / IN);
+    const ft = Math.floor(total / 12), inch = total % 12;
+    return `${sign}${ft}' ${inch}"`;
+  }
+  // "8' 6\"", "8 ft 6 in", "102 in", "8.5'", "2.6 m", "260 cm", or a bare number in the user's
+  // units (feet or metres) -> metres; NaN when it can't be read
+  function parseLen(text) {
+    const t = String(text ?? "").trim().toLowerCase().replace(/[′’]/g, "'").replace(/[″”“]/g, '"').replace(/−/g, "-").replace(",", ".");
+    if (!t) return NaN;
+    let m;
+    if ((m = /^(-?\d+(?:\.\d+)?)\s*(m|meters?|metres?)$/.exec(t))) return Number(m[1]);
+    if ((m = /^(-?\d+(?:\.\d+)?)\s*cm$/.exec(t))) return Number(m[1]) / 100;
+    if ((m = /^(-?\d+(?:\.\d+)?)\s*("|in|inch|inches)$/.exec(t))) return Number(m[1]) * IN;
+    if ((m = /^(-?)\s*(\d+(?:\.\d+)?)\s*('|ft|foot|feet)\s*(?:(\d+(?:\.\d+)?)\s*("|in|inch|inches)?)?$/.exec(t))) {
+      const v = Number(m[2]) * FT + (m[4] ? Number(m[4]) * IN : 0);
+      return m[1] === "-" ? -v : v;
+    }
+    if ((m = /^(-?\d+(?:\.\d+)?)$/.exec(t))) return Number(m[1]) * (units() === "imperial" ? FT : 1);
+    return NaN;
+  }
+  // Snap a length to a whole inch (imperial) or 5 cm (metric)
+  function snapLen(m) {
+    return units() === "imperial" ? Math.round(m / IN) * IN : Math.round(m * 20) / 20;
+  }
+
   // A palette colour's display hex: its own, or a colour temperature's approximate white
   function colorHex(c) {
     if (c.hex) return c.hex;
@@ -282,6 +321,7 @@
 
   window.L = {
     icon, el, api, toast, run, store, save, onData, refresh, data, typing, set, colorHex,
+    units, fmtLen, parseLen, snapLen, FT, IN,
     INTEGRATION, DRIVER, lightIcon, stateText,
     setTitle(text) { document.getElementById("page-title").textContent = text; document.title = `${text} · Luminorium`; },
     topExtra() { return document.getElementById("top-extra"); },

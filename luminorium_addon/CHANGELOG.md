@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0-dev.2
+
+- **House map in 3D:** the house as a volume you can turn and zoom. Each floor is a slab at its
+  height, and each light an orb with a line down to its floor. Tap a light to pick it, tap the
+  floor to place it, drag to move it, and drag up or down in **Raise** mode. **3D**, **Top** and
+  **Front** reset the view. The flat plan and side views stay as a second tab.
+- **Feet and inches:** sizes and heights follow Home Assistant's unit system (imperial here), or
+  the choice under **Settings › Units**. Fields take `8' 6"`, `8 ft 6 in`, `102 in`, `2.6 m`, and
+  the grid and snapping go by feet and inches.
+- **Better first guess for floor heights:** nothing deeper than one storey below the ground; the
+  levels below main share that depth, so split levels come out half a storey apart.
+
 ## 0.3.0-dev.1
 
 A new UI, and the house map.

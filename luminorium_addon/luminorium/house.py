@@ -22,6 +22,8 @@ from .store import JsonStore
 OUTSIDE = "_outside"
 STOREY_M = 2.7
 CEILING_M = 2.4
+# The deepest a floor goes by default: one storey below the ground
+BASEMENT_DEPTH_M = 2.4
 # Mount types and the height above the floor (m) each suggests; ceiling-hung ones follow the ceiling
 MOUNTS: dict[str, dict[str, Any]] = {
     "ceiling": {"label": "Ceiling", "below_ceiling": 0.05},
@@ -49,21 +51,30 @@ class Part:
 
 
 def default_floors(inv: Inventory) -> dict[str, dict]:
-    """A first guess: one storey per HA level, the 'main' level at the ground."""
-    real = [f for f in inv.floors.values() if not f.id.startswith("_")]
-    levels = sorted({f.level for f in real if f.level is not None})
-    ref = next((f.level for f in real if "main" in f.name.lower() and f.level is not None), None)
-    if ref is None:
-        ref = next((lv for lv in levels if lv >= 0), levels[0] if levels else 0)
+    """A first guess, corrected by the user under Floors & size.
+
+    The level named "main" (else the lowest above ground) is at 0. Nothing goes deeper than
+    one storey below the ground: the floors under main share that depth evenly, so a split-level
+    house (levels half a storey apart) comes out right. Above main, floors keep the same step in
+    a split-level house, else one storey each.
+    """
+    real = sorted(
+        (f for f in inv.floors.values() if not f.id.startswith("_")),
+        key=lambda f: (f.level is None, f.level if f.level is not None else 0),
+    )
+    if not real:
+        return {}
+    main_i = next((i for i, f in enumerate(real) if "main" in f.name.lower()), None)
+    if main_i is None:
+        main_i = next((i for i, f in enumerate(real) if (f.level or 0) >= 0), 0)
+    below = main_i  # floors under main, lowest first
+    step_below = BASEMENT_DEPTH_M / below if below else STOREY_M
+    step_above = step_below if below >= 2 else STOREY_M
     out = {}
-    for i, f in enumerate(sorted(real, key=lambda f: (f.level is None, f.level or 0))):
-        level = f.level if f.level is not None else i
-        out[f.id] = {
-            "elevation": round((level - ref) * STOREY_M, 2),
-            "ceiling": CEILING_M,
-            "x0": None,
-            "x1": None,
-        }
+    for i, f in enumerate(real):
+        k = i - main_i
+        elevation = k * step_below if k < 0 else k * step_above
+        out[f.id] = {"elevation": round(elevation, 2), "ceiling": CEILING_M, "x0": None, "x1": None}
     return out
 
 

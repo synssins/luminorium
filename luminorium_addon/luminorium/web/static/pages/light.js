@@ -78,7 +78,7 @@
     return el("section.card", { "aria-labelledby": "plc" },
       el("h2#plc", "Place and fixture"),
       el("div.row", { style: { padding: "12px 14px", borderRadius: "12px", background: "var(--card2)" } },
-        icon("cube", 22), el("span", { style: { flex: "1" } }, placed ? `On the house map · ${placed.mount || "placed"}, ${placed.h} m up` : "Not on the house map yet"),
+        icon("cube", 22), el("span", { style: { flex: "1" } }, placed ? `On the house map · ${placed.mount || "placed"}, ${L.fmtLen(placed.h)} up` : "Not on the house map yet"),
         el("a", { href: `house?select=${encodeURIComponent(target)}` }, placed ? "Move it" : "Place it")),
       el("div.row", { style: { padding: "12px 14px", borderRadius: "12px", background: "var(--card2)" } },
         icon("fixture", 22), el("span", { style: { flex: "1" } }, fx ? `Part of ${fx.name}` : "Not part of a fixture"),

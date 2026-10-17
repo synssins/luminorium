@@ -18,8 +18,12 @@ Code: `luminorium/house.py` (`HouseService`), the API in `web/server.py`, the pa
   - `ceiling`, its ceiling height (2.4 m by default).
   - an optional span `x0`–`x1`: the stretch of the house, left to right, that the floor covers
     (the left half of a split-level house, say). Empty means the whole width.
-- **First guess:** one 2.7 m storey per HA level, with the level whose name has "main" at 0 m.
-  The user corrects it under **Floors & size**.
+- **First guess:** the level whose name has "main" (else the lowest above ground) is at 0.
+  Nothing goes deeper than one storey below the ground (2.4 m, 7′ 10″). The floors under main
+  share that depth evenly, so a split-level house (levels half a storey apart) comes out right:
+  in this house Basement −7′ 10″, Ground −3′ 11″, Main 0, Bedroom +3′ 11″. Above main, floors keep
+  the same step in a split-level house, and are a full storey (2.7 m) each in a plain one. The
+  user corrects it under **Floors & size**.
 - **Outside** (`_outside`) is the yard. A height outside is above the ground.
 - **Items:** a light or a fixture. Each has a `floor`, `x`, `y`, `h` (the height above that floor)
   and a `mount`. Its world position is (`x`, `y`, `elevation + h`).
@@ -83,8 +87,28 @@ you stand. Every flash is restored afterwards, and nothing is sent in read-only 
 | `POST /api/house/items/{target}/line` | `{start: {x, y, h}, end: {x, y, h}, parts?: [index, …]}` | `{placed: n}`: the parts spread evenly from start to end |
 | `POST /api/house/identify` | `{target, part?}` | `{flashing, part?}`; `409` when read-only or the light is busy |
 
+## Units
+
+Everything is stored in metres. The page shows and accepts the user's units: feet and inches when
+Home Assistant's unit system is imperial (`get_config` → `unit_system.length` is `mi`), else
+metres. **Settings › Units** overrides it per browser. Fields accept `8' 6"`, `8 ft 6 in`,
+`102 in`, `8.5'`, `2.6 m` or `260 cm`, or a bare number in the current unit. In imperial the
+grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm in metric).
+
 ## The page
 
+- **3D** (the default tab): the house as a volume. Each floor is a slab at its height, over its
+  span, with its ceiling outline, above a ground grid. Every placed light is an orb with a line
+  down to its floor (lit ones glow); a strip's parts are small dots. Lights on other floors are
+  dimmed. The view is drawn by `pages/house3d.js`, a small perspective renderer on a 2D canvas
+  (no 3D library to download, so it works offline).
+  - Drag empty space to turn the view; scroll or pinch to zoom. **3D**, **Top** and **Front**
+    reset the angle.
+  - Tap a light to pick it. Tap the floor to put the picked light (or part) there, on the floor
+    chosen above the view.
+  - **Move:** drag the picked light, or one of its parts, across its floor.
+  - **Raise:** drag it up or down; it stops at the ceiling.
+- **Plan & side** (the second tab), for exact positions:
 - **From above:** the plan, with a 1 m grid (5 m lines heavier) and the house outline. The chosen
   floor's span is highlighted, and lights on other floors are dimmed. Tap empty ground to place
   the selected light or part; drag it to move it (5 cm steps).

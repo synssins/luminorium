@@ -14,6 +14,17 @@
           el("button", { type: "button", role: "radio", "aria-checked": String(current === v), on: { click: () => pick(v) } }, label))));
   }
 
+  function unitsCard() {
+    const current = store("units", "auto");
+    const ha = status && status.units === "imperial" ? "feet and inches" : "metres";
+    const pick = (v) => { save("units", v); render(); };
+    return el("section.card", el("h2", "Units"),
+      el("div.seg", { role: "radiogroup", "aria-label": "Units" },
+        [["auto", `As in Home Assistant (${ha})`], ["imperial", "Feet and inches"], ["metric", "Metres"]].map(([v, label]) =>
+          el("button", { type: "button", role: "radio", "aria-checked": String(current === v), on: { click: () => pick(v) } }, label))),
+      el("span.small.muted", "For sizes and heights on the house map. Positions are kept exactly whichever you choose."));
+  }
+
   let status = null;
   function render() {
     if (!status) return;
@@ -24,6 +35,7 @@
           el("div.kv", el("span", "Home Assistant"), el("span", status.connected ? `Connected, ${status.ha_version}` : "Disconnected")),
           el("div.kv", el("span", "Mode"), el("span", status.read_only ? "Read-only: nothing is sent to lights" : "Normal")),
           el("p.small.muted", "Read-only mode, the drivers and their networks are set in the add-on's options in Home Assistant (Settings › Add-ons › Luminorium › Configuration).")),
+        unitsCard(),
         themeCard(),
         el("section.card", el("h2", "Phone camera check"),
           el("p.muted", { style: { margin: "0" } }, "Checks whether this phone's browser (or the HA app) lets Luminorium use the camera and motion sensors, which camera mapping needs."),

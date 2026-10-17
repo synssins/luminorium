@@ -43,7 +43,8 @@ scripts).
 }
 ```
 
-`activity` is the latest 30 events, newest first. `drivers` has one entry per direct driver:
+`activity` is the latest 30 events, newest first. `units` is `imperial` or `metric`, from Home
+Assistant's unit system. `drivers` has one entry per direct driver:
 `{"enabled": false}` when switched off in the options; `connected` is the link to its hub (or
 its UDP socket); `error` the last problem ("no MQTT broker (Mosquitto not found)", "can't listen
 on UDP 4002: …").

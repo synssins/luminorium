@@ -17,12 +17,33 @@ PORCH = "light.front_porch_light"
 STRING = "light.led_bulb_string_lights"  # Govee, 30 segments
 
 
-def test_default_floors_stack_from_the_main_level(lum):
+def test_default_floors_never_go_deeper_than_one_storey(lum):
+    # This house: 4 levels, 2 under "Main": a split level, half a storey apart
     floors = {f["name"]: f for f in lum.house.view()["floors"]}
     assert floors["Main Level"]["elevation"] == 0
-    assert floors["Bedroom Level"]["elevation"] == pytest.approx(2.7)
-    assert floors["Ground Level"]["elevation"] == pytest.approx(-2.7)
+    assert floors["Ground Level"]["elevation"] == pytest.approx(-1.2)
+    assert floors["Basement"]["elevation"] == pytest.approx(-2.4)
+    assert floors["Bedroom Level"]["elevation"] == pytest.approx(1.2)
     assert all(f["ceiling"] == 2.4 for f in floors.values())
+
+
+def test_default_floors_plain_house():
+    from luminorium.house import default_floors
+    from luminorium.inventory.model import Floor, Inventory
+
+    inv = Inventory(
+        floors={
+            "basement": Floor("basement", "Basement", -1),
+            "main": Floor("main", "Main floor", 0),
+            "upstairs": Floor("upstairs", "Upstairs", 1),
+        }
+    )
+    f = default_floors(inv)
+    assert (f["basement"]["elevation"], f["main"]["elevation"], f["upstairs"]["elevation"]) == (
+        -2.4,
+        0,
+        2.7,
+    )
 
 
 def test_split_levels_and_heights(lum):

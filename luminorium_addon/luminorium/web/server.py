@@ -116,6 +116,11 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         title, script = pages[key]
         wide = ' data-wide="1"' if key == "house" else ""
         crumbs = ' data-crumbs="Lights@lights"' if key == "light" else ""
+        extra_js = (
+            f'<script src="static/pages/house3d.js?v={__version__}"></script>\n'
+            if key == "house"
+            else ""
+        )
         return HTMLResponse(
             f"""<!doctype html>
 <html lang="en">
@@ -129,7 +134,7 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
 </head>
 <body data-page="{script}" data-title="{title.replace("&", "&amp;")}"{wide}{crumbs}>
 <script src="static/shell.js?v={__version__}"></script>
-<script src="static/pages/{script}.js?v={__version__}"></script>
+{extra_js}<script src="static/pages/{script}.js?v={__version__}"></script>
 </body>
 </html>
 """
@@ -177,6 +182,7 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
             "touched": sorted(lum.safety.snapshots),
             "activity": list(lum.safety.activity)[:30],
             "drivers": lum.driver_status(),
+            "units": lum.units,
         }
 
     def light_dict(light) -> dict:

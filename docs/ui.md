@@ -36,6 +36,9 @@ and its own `pages/<name>.js`, versioned so an update isn't hidden by the browse
   harmless when it's unavailable).
 - Light helpers: `stateText`, `lightIcon`, `colorHex` (palette colours, kelvin included), and
   the names in `INTEGRATION` and `DRIVER`.
+- Lengths: `units()` (`imperial` or `metric`: the Settings choice, else HA's unit system from
+  `api/status`), `fmtLen(metres)` (`7' 10"` or `2.40 m`), `parseLen(text)` (feet and inches,
+  inches, metres or centimetres, or a bare number in the current unit), `snapLen` (an inch or 5 cm).
 
 No `alert()`, `confirm()` or `prompt()`, which the HA companion app's webview may not show.
 Errors go to toasts, and names are typed inline.
@@ -48,11 +51,11 @@ Errors go to toasts, and names are typed inline.
 | **Lights** | Search; filters (included, switches, excluded, all); levels and rooms that fold (remembered); fixture suggestions; **Group lights** mode; a card per light or fixture with state, driver and latency, capabilities, warnings, an include checkbox, **Test** and **Details** |
 | **Light** (`light?id=…` or `light?fixture=…`) | What it can do; driver choice (Automatic or a pinned driver) and timing; **Test with options** (fade, effect, hold); its place on the house map and its fixture; Home Assistant ids; what each effect name becomes on it |
 | **Palettes & shows** | Playing now, with Stop; tabs for Palettes (a **Play on** target: every light, a level or a room), Shows and Effects |
-| **House map** | Placing lights in 3D ([house.md](house.md)) |
+| **House map** | Placing lights in 3D: a volumetric view, plus a plan and a side view ([house.md](house.md)) |
 | **Views**, **Map with camera** | The photo views editor and the guided camera capture ([mapping.md](mapping.md)) |
 | **Drivers** | A card per driver: status, endpoint, counts, notes (Z-Wave nodes on unicast, Govee LAN Control) and how many lights use it |
 | **Activity** | The latest 30 events |
-| **Settings** | Version and mode, appearance (match the device, dark, light), the camera check, where files live |
+| **Settings** | Version and mode, units (as in Home Assistant, feet and inches, metres), appearance (match the device, dark, light), the camera check, where files live |
 
 ## Phones
 

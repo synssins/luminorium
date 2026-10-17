@@ -64,6 +64,9 @@ class Luminorium:
         )
         self.house = HouseService(JsonStore(settings.config_dir), self.inventory, self._parts_for)
         self._startup: asyncio.Task | None = None
+        # HA's own settings (unit system, time zone), read on every (re)connect
+        self.ha_config: dict = {}
+        self.ha.on_connect(self._read_ha_config)
         self.router.attach(lambda: self.inventory.inventory)
         self.inventory.on_rebuild(self._rebuilt)
 
@@ -107,6 +110,18 @@ class Luminorium:
         for _ in range(max(1, int(seconds / 0.2))):
             await wled.stream(light, frame)
             await asyncio.sleep(0.2)
+
+    async def _read_ha_config(self) -> None:
+        try:
+            self.ha_config = await self.ha.command({"type": "get_config"}) or {}
+        except Exception as err:
+            log.debug("HA config not read: %s", err)
+
+    @property
+    def units(self) -> str:
+        """'imperial' or 'metric', as Home Assistant is set up."""
+        length = ((self.ha_config or {}).get("unit_system") or {}).get("length")
+        return "imperial" if length in ("mi", "ft", "in", "yd") else "metric"
 
     def driver_for(self, light: Light) -> Driver:
         return self.router.driver_for(light)

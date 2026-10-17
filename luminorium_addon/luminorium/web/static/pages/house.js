@@ -17,6 +17,8 @@
     search: "",
     settings: false,
     drag: null,
+    view: L.store("house.view", "3d"), // "3d" | "flat"
+    mode3d: "move",                     // "move" | "raise" in the 3D view
   };
   let house = null;
   let inventory = null;
@@ -70,7 +72,7 @@
     for (const k of kids.flat()) if (k) n.append(k instanceof Node ? k : document.createTextNode(String(k)));
     return n;
   }
-  const r2 = (v) => Math.round(v * 20) / 20; // 5 cm steps
+  const r2 = (v) => L.snapLen(v); // a whole inch, or 5 cm
 
   // ---- plan view (from above) -----------------------------------------------------------------
 
@@ -80,8 +82,10 @@
     const svg = s("svg", { viewBox: vb, role: "img", "aria-label": `Plan from above, ${floorName(ui.floor)}`,
       style: "width:100%;height:auto;display:block;touch-action:none;background:var(--field);border-radius:10px;cursor:crosshair" });
     const grid = s("g", { stroke: "var(--line)", "stroke-width": 0.03 });
-    for (let x = Math.ceil(b.x0); x <= b.x1; x++) grid.append(s("line", { x1: x, y1: -b.y1, x2: x, y2: -b.y0, "stroke-width": x % 5 ? 0.02 : 0.05 }));
-    for (let y = Math.ceil(b.y0); y <= b.y1; y++) grid.append(s("line", { x1: b.x0, y1: -y, x2: b.x1, y2: -y, "stroke-width": y % 5 ? 0.02 : 0.05 }));
+    // Grid lines every foot (heavier every 5 ft), or every metre (heavier every 5 m)
+    const step = L.units() === "imperial" ? L.FT : 1;
+    for (let i = Math.ceil(b.x0 / step); i * step <= b.x1; i++) grid.append(s("line", { x1: i * step, y1: -b.y1, x2: i * step, y2: -b.y0, "stroke-width": i % 5 ? 0.02 : 0.05 }));
+    for (let i = Math.ceil(b.y0 / step); i * step <= b.y1; i++) grid.append(s("line", { x1: b.x0, y1: -i * step, x2: b.x1, y2: -i * step, "stroke-width": i % 5 ? 0.02 : 0.05 }));
     svg.append(grid);
     // the house, and which part of it this floor covers
     svg.append(s("rect", { x: 0, y: -D, width: W, height: D, fill: "var(--card2)", stroke: "var(--faint)", "stroke-width": 0.08, rx: 0.1 }));
@@ -91,7 +95,7 @@
       svg.append(s("rect", { x: x0, y: -D, width: Math.max(0, x1 - x0), height: D, fill: "var(--accent)", "fill-opacity": 0.08,
         stroke: "var(--accent)", "stroke-opacity": 0.5, "stroke-width": 0.05, "stroke-dasharray": "0.3 0.2" }));
     }
-    svg.append(s("text", { x: 0.2, y: -D + 0.7, "font-size": 0.55, fill: "var(--muted)" }, `${floorName(ui.floor)} · ${W} × ${D} m`));
+    svg.append(s("text", { x: 0.2, y: -D + 0.7, "font-size": 0.55, fill: "var(--muted)" }, `${floorName(ui.floor)} · ${L.fmtLen(W)} × ${L.fmtLen(D)}`));
     svg.append(s("text", { x: b.x1 - 0.3, y: -b.y0 - 0.4, "font-size": 0.55, fill: "var(--faint)", "text-anchor": "end" }, "Street ↓"));
     svg.append(s("text", { x: b.x0 + 0.3, y: -b.y0 - 0.4, "font-size": 0.55, fill: "var(--faint)" }, "Yard"));
 
@@ -160,25 +164,82 @@
       else await placePart(ui.part, d.at);
       return;
     }
-    if (ui.mode === "line-start") { ui.lineStart = at; ui.mode = "line-end"; paint(); toast("Now tap where the last one is"); return; }
-    if (ui.mode === "line-end") {
-      const t = target(ui.sel);
-      const h = t.item ? t.item.h : 0.5;
-      ui.mode = null;
-      await run(async () => {
-        const r = await api(`api/house/items/${encodeURIComponent(t.id)}/line`, { method: "POST",
-          body: { start: { ...ui.lineStart, h }, end: { ...at, h } } });
-        toast(`${r.placed} parts spread along the line`);
-      });
-      ui.lineStart = null;
-      await reload();
-      return;
-    }
+    if (ui.mode) { await lineClick(at); return; }
     const tid = e.target.getAttribute && e.target.getAttribute("data-target");
     if (tid || !ui.sel) return;
     // A click on empty ground: place the selected light (or part) here
     if (ui.part !== null && target(ui.sel)?.item) await placePart(ui.part, at);
     else await placeItem(at);
+  }
+
+  async function lineClick(at) {
+    if (ui.mode === "line-start") { ui.lineStart = at; ui.mode = "line-end"; paint(); toast("Now tap where the last one is"); return; }
+    const t = target(ui.sel);
+    const h = t.item ? t.item.h : 0.5;
+    ui.mode = null;
+    await run(async () => {
+      const r = await api(`api/house/items/${encodeURIComponent(t.id)}/line`, { method: "POST",
+        body: { start: { ...ui.lineStart, h }, end: { ...at, h } } });
+      toast(`${r.placed} parts spread along the line`);
+    });
+    ui.lineStart = null;
+    await reload();
+  }
+
+  // ---- the 3D view -----------------------------------------------------------------------------
+
+  let canvas3d = null;
+  let view3d = null;
+  function scene3d() {
+    const tops = house.floors.map((f) => f.elevation + f.ceiling);
+    const bottoms = house.floors.map((f) => f.elevation);
+    const lights = house.targets.filter((t) => t.world).map((t) => {
+      const sel = t.id === ui.sel;
+      const here = t.item.floor === ui.floor || t.item.floor === house.outside;
+      return {
+        id: t.id, label: t.name, x: t.world.x, y: t.world.y, z: t.world.z, floorZ: floorZ(t.item.floor),
+        on: t.state === "on", sel, dim: !here && !sel,
+        parts: t.parts.filter((p) => p.world).map((p) => ({ index: p.index, x: p.world.x, y: p.world.y, z: p.world.z, sel: sel && ui.part === p.index })),
+      };
+    });
+    return {
+      W: house.size.width, D: house.size.depth,
+      zMin: Math.min(0, ...bottoms), zMax: Math.max(2.5, ...tops),
+      floors: house.floors.map((f) => ({ ...f, active: f.id === ui.floor, label: L.fmtLen(f.elevation, { signed: true }) })),
+      lights, grid: L.units() === "imperial" ? L.FT : 1,
+      placeZ: floorZ(ui.floor), selPart: ui.part, labels: false,
+    };
+  }
+  function ensure3d() {
+    if (view3d) return;
+    canvas3d = el("canvas", { "aria-label": "The house in 3D: floors and lights", role: "img",
+      style: { width: "100%", aspectRatio: "4 / 3", maxHeight: "72vh", display: "block", borderRadius: "10px", cursor: "grab" } });
+    view3d = new window.House3D(canvas3d, {
+      onPick: (id, part) => { const t = target(id); ui.sel = id; ui.part = part; if (t && part === null) ui.floor = floorOfTarget(t); paint(); },
+      onPlace: async (x, y) => {
+        const at = { x: r2(x), y: r2(y) };
+        if (ui.mode) return lineClick(at);
+        if (!ui.sel) { toast("Pick a light first, from the list or by tapping it"); return; }
+        const t = target(ui.sel);
+        if (ui.part !== null && t.item) await placePart(ui.part, at);
+        else await placeItem({ ...at, floor: t.item ? t.item.floor : ui.floor });
+      },
+      onMove: async (id, part, x, y, done) => {
+        const t = target(id);
+        const at = { x: r2(x), y: r2(y) };
+        if (part === null) { t.item.x = at.x; t.item.y = at.y; t.world.x = at.x; t.world.y = at.y; }
+        else { const p = t.parts.find((q) => q.index === part); p.world.x = at.x; p.world.y = at.y; }
+        view3d.setScene(scene3d());
+        if (done) { if (part === null) await placeItem(at); else await placePart(part, at); }
+      },
+      onRaise: async (id, h, done) => {
+        const t = target(id);
+        const hh = Math.min(ceilingOf(t.item.floor), r2(h));
+        t.item.h = hh; t.world.z = floorZ(t.item.floor) + hh;
+        view3d.setScene(scene3d());
+        if (done) await placeItem({ h: hh });
+      },
+    });
   }
 
   // ---- side view (from the street) ------------------------------------------------------------
@@ -196,7 +257,7 @@
         fill: active ? "var(--accent)" : "var(--card2)", "fill-opacity": active ? 0.1 : 0.7,
         stroke: active ? "var(--accent)" : "var(--line2)", "stroke-width": 0.04 }));
       svg.append(s("text", { x: x0 + 0.2, y: -(f.elevation + f.ceiling) + 0.45, "font-size": 0.35, fill: active ? "var(--accent)" : "var(--muted)" },
-        `${f.name}  ${f.elevation >= 0 ? "+" : ""}${f.elevation.toFixed(1)} m`));
+        `${f.name}  ${L.fmtLen(f.elevation, { signed: true })}`));
     }
     for (const t of house.targets) {
       if (!t.world) continue;
@@ -208,7 +269,7 @@
       if (sel) {
         const fz = floorZ(t.item.floor);
         svg.append(s("line", { x1: t.world.x, y1: -fz, x2: t.world.x, y2: -t.world.z, stroke: "var(--accent)", "stroke-width": 0.05, "stroke-dasharray": "0.15 0.1" }));
-        svg.append(s("text", { x: t.world.x + 0.3, y: -(fz + t.item.h / 2), "font-size": 0.35, fill: "var(--accent)" }, `${t.item.h.toFixed(2)} m above the floor`));
+        svg.append(s("text", { x: t.world.x + 0.3, y: -(fz + t.item.h / 2), "font-size": 0.35, fill: "var(--accent)" }, `${L.fmtLen(t.item.h)} above the floor`));
       }
     }
     let dragging = false;
@@ -263,14 +324,24 @@
     await reload();
   }
   async function saveSettings(form) {
+    // Every field is a length in the user's units; empty "covers" fields mean the whole width
+    const bad = [];
+    const len = (name, optional = false) => {
+      const input = form.querySelector(`[name="${name}"]`);
+      if (optional && !input.value.trim()) return null;
+      const v = L.parseLen(input.value);
+      if (Number.isNaN(v)) bad.push(input.value || "(empty)");
+      return v;
+    };
     const floors = {};
     for (const f of house.floors) {
-      const g = (k) => form.querySelector(`[name="${f.id}.${k}"]`).value;
-      floors[f.id] = { elevation: g("elevation"), ceiling: g("ceiling"), x0: g("x0"), x1: g("x1") };
+      floors[f.id] = { elevation: len(`${f.id}.elevation`), ceiling: len(`${f.id}.ceiling`), x0: len(`${f.id}.x0`, true), x1: len(`${f.id}.x1`, true) };
     }
-    const size = { width: form.querySelector('[name="width"]').value, depth: form.querySelector('[name="depth"]').value };
-    await run(async () => { await api("api/house/settings", { method: "PUT", body: { size, floors } }); toast("Saved"); });
+    const size = { width: len("width"), depth: len("depth") };
+    if (bad.length) { toast(`Couldn't read ${bad.map((b) => `“${b}”`).join(", ")} as a length`); return false; }
+    const ok = await run(async () => { await api("api/house/settings", { method: "PUT", body: { size, floors } }); toast("Saved"); return true; });
     await reload();
+    return !!ok;
   }
   async function reload() { house = await api("api/house"); paint(); }
 
@@ -309,9 +380,14 @@
     const item = t.item;
     const floor = item ? item.floor : floorOfTarget(t);
     const ceil = ceilingOf(floor);
-    const num = (label, key, value, step = 0.05) => el("label.field", el("span", label),
-      el("input", { type: "number", step, value: value ?? "", inputmode: "decimal", disabled: !item,
-        on: { change: (e) => placeItem({ [key]: Number(e.target.value) }) } }));
+    const num = (label, key, value) => el("label.field", el("span", label),
+      el("input", { type: "text", value: value === undefined || value === null ? "" : L.fmtLen(value), inputmode: "text", disabled: !item,
+        "aria-label": label, autocomplete: "off",
+        on: { change: (e) => {
+          const v = L.parseLen(e.target.value);
+          if (Number.isNaN(v)) { toast(`Couldn't read “${e.target.value}” as a length`); e.target.value = L.fmtLen(value); return; }
+          placeItem({ [key]: v });
+        } } }));
     const parts = t.parts.length ? el("section", { style: { display: "flex", flexDirection: "column", gap: "6px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
       el("div.card-head", el("h3", `Parts (${t.parts.length})`),
         el("button.btn.small", { type: "button", disabled: !item && false, "aria-pressed": String(!!ui.mode),
@@ -334,8 +410,8 @@
         el("select", { disabled: !item, on: { change: (e) => placeItem({ mount: e.target.value }) } },
           house.mounts.map((m) => el("option", { value: m.id, selected: item && item.mount === m.id }, m.label)))),
       el("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" } },
-        num("Across (m)", "x", item?.x), num("Back from front (m)", "y", item?.y)),
-      el("label.field", el("span", "Height above the floor", el("span.mono", item ? `${item.h.toFixed(2)} m` : "–")),
+        num("Across", "x", item?.x), num("Back from the front", "y", item?.y)),
+      el("label.field", el("span", "Height above the floor", el("span.mono", item ? L.fmtLen(item.h) : "–")),
         el("input", { type: "range", min: 0, max: ceil, step: 0.05, value: item?.h ?? 0, disabled: !item,
           on: { change: (e) => placeItem({ h: Number(e.target.value) }) } })),
       item ? null : el("div.banner", { style: { fontSize: "14px" } }, "Tap the plan where this light is to place it."),
@@ -347,15 +423,16 @@
 
   function settingsPanel() {
     if (!ui.settings) return null;
-    const cell = (name, value, label) => el("label.field", el("span", label), el("input", { name, type: "number", step: 0.1, value: value ?? "", placeholder: label === "Covers from (m)" ? "0" : label === "to (m)" ? String(house.size.width) : "" }));
-    const form = el("form.card", { "aria-label": "Floors and size", on: { submit: (e) => { e.preventDefault(); saveSettings(form); ui.settings = false; } } },
+    const cell = (name, value, label, placeholder = "") => el("label.field", el("span", label),
+      el("input", { name, type: "text", autocomplete: "off", value: value === null || value === undefined ? "" : L.fmtLen(value), placeholder }));
+    const form = el("form.card", { "aria-label": "Floors and size", on: { submit: async (e) => { e.preventDefault(); if (await saveSettings(form)) { ui.settings = false; paint(); } } } },
       el("div.card-head", el("h2", "Floors & size"), el("span.small.muted", "Heights are from the ground outside; split levels are floors half a storey apart")),
       el("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px" } },
-        cell("width", house.size.width, "House width (m)"), cell("depth", house.size.depth, "House depth (m)")),
+        cell("width", house.size.width, "House width"), cell("depth", house.size.depth, "House depth")),
       house.floors.map((f) => el("div", { style: { display: "grid", gridTemplateColumns: "minmax(140px, 1.2fr) repeat(4, minmax(90px, 1fr))", gap: "10px", alignItems: "end", borderTop: "1px solid var(--line)", paddingTop: "10px" } },
         el("b", { style: { paddingBottom: "12px" } }, f.name),
-        cell(`${f.id}.elevation`, f.elevation, "Floor height (m)"), cell(`${f.id}.ceiling`, f.ceiling, "Ceiling (m)"),
-        cell(`${f.id}.x0`, f.x0, "Covers from (m)"), cell(`${f.id}.x1`, f.x1, "to (m)"))),
+        cell(`${f.id}.elevation`, f.elevation, "Floor height"), cell(`${f.id}.ceiling`, f.ceiling, "Ceiling"),
+        cell(`${f.id}.x0`, f.x0, "Covers from", L.fmtLen(0)), cell(`${f.id}.x1`, f.x1, "to", L.fmtLen(house.size.width)))),
       el("p.small.muted", { style: { margin: 0 } }, "“Covers” is the stretch of the house, left to right from the front, that this floor is in. Leave it empty for the whole width."),
       el("div.row", el("button.btn.primary", { type: "submit" }, "Save"), el("button.btn", { type: "button", on: { click: () => { ui.settings = false; paint(); } } }, "Cancel")));
     return form;
@@ -367,6 +444,7 @@
   let listBox = null;
   function repaintViews() {
     if (!views) return;
+    if (ui.view === "3d") { view3d.mode = ui.mode3d; view3d.setScene(scene3d()); return; }
     views.plan.replaceChildren(planView());
     views.side.replaceChildren(sideView());
   }
@@ -383,22 +461,48 @@
         el("button.chip", { type: "button", "aria-pressed": String(ui.floor === id), on: { click: () => { ui.floor = id; paint(); } } }, name)));
     views = { plan: el("div"), side: el("div") };
     listBox = listPanel();
-    L.set(page, 
+    const lineBanner = ui.mode ? el("div.banner", { style: { fontSize: "14px" } }, ui.mode === "line-start" ? "Tap where the first part is." : "Now tap where the last part is.") : null;
+    const viewTabs = el("div.tabs", { role: "tablist", "aria-label": "View" },
+      [["3d", "3D"], ["flat", "Plan & side"]].map(([k, label]) => el("button", { type: "button", role: "tab", "aria-selected": String(ui.view === k),
+        on: { click: () => { ui.view = k; L.save("house.view", k); paint(); } } }, label)));
+    let main;
+    if (ui.view === "3d") {
+      ensure3d();
+      const t = ui.sel && target(ui.sel);
+      const hint = !t ? "Pick a light from the list, or tap one."
+        : !t.placed ? `Tap where ${t.name} is on the ${floorName(ui.floor)} floor.`
+        : ui.mode3d === "raise" ? "Drag the picked light up or down."
+        : "Drag the picked light across its floor, or tap the floor to put it there.";
+      main = el("section.card", { "aria-label": "The house in 3D", style: { padding: "14px 16px" } },
+        el("div.row", { style: { justifyContent: "space-between" } },
+          el("div.seg", { role: "radiogroup", "aria-label": "Dragging the picked light" },
+            [["move", "Move"], ["raise", "Raise"]].map(([k, label]) => el("button", { type: "button", role: "radio", "aria-checked": String(ui.mode3d === k),
+              on: { click: () => { ui.mode3d = k; paint(); } } }, label))),
+          el("div.row", { style: { gap: "6px" } }, [["3d", "3D"], ["top", "Top"], ["front", "Front"]].map(([k, label]) =>
+            el("button.btn.small", { type: "button", on: { click: () => view3d.preset(k) } }, label)))),
+        floorTabs, lineBanner, canvas3d, el("span.small.muted", hint));
+    } else {
+      main = [
+        el("section.card", { "aria-label": "From above", style: { padding: "14px 16px" } },
+          el("div.card-head", el("h2", "From above"), floorTabs), lineBanner, views.plan),
+        el("section.card", { "aria-label": "From the street", style: { padding: "14px 16px" } },
+          el("div.card-head", el("h2", "From the street"), el("span.small.muted", "Drag the selected light up or down")),
+          views.side)];
+    }
+    L.set(page,
       settingsPanel(),
       el("div.hm",
         listBox,
-        el("div.hm-views",
-          el("section.card", { "aria-label": "From above", style: { padding: "14px 16px" } },
-            el("div.card-head", el("h2", "From above"), floorTabs),
-            ui.mode ? el("div.banner", { style: { fontSize: "14px" } }, ui.mode === "line-start" ? "Tap where the first part is." : "Now tap where the last part is.") : null,
-            views.plan),
-          el("section.card", { "aria-label": "From the street", style: { padding: "14px 16px" } },
-            el("div.card-head", el("h2", "From the street"), el("span.small.muted", "Drag the selected light up or down")),
-            views.side)),
+        el("div.hm-views", viewTabs, main),
         inspector()));
     repaintViews();
   }
 
-  onData((d) => { status = d.status; });
+  // Redraw once the status says which units HA uses (and whenever that changes)
+  let shownUnits = null;
+  onData((d) => {
+    status = d.status;
+    if (house && L.units() !== shownUnits) { shownUnits = L.units(); if (!L.typing()) paint(); }
+  });
   load().then(() => { paint(); start(15000); }).catch((e) => L.set(page, el("div.empty", `Couldn't load the house map: ${e.message}`)));
 })();
