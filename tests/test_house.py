@@ -618,3 +618,35 @@ async def test_checks_point_out_numbers_that_disagree(client, lum):
     )
     view = (await client.get("/api/house")).json()
     assert any("outside the walls" in c["text"] for c in view["checks"])
+
+
+async def test_aiming_at_a_spot_and_keeping_it(client, lum):
+    # a flood on the porch post, 1.5 m up, aimed at a wall 4 m behind it and 2.5 m up
+    await client.put(
+        f"/api/house/items/{PORCH}",
+        json={"floor": OUTSIDE, "x": 5, "y": -4, "h": 1.5, "mount": "post"},
+    )
+    r = await client.put(
+        f"/api/house/items/{PORCH}/aim",
+        json={"kind": "flood", "at": {"x": 5, "y": 0, "z": 2.5}, "what": "the Main wall"},
+    )
+    aim = r.json()["aim"]
+    assert aim["heading"] == 180  # straight back, toward the house
+    assert aim["tilt"] == pytest.approx(14.0, abs=0.1)  # atan(1 / 4)
+    assert aim["what"] == "the Main wall" and aim["beam"] == 90
+    # moved 4 m to the right: it still points at the same spot, now back and to the left
+    await client.put(f"/api/house/items/{PORCH}", json={"floor": OUTSIDE, "x": 9, "y": -4})
+    aim = lum.house.data["items"][PORCH]["aim"]
+    assert aim["heading"] == pytest.approx(135, abs=0.1)
+    # an uplight on a tree: straight up when it's right underneath
+    r = await client.put(
+        f"/api/house/items/{PORCH}/aim", json={"kind": "spot", "at": {"x": 9, "y": -4, "z": 6}}
+    )
+    assert r.json()["aim"]["tilt"] == 90
+    # turned by hand: no longer tied to a spot
+    r = await client.put(
+        f"/api/house/items/{PORCH}/aim", json={"kind": "spot", "tilt": 30, "heading": 90}
+    )
+    assert "at" not in r.json()["aim"]
+    bad = {"kind": "flood", "at": lum.house.world(PORCH)}  # where the light is
+    assert (await client.put(f"/api/house/items/{PORCH}/aim", json=bad)).status_code == 400

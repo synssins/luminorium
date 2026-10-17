@@ -173,6 +173,23 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
   heading}`: heading in degrees clockwise from above, 0 facing the street. Drawn as a wedge from
   above (a circle when it points straight up or down) and a cone in 3D.
 
+## Floods and spots
+
+The light's panel has **Its light**: **All around** (no aim), **Flood** (90°), **Spot** (25°) or
+**Half** (a wall light, 180°), with sliders for the beam width, how far it **Points** up or down,
+and which way it's **Turned**. Two ways to point it at something:
+
+- **Aim at something in 3D:** click what it should light. The click is cast into the scene
+  (`House3D.raycast`): the nearest of the ground, a house block's walls (as boxes), and trees and
+  bushes (as spheres round their canopy). The light then points at that spot.
+- **Aim from above** (the Top view's **Aim a light**): tap the ground, or a tree or bush (its
+  canopy, for an uplight).
+
+Aimed at a spot, the item keeps `aim.at` ({x, y, z}) and `aim.what` ("the garage wall"), and the
+heading and tilt are worked out from the light to it (`_aim_towards`), again whenever the light
+is moved. Turning it by hand (the sliders, the arrow from above) drops the spot. In 3D a dashed
+line runs from the light to a ring where the beam lands; from above, to a crosshair.
+
 ## Checks
 
 `HouseService.checks()` (in `GET /api/house` as `checks`) and the front photo's own
@@ -215,7 +232,7 @@ and a sentence. The page lists them above the views (**Things to check**), each 
 | `GET /api/house/photo?which=top` | | the image |
 | `PUT /api/house/site` | `{xf: {s, theta, tx, ty}, square: {a, b, runs: across\|depth}, turns, ref: {pts, length?}, check: {pts, length}, outline: [[x, y]…], ext_wall: 2x4\|2x6\|2x8, yard: [{id, kind, name, pts?, smooth?, width?, c?, r?, h?}], walls: [{id, level, a, b, studs, finish}], doors: [{id, wall, at, width}], rooms: [{id, level, at, area, name}]}` | the view; `400` for an unknown level, area, build, wall or yard kind |
 | `DELETE /api/house/site` | | the view; removes the top photo and its drawing |
-| `PUT /api/house/items/{target}/aim` | `{kind: flood\|spot\|wall, beam?, tilt?, heading?}` or `null` | the item; `400` before it's placed or out of range |
+| `PUT /api/house/items/{target}/aim` | `{kind: flood\|spot\|wall, beam?, tilt?, heading?, at?: {x, y, z}, what?}` or `null` (with `at`, heading and tilt point at it) | the item; `400` before it's placed or out of range |
 
 `GET /api/house` also returns `site` (the top view as saved), `top` (`{plan, outline, ext_thick,
 yard, walls (with thickness), doors, rooms}`) and `checks`. `massing` adds `footprint` (the front

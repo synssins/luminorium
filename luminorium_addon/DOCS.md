@@ -111,8 +111,10 @@ Units changes it). Type them as `8' 6"`, `8 ft 6 in`, `102 in`, or just `8.5`.
 3. **Floor plans** (in the top view): draw each level's walls, then type how far each is from
    another wall, face to face, as you'd measure with a tape. Add doorways and name the rooms.
 
-Then aim floods and spots from the top view: drag the arrow to point them, tilt them up or down
-in the panel. **Things to check** at the top of the House map says when numbers don't agree
+Then aim floods and spots: pick the light, choose **Flood** or **Spot** under **Its light**, then
+**Aim at something in 3D** and click the wall, ground or tree it should light (or **Aim from
+above** and tap it). It stays aimed there if you move the light. The sliders fine-tune the beam
+width and angle. **Things to check** at the top of the House map says when numbers don't agree
 (the roof measures differently from the front and from above, a floor is out of order, a light
 is outside the walls), with **Show me** to go there.
 

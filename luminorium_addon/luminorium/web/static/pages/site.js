@@ -352,7 +352,7 @@ window.SiteEditor = class SiteEditor {
         const s = this.ctx.selection();
         return s.target ? `Tap where ${s.target.name} is (${this.levelName()}${this.level === OUT ? "" : " level"}).` : "Pick a light from the list, then tap where it is.";
       }
-      case "aim": return this.sel && this.sel.kind === "light" ? "Drag the arrow to point the light. Drag the edge of its beam to make it wider or narrower. Tilt it up or down in the panel." : "Tap a light to aim it.";
+      case "aim": return this.sel && this.sel.kind === "light" ? "Tap what it should light (the ground, a tree, a bush) to point it there, or drag the arrow to turn it. Drag the edge of its beam to widen it. Tilt it in the panel." : "Tap a light to aim it.";
       case "measure": return this.measure ? `${fmt(this.measure.len)} · drag again to measure something else` : "Drag from one point to another to measure it.";
       case "pan": return "Drag to move. Scroll or pinch to zoom.";
       default: return "Tap something to pick it; drag it or its handles. Delete removes it.";
@@ -776,12 +776,21 @@ window.SiteEditor = class SiteEditor {
     ctx.fillStyle = sel ? "rgba(255,180,80,0.28)" : "rgba(245,194,90,0.18)";
     if (up) {
       ctx.beginPath(); ctx.arc(p.x, p.y, 1.2 * this.view.k * Math.tan(Math.min(80, a.beam / 2) * Math.PI / 180) + 6, 0, Math.PI * 2); ctx.fill();
+      if (sel) this.aimHandles = null;
       return;
     }
     const hd = headingVec(a.heading || 0);
     const ang = Math.atan2(-hd[1], hd[0]); // screen angle (y down)
     const half = Math.min(179, a.beam) / 2 * Math.PI / 180;
     ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, len, ang - half, ang + half); ctx.closePath(); ctx.fill();
+    if (a.at) {
+      const q = this.h2s(a.at.x, a.at.y);
+      ctx.save(); ctx.strokeStyle = sel ? "#ff8a3d" : "rgba(245,194,90,0.7)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(q.x, q.y, 7, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(q.x - 10, q.y); ctx.lineTo(q.x + 10, q.y); ctx.moveTo(q.x, q.y - 10); ctx.lineTo(q.x, q.y + 10); ctx.stroke();
+      ctx.restore();
+    }
     if (sel) {
       const tip = { x: p.x + Math.cos(ang) * len, y: p.y + Math.sin(ang) * len };
       ctx.strokeStyle = "#ff8a3d"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
@@ -903,6 +912,11 @@ window.SiteEditor = class SiteEditor {
         this.paint();
         return;
       }
+      if (this.tool === "aim" && this.sel && this.sel.kind === "light") {
+        // a tap aims the picked light there; a drag pans
+        this.drag = { kind: "aimTap", start: p, view: { ...this.view } };
+        return;
+      }
       this.sel = null; this.aimHandles = null; this.paint();
       this.drag = { kind: "pan", start: p, view: { ...this.view } };
       return;
@@ -924,6 +938,7 @@ window.SiteEditor = class SiteEditor {
       this.view = { k, x: mid.x - hx * k, y: mid.y + hy * k, fitted: true };
       this.render(); return;
     }
+    if (d.kind === "aimTap" && Math.hypot(p.x - d.start.x, p.y - d.start.y) > 6) d.kind = "pan";
     if (d.kind === "pan") { this.view = { ...d.view, x: d.view.x + p.x - d.start.x, y: d.view.y + p.y - d.start.y, fitted: true }; this.render(); return; }
     const [x, y] = this.s2h(p);
     if (d.kind === "handle") { this.dragHandle(d.h, p, [x, y]); this.render(); return; }
@@ -979,6 +994,19 @@ window.SiteEditor = class SiteEditor {
     const p = this.local(e);
     const tapped = Math.hypot(p.x - d.start.x, p.y - d.start.y) < 6;
     if (d.kind === "pan" || d.kind === "measure") { this.paint(); return; }
+    if (d.kind === "aimTap") {
+      const t = this.shape(this.sel);
+      if (!t || !t.item) return;
+      const [x, y] = this.s2h(p);
+      // a tree or bush under the tap: its canopy; else the ground
+      const plant = this.doc.yard.find((q) => q.c && Math.hypot(q.c[0] - x, q.c[1] - y) <= q.r);
+      const h = plant ? plant.h ?? (plant.kind === "tree" ? Math.max(3, plant.r * 1.6) : Math.max(0.6, plant.r)) : 0;
+      const at = plant ? { x: plant.c[0], y: plant.c[1], z: round3(h * (plant.kind === "tree" ? 0.65 : 0.5)) } : { x: round3(x), y: round3(y), z: 0 };
+      const what = plant ? (plant.name ? `the ${plant.name}` : `the ${plant.kind}`) : "the ground";
+      const aim = t.item.aim || { kind: "flood", beam: 90, tilt: 0, heading: 0 };
+      this.ctx.aim(t.id, { kind: aim.kind, beam: aim.beam, tilt: aim.tilt, heading: aim.heading, at, what });
+      return;
+    }
     const [x, y] = this.s2h(p);
     if (d.kind === "handle") {
       if (d.h.kind === "aimTip" || d.h.kind === "aimEdge") { const ah = this.aimHandles; if (ah) this.ctx.aim(ah.light.id, ah.light.item.aim); return; }

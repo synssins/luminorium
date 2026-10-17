@@ -269,6 +269,12 @@ class HouseService:
             {"floor": floor, "x": _num(x), "y": _num(y), "h": max(0.0, _num(h)), "mount": mount}
         )
         self.data["items"][tid] = item
+        aim = item.get("aim")
+        if aim and aim.get("at"):
+            # still pointing at what it was aimed at
+            pointed = _aim_towards(self.world(tid), aim["at"])
+            if pointed:
+                aim.update(pointed)
         self._save()
         return item
 
@@ -297,7 +303,18 @@ class HouseService:
             heading = _num(aim.get("heading", 0)) % 360
             if not 2 <= beam <= 180 or not -90 <= tilt <= 90:
                 raise HouseError("a beam is 2-180° wide, tilted -90° to 90°")
-            item["aim"] = {"kind": kind, "beam": beam, "tilt": tilt, "heading": round(heading, 1)}
+            new = {"kind": kind, "beam": beam, "tilt": tilt, "heading": round(heading, 1)}
+            at = aim.get("at")
+            if at:
+                # aimed at a spot (a wall, the ground, a tree): it stays aimed there when moved
+                new["at"] = {k: _num(at.get(k)) for k in ("x", "y", "z")}
+                pointed = _aim_towards(self.world(tid), new["at"])
+                if pointed is None:
+                    raise HouseError("that's where the light is")
+                new.update(pointed)
+            if aim.get("what"):
+                new["what"] = str(aim["what"])[:60]  # what it's aimed at, in words
+            item["aim"] = new
         self._save()
         return item
 
@@ -926,6 +943,20 @@ class HouseService:
 
     def _save(self) -> None:
         self.store.save("house", self.data)
+
+
+def _aim_towards(src: dict | None, at: dict) -> dict | None:
+    """Heading (clockwise from above, 0 toward the street) and tilt (up from level) from a light
+    to a spot."""
+    if not src:
+        return None
+    dx, dy, dz = at["x"] - src["x"], at["y"] - src["y"], at["z"] - src["z"]
+    flat = math.hypot(dx, dy)
+    if flat < 1e-6 and abs(dz) < 1e-6:
+        return None
+    heading = math.degrees(math.atan2(-dx, -dy)) % 360 if flat > 1e-6 else 0.0
+    tilt = math.degrees(math.atan2(dz, flat))
+    return {"heading": round(heading, 1), "tilt": round(tilt, 1)}
 
 
 def _ft(m: float) -> str:

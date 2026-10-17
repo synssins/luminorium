@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0-dev.13
+
+- **Floods and spots, from the light's panel:** **Its light** is All around, Flood, Spot or Half
+  (a wall light), with sliders for the beam width, how far it points up or down, and which way
+  it's turned.
+- **Aim at something:** **Aim at something in 3D**, then click the wall, ground or tree it
+  should light; or **Aim from above** and tap the ground or a tree (its canopy, for an uplight).
+  It stays pointed there when the light is moved. A dashed line and a ring show where the beam
+  lands.
+
 ## 0.3.0-dev.12
 
 - **The House map fits the window** on a big screen: no page scrollbar, no zooming out. The

@@ -116,6 +116,14 @@
         view3d.setScene(scene3d());
         if (done) { if (part === null) await placeItem(at); else await placePart(part, at); }
       },
+      onAimAt: async (point, what) => {
+        const t = target(ui.sel);
+        if (!t || !t.item) return;
+        const aim = t.item.aim || { kind: "flood", beam: 90, tilt: 0, heading: 0 };
+        ui.aiming = false;
+        await aimLight(t.id, { kind: aim.kind, beam: aim.beam, tilt: aim.tilt, heading: aim.heading, at: point, what });
+        toast(`${t.name} now points at ${what}`);
+      },
       onRaise: async (id, h, done) => {
         const t = target(id);
         const hh = Math.min(ceilingOf(t.item.floor), r2(h));
@@ -227,7 +235,7 @@
     await run(() => api(`api/house/items/${encodeURIComponent(id)}/aim`, { method: "PUT", body: aim }));
     house = await api("api/house");
     if (site) { site.render(); site.paintInspector(); }
-    paintSide();
+    paint();
   }
 
   // A tap on the photo: across (x) and height above the ground (z), in house metres
@@ -369,10 +377,47 @@
         el("input", { type: "range", min: 0, max: ceil, step: 0.05, value: item?.h ?? 0, disabled: !item,
           on: { change: (e) => placeItem({ h: Number(e.target.value) }) } })),
       item ? null : el("div.banner", { style: { fontSize: "14px" } }, "Tap where this light is in 3D, on the Front photo, or in the Top view to place it."),
+      item ? beamPanel(t) : null,
       el("div.row", { style: { gap: "8px" } },
         el("button.btn.primary", { type: "button", disabled: status?.read_only, style: { flex: "1" }, on: { click: () => identify(undefined) } }, "Flash it"),
         item ? el("button.btn", { type: "button", on: { click: removeItem } }, "Remove") : null),
       parts);
+  }
+
+  // ---- floods and spots ----------------------------------------------------------------------
+
+  const BEAM_KINDS = [["all", "All around"], ["flood", "Flood"], ["spot", "Spot"], ["wall", "Half"]];
+  const BEAM_WIDTH = { flood: 90, spot: 25, wall: 180 };
+  function beamPanel(t) {
+    const aim = t.item.aim || null;
+    const kind = aim ? aim.kind : "all";
+    const send = (change) => aimLight(t.id, change);
+    const slider = (label, key, min, max, fmt) => {
+      const out = el("span.mono", fmt(aim[key]));
+      return el("label.field", el("span", label, out), el("input", { type: "range", min, max, step: 1, value: aim[key],
+        on: { input: (e) => { out.textContent = fmt(Number(e.target.value)); },
+          // turning it by hand: no longer aimed at a spot
+          change: (e) => send({ kind: aim.kind, beam: aim.beam, tilt: aim.tilt, heading: aim.heading, [key]: Number(e.target.value) }) } }));
+    };
+    const tiltText = (v) => { v = Math.round(v); return v >= 85 ? "straight up" : v <= -85 ? "straight down" : v === 0 ? "level" : v > 0 ? `${v}° up` : `${-v}° down`; };
+    return el("section", { "aria-label": "Its light", style: { display: "flex", flexDirection: "column", gap: "10px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
+      el("div.field", el("span", "Its light"),
+        el("div.seg", { role: "radiogroup", "aria-label": "Its light" }, BEAM_KINDS.map(([k, label]) =>
+          el("button", { type: "button", role: "radio", "aria-checked": String(kind === k), on: { click: () => {
+            if (k === "all") send(null);
+            else send({ ...(aim || { tilt: 0, heading: 0 }), kind: k, beam: aim && aim.kind === k ? aim.beam : BEAM_WIDTH[k] });
+          } } }, label)))),
+      !aim ? el("span.small.muted", "Bulbs and ceiling lights light all around. Choose Flood or Spot for a light that points somewhere (a wall wash, an uplight on a tree), or Half for a wall light.") : [
+        el("div.row", { style: { gap: "8px", flexWrap: "wrap" } },
+          el("button.btn.small.primary", { type: "button", "aria-pressed": String(!!ui.aiming), on: { click: () => { ui.aiming = !ui.aiming; ui.view = "3d"; L.save("house.view", "3d"); paint(); } } },
+            ui.aiming ? "Cancel aiming" : "Aim at something in 3D"),
+          el("button.btn.small", { type: "button", on: { click: () => { ui.aiming = false; ui.view = "top"; L.save("house.view", "top"); paint(); if (site) { site.setTool("aim"); site.sel = { kind: "light", id: t.id }; site.paint(); } } } }, "Aim from above")),
+        el("span.small", aim.at ? `Aimed at ${aim.what || "a spot"}, ${L.fmtLen(Math.hypot(aim.at.x - t.world.x, aim.at.y - t.world.y, aim.at.z - t.world.z))} away.`
+          : `Faces ${typeof headingText === "function" ? headingText(aim.heading).replace(/^toward /, "toward ") : `${aim.heading}°`}, ${tiltText(aim.tilt)}.`),
+        slider("Beam width", "beam", 5, aim.kind === "wall" ? 180 : 160, (v) => `${v}°`),
+        slider("Points", "tilt", -90, 90, tiltText),
+        slider("Turned", "heading", 0, 359, (v) => (typeof headingText === "function" ? headingText(v) : `${v}°`)),
+      ]);
   }
 
   function settingsPanel() {
@@ -398,7 +443,7 @@
   let listBox = null;
   function repaintViews() {
     if (!views) return;
-    if (ui.view === "3d") { view3d.mode = ui.mode3d; view3d.setScene(scene3d()); return; }
+    if (ui.view === "3d") { view3d.mode = ui.mode3d; view3d.aimMode = !!ui.aiming; view3d.setScene(scene3d()); return; }
   }
   function paintList() {
     if (!listBox) return;
@@ -439,7 +484,8 @@
     if (ui.view === "3d") {
       ensure3d();
       const t = ui.sel && target(ui.sel);
-      const hint = !t ? "Pick a light from the list, or tap one."
+      const hint = ui.aiming && t ? `Click what ${t.name} should point at: a wall, the ground, or a tree. Drag to turn the view first if you need to.`
+        : !t ? "Pick a light from the list, or tap one."
         : !t.placed ? `Tap where ${t.name} is on the ${floorName(ui.floor)} floor.`
         : ui.mode3d === "raise" ? "Drag the picked light up or down."
         : "Drag the picked light across its floor, or tap the floor to put it there.";

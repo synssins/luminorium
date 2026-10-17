@@ -8,7 +8,7 @@ window.House3D = class House3D {
   constructor(canvas, handlers) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
-    this.h = handlers; // onPick(id, part), onPlace(x, y), onMove(id, part, x, y, done), onRaise(id, h, done)
+    this.h = handlers; // onPick(id, part), onPlace(x, y), onMove(id, part, x, y, done), onRaise(id, h, done), onAimAt(point, what)
     this.scene = null;
     this.yaw = -0.55;     // around the vertical axis
     this.pitch = 0.62;    // above the horizon
@@ -185,7 +185,7 @@ window.House3D = class House3D {
     items.sort((a, b) => b.depth - a.depth);
     for (const it of items) it.draw();
     // a hint (the page shows it under the view on narrow screens)
-    if (W >= 520) this.text(this.mode === "raise" ? "Raise: drag the picked light up or down" : "Drag to turn · scroll or pinch to zoom · drag the picked light to move it",
+    if (W >= 520) this.text(this.aimMode ? "Aim: click what the light should point at (a wall, the ground, a tree)" : this.mode === "raise" ? "Raise: drag the picked light up or down" : "Drag to turn · scroll or pinch to zoom · drag the picked light to move it",
       12, H - 12, col.muted, 12, "left");
   }
 
@@ -297,6 +297,31 @@ window.House3D = class House3D {
     }
   }
 
+  // What a screen point looks at: the nearest of the ground, a house block's walls, a tree or
+  // bush. Returns { p: {x, y, z}, what } or null.
+  raycast(sx, sy) {
+    const cam = this.cam, s = this.scene;
+    if (!cam || !s) return null;
+    const o = cam.pos, d = this.ray(sx, sy, cam);
+    let best = null;
+    const take = (t, what) => { if (t > 0.05 && (!best || t < best.t)) best = { t, what }; };
+    if (Math.abs(d.z) > 1e-9) take(-o.z / d.z, "the ground");
+    for (const b of (s.massing && s.massing.blocks) || []) {
+      const y0 = b.y0 || 0;
+      const t = rayBox(o, d, [b.x0, y0, b.z0], [b.x1, y0 + b.depth, b.z1]);
+      if (t !== null) take(t, `the ${b.name || "house"} wall`);
+    }
+    for (const y of (s.top && s.top.yard) || []) {
+      if (!y.c) continue;
+      const h = y.h ?? (y.kind === "tree" ? Math.max(3, y.r * 1.6) : Math.max(0.6, y.r));
+      const t = raySphere(o, d, { x: y.c[0], y: y.c[1], z: h * (y.kind === "tree" ? 0.65 : 0.5) }, y.r * (y.kind === "tree" ? 0.8 : 1));
+      if (t !== null) take(t, y.name ? `the ${y.name}` : `the ${y.kind}`);
+    }
+    if (!best) return null;
+    const r3 = (v) => Math.round(v * 1000) / 1000;
+    return { p: { x: r3(o.x + d.x * best.t), y: r3(o.y + d.y * best.t), z: r3(Math.max(0, o.z + d.z * best.t)) }, what: best.what };
+  }
+
   // A light's beam: a faint cone from the light the way it points
   beam(items, P, l) {
     const a = l.aim;
@@ -314,6 +339,17 @@ window.House3D = class House3D {
     });
     const apex = P(l.x, l.y, l.z);
     if (!apex || rim.some((q) => !q)) return;
+    if (a.at) {
+      const spot = P(a.at.x, a.at.y, a.at.z);
+      if (spot) items.push({ depth: spot.depth - 0.05, draw: () => {
+        const ctx = this.ctx;
+        ctx.save(); ctx.strokeStyle = l.sel ? "#ff8a3d" : "#f5c25a"; ctx.globalAlpha = l.sel ? 0.9 : 0.5;
+        ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(apex.x, apex.y); ctx.lineTo(spot.x, spot.y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(spot.x, spot.y, Math.max(5, 0.25 * spot.scale), 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(spot.x, spot.y, 2.5, 0, Math.PI * 2); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
+        ctx.restore();
+      } });
+    }
     const color = l.sel ? "#ff8a3d" : "#f5c25a";
     items.push({ depth: avgDepth(rim) + 0.1, draw: () => {
       const ctx = this.ctx;
@@ -440,6 +476,12 @@ window.House3D = class House3D {
     if (d.kind === "move" && d.moved && d.at) return this.h.onMove(d.light.id, d.part, d.at.x, d.at.y, true);
     if (d.kind === "raise" && d.moved) return this.h.onRaise(d.light.id, d.h, true);
     if (d.kind === "orbit" && !d.moved) {
+      // aiming: what's under the tap is where the picked light points
+      if (this.aimMode) {
+        const hit = this.raycast(d.start.x, d.start.y);
+        if (hit && this.h.onAimAt) this.h.onAimAt(hit.p, hit.what);
+        return;
+      }
       if (d.hit) return this.h.onPick(d.hit.id, d.hit.part);
       // a tap on empty space: place the picked light (or part) on the shown floor there
       const at = this.onPlane(d.start.x, d.start.y, this.scene.placeZ);
@@ -448,6 +490,26 @@ window.House3D = class House3D {
   }
 };
 
+// Where a ray first meets an axis-aligned box (min, max as [x, y, z]), or null
+function rayBox(o, d, lo, hi) {
+  let t0 = -Infinity, t1 = Infinity;
+  for (const [k, i] of [["x", 0], ["y", 1], ["z", 2]]) {
+    if (Math.abs(d[k]) < 1e-12) { if (o[k] < lo[i] || o[k] > hi[i]) return null; continue; }
+    let a = (lo[i] - o[k]) / d[k], b = (hi[i] - o[k]) / d[k];
+    if (a > b) [a, b] = [b, a];
+    t0 = Math.max(t0, a); t1 = Math.min(t1, b);
+    if (t0 > t1) return null;
+  }
+  return t0 > 0 ? t0 : t1 > 0 ? t1 : null;
+}
+function raySphere(o, d, c, r) {
+  const ox = o.x - c.x, oy = o.y - c.y, oz = o.z - c.z;
+  const b = ox * d.x + oy * d.y + oz * d.z, cc = ox * ox + oy * oy + oz * oz - r * r;
+  const disc = b * b - cc;
+  if (disc < 0) return null;
+  const t = -b - Math.sqrt(disc);
+  return t > 0 ? t : null;
+}
 function sub(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
 function add(a, b) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; }
 function scale(a, k) { return { x: a.x * k, y: a.y * k, z: a.z * k }; }
