@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0-dev.14
+
+- **3D: tap off a light to let go of it.** Tapping anywhere else no longer moves a light that's
+  already placed; drag it to move it. A light not placed yet still goes where you tap.
+
 ## 0.3.0-dev.13
 
 - **Floods and spots, from the light's panel:** **Its light** is All around, Flood, Spot or Half

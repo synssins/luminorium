@@ -105,8 +105,12 @@
         if (ui.mode) return lineClick(at);
         if (!ui.sel) { toast("Pick a light first, from the list or by tapping it"); return; }
         const t = target(ui.sel);
-        if (ui.part !== null && t.item) await placePart(ui.part, at);
-        else await placeItem({ ...at, floor: t.item ? t.item.floor : ui.floor });
+        const part = ui.part !== null && t.item ? t.parts.find((q) => q.index === ui.part) : null;
+        // A tap off something already placed lets go of it (dragging is how it moves); one not
+        // placed yet goes where the tap is
+        if (part) { if (part.placed) { ui.part = null; paint(); } else await placePart(ui.part, at); return; }
+        if (t.item) { ui.sel = null; ui.part = null; paint(); return; }
+        await placeItem({ ...at, floor: ui.floor });
       },
       onMove: async (id, part, x, y, done) => {
         const t = target(id);
@@ -488,7 +492,7 @@
         : !t ? "Pick a light from the list, or tap one."
         : !t.placed ? `Tap where ${t.name} is on the ${floorName(ui.floor)} floor.`
         : ui.mode3d === "raise" ? "Drag the picked light up or down."
-        : "Drag the picked light across its floor, or tap the floor to put it there.";
+        : ui.mode3d === "move" && t.placed ? "Drag the picked light to move it. Tap anywhere else to let go of it." : "Drag the picked light across its floor.";
       main = el("section.card", { "aria-label": "The house in 3D", style: { padding: "14px 16px" } },
         el("div.row", { style: { justifyContent: "space-between" } },
           el("div.seg", { role: "radiogroup", "aria-label": "Dragging the picked light" },

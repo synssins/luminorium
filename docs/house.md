@@ -259,8 +259,9 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
   (no 3D library to download, so it works offline).
   - Drag empty space to turn the view; scroll or pinch to zoom. **3D**, **Top** and **Front**
     reset the angle.
-  - Tap a light to pick it. Tap the floor to put the picked light (or part) there, on the floor
-    chosen above the view.
+  - Tap a light to pick it. A light (or part) not placed yet goes where you then tap the floor,
+    on the floor chosen above the view. Tapping off a placed light lets go of it: it only moves
+    when dragged.
   - **Move:** drag the picked light, or one of its parts, across its floor.
   - **Raise:** drag it up or down; it stops at the ceiling.
   (The flat "Plan & side" tab was removed in 0.3.0-dev.12: the Top view and 3D cover it.)
