@@ -226,6 +226,20 @@ window.House3D = class House3D {
       const lab = P(top[0], top[1], top[2] + 0.2);
       if (lab && r.name) items.push({ depth: lab.depth - 0.01, draw: () => this.text(r.name, lab.x, lab.y, col.muted, 11, "center") });
     }
+    // Spaces with their own floor (a landing, storage over the entry): a slab at that height
+    const levels = new Map(this.scene.floors.map((f) => [f.id, f]));
+    for (const b of this.scene.massing.blocks) {
+      if (!b.level || !b.offset || !levels.has(b.level)) continue;
+      const z = levels.get(b.level).elevation + b.offset;
+      const y0 = b.y0 || 0, y1 = y0 + b.depth;
+      face([[b.x0, y0, z], [b.x1, y0, z], [b.x1, y1, z], [b.x0, y1, z]], "#f0b429", 0.12, 0.8);
+    }
+    // The front of the house along the ground, from the ground line's bends
+    const foot = this.scene.massing.footprint;
+    if (foot && foot.length > 1) {
+      const q = foot.map(([x, y]) => P(x, y, 0.02));
+      items.push({ depth: avgDepth(q) - 0.02, draw: () => { for (let i = 0; i + 1 < q.length; i++) this.line(q[i], q[i + 1], "#7bc47f", 2); } });
+    }
     // windows and doors sit on the front wall of the block they're in
     for (const o of this.scene.massing.openings) {
       const blk = this.scene.massing.blocks.find((b) => (o.x0 + o.x1) / 2 >= b.x0 && (o.x0 + o.x1) / 2 <= b.x1);

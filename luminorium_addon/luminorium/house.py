@@ -32,6 +32,8 @@ DOOR_H_M = 2.032
 ROOF_BACKS = ("extrude", "ridge", "shed")
 OPENINGS = ("window", "door", "garage")
 PHOTO_MAX_BYTES = 15 * 1024 * 1024
+# Soffits stick out about 24" past the walls on most houses
+EAVE_M = 0.6096
 # Joists and subfloor between a ceiling and the floor above it: about 12"
 FLOOR_DEPTH_M = 0.3048
 STOREY_M = 2.7
@@ -46,6 +48,7 @@ MOUNTS: dict[str, dict[str, Any]] = {
     "floor_lamp": {"label": "Floor lamp", "h": 1.5},
     "table": {"label": "Tabletop", "h": 0.8},
     "under_cabinet": {"label": "Under cabinet", "h": 1.4},
+    "soffit": {"label": "Under the eaves", "h": 2.6},
     "strip": {"label": "Strip", "h": 1.0},
     "post": {"label": "Path or post", "h": 0.5},
     "ground": {"label": "In the ground", "h": 0.0},
@@ -423,11 +426,38 @@ class HouseService:
             dw, dh = _num(door.get("w", DOOR_W_M)), _num(door.get("h", DOOR_H_M))
             if not (0.3 <= dw <= 6 and 0.3 <= dh <= 6):
                 raise HouseError("the door must be 1-20 ft each way")
-            out["door"] = {"pts": clean, "w": dw, "h": dh}
+            recess = _num(door.get("recess", 0))
+            if not 0 <= recess <= 5:
+                raise HouseError("a door is set back 0-15 ft")
+            out["door"] = {"pts": clean, "w": dw, "h": dh, "recess": recess}
         else:
             out["door"] = None
         ground = body.get("ground")
         out["ground"] = None if ground is None else {"z": _num(ground.get("z", 0))}
+        if ground and ground.get("pts"):
+            # the traced ground line (photo px) and where each point is on the ground
+            pts = ground["pts"]
+            if not isinstance(pts, list) or not 2 <= len(pts) <= 40:
+                raise HouseError("the ground line needs 2 to 40 points")
+            out["ground"]["pts"] = [[_num(p[0], 1e5), _num(p[1], 1e5)] for p in pts]
+            foot = ground.get("footprint")
+            if foot:
+                if not isinstance(foot, list) or len(foot) != len(pts):
+                    raise HouseError("the ground footprint doesn't match the ground line")
+                out["ground"]["footprint"] = [[_num(p[0]), _num(p[1])] for p in foot]
+        eave = _num(body.get("eave", EAVE_M))
+        if not 0 <= eave <= 2:
+            raise HouseError("eaves stick out 0-6 ft")
+        out["eave"] = eave
+        edges = []
+        for e in _list(body.get("edges"), 20):
+            pts = e.get("pts") or []
+            if not isinstance(pts, list) or not 2 <= len(pts) <= 60:
+                raise HouseError("a roof edge line needs 2 to 60 points")
+            edges.append(
+                {"id": str(e.get("id") or "")[:40], "pts": [[_num(p[0]), _num(p[1])] for p in pts]}
+            )
+        out["edges"] = edges
         floor_depth = _num(body.get("floor_depth", FLOOR_DEPTH_M))
         if not 0 <= floor_depth <= 1:
             raise HouseError("a floor is 0-3 ft thick")
@@ -448,11 +478,22 @@ class HouseService:
         _migrate_roofs(body)  # a page from before roofs were their own shapes
         for b in _list(body.get("blocks"), 50):
             blk = {"id": ident(b.get("id")), "name": ident(b.get("name"), 60), **rect(b)}
-            if b.get("floor"):
-                # the HA floor whose floor is this block's bottom (a basement in the ground)
-                if b["floor"] not in floors:
-                    raise HouseError(f"unknown floor {b['floor']}")
-                blk["floor"] = str(b["floor"])
+            for key in ("floor", "level"):
+                # level: the HA floor this part of the house belongs to; floor: the HA floor
+                # whose floor is this block's bottom (a basement in the ground)
+                if b.get(key):
+                    if b[key] not in floors:
+                        raise HouseError(f"unknown floor {b[key]}")
+                    blk[key] = str(b[key])
+            if b.get("face"):
+                if b["face"] not in ("line", "out", "back", "auto"):
+                    raise HouseError(f"unknown front face {b['face']}")
+                blk["face"] = b["face"]
+            if b.get("offset") not in (None, ""):
+                off = _num(b["offset"])
+                if not -5 <= off <= 5:
+                    raise HouseError("a space's floor is within 15 ft of its level's")
+                blk["offset"] = off
             for key, lo, hi in (("depth", 0.5, 200), ("y0", -50, 50), ("below", 0, 10)):
                 if b.get(key) not in (None, ""):
                     v = _num(b[key])
@@ -616,6 +657,10 @@ class HouseService:
                 # drawn bottom
                 w["z0"] = round(w["z0"] - b["below"], 3)
                 w["below"] = b["below"]
+            if b.get("level"):
+                # a space inside a level, with its own floor (a landing, storage over the entry)
+                w["level"] = b["level"]
+                w["offset"] = b.get("offset", 0.0)
             blocks.append(w)
         roofs = []
         for r in f.get("roofs") or []:
@@ -631,7 +676,18 @@ class HouseService:
                 }
             )
         openings = [{"kind": o["kind"], **world(o)} for o in f.get("openings") or []]
-        return {"blocks": blocks, "openings": openings, "roofs": roofs}
+        foot = (f.get("ground") or {}).get("footprint")
+        edges = f.get("edges") or []
+        xs = [p[0] for e in edges for p in e["pts"]]
+        return {
+            "blocks": blocks,
+            "openings": openings,
+            "roofs": roofs,
+            # the front of the house along the ground, from the ground line's bends
+            "footprint": [[round(x - ox, 3), round(y, 3)] for x, y in foot] if foot else None,
+            "roofline": round(max(xs) - min(xs), 3) if xs else None,
+            "eave": f.get("eave", EAVE_M),
+        }
 
     def master_of(self, entity_id: str) -> str | None:
         """The house-map target a light is placed as: itself, or a WLED segment light's main

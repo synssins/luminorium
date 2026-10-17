@@ -358,7 +358,7 @@
       house: () => house,
       floors: () => house.floors,
       selection: () => ({ target: ui.sel ? target(ui.sel) : null, part: ui.part }),
-      place: (x, z, outside) => placeFromPhoto(x, z, outside),
+      place: (x, z, where, wallY, block, eave) => placeFromPhoto(x, z, where, wallY, block, eave),
       // the drawing was saved: the house width and floor heights may have changed
       saved: (view) => { house = view; paintSide(); },
       changed: () => reload(),
@@ -366,10 +366,14 @@
     facade.load(house.facade);
   }
   // A tap on the photo: across (x) and height above the ground (z), in house metres
-  async function placeFromPhoto(x, z, outside) {
+  // where: "inside" (by the window), "wall" (outside, on the wall) or "eave" (under the eaves);
+  // wallY: how far back the wall tapped is; block: the house block tapped, if any
+  async function placeFromPhoto(x, z, where, wallY = 0, block = null, eave = 0.6096) {
     const t = target(ui.sel);
     if (!t) return;
-    const at = { x: r2(x), y: outside ? -0.15 : 0.3 };
+    const outside = where !== "inside";
+    const y = where === "inside" ? wallY + 0.3 : where === "eave" ? wallY - eave / 2 : wallY - 0.15;
+    const at = { x: r2(x), y: r2(y) };
     if (ui.part !== null && t.item) {
       const h = Math.max(0, r2(z - floorZ(t.item.floor)));
       await run(() => api(`api/house/items/${encodeURIComponent(t.id)}/parts/${ui.part}`, { method: "PUT", body: { ...at, h } }));
@@ -377,7 +381,8 @@
       return;
     }
     let floor = house.outside;
-    if (!outside) {
+    if (!outside && block && block.level && floorsById().has(block.level)) floor = block.level;
+    else if (!outside) {
       // the highest floor under the point, where that floor covers it
       const under = house.floors.filter((f) => (f.x0 == null || x >= f.x0 - 0.05) && (f.x1 == null || x <= f.x1 + 0.05) && f.elevation <= z + 0.05)
         .sort((a, b) => b.elevation - a.elevation)[0];
@@ -385,7 +390,8 @@
     }
     const h = Math.max(0, Math.min(outside ? 30 : ceilingOf(floor), r2(z - floorZ(floor))));
     ui.floor = floor;
-    await placeItem({ ...at, floor, h, mount: t.item?.mount || "wall" });
+    const mount = where === "eave" ? "soffit" : t.item?.mount && t.item.mount !== "soffit" ? t.item.mount : "wall";
+    await placeItem({ ...at, floor, h, mount });
     toast(`${t.name}: ${floorName(floor)}, ${L.fmtLen(h)} up`);
   }
 

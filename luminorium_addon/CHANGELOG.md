@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.0-dev.8
+
+- **Front photo, measured properly off the door's plane.** The camera is worked out from the
+  door (its lens too, when the photo has enough perspective), so every wall is measured on its
+  own plane:
+  - **Set back into the wall by:** a recessed front door no longer makes the front wall measure
+    a few percent too big.
+  - **Its front wall** on each house block: in line, sticks out (an overhang), set back, or
+    follows the ground line.
+- **Ground line with bends.** Tap one end of the house, then the other; tap the line to add a
+  bend where the front steps in or out, and drag it onto the corner. Each bend says how far back
+  or out it is, and the front of the house follows it in 3D.
+- **Roof edge lines:** trace each roof level's bottom edge; the roofline across (overlaps counted
+  once) is shown, ready for the top view.
+- **Eaves:** how far the eaves stick out (24" unless changed). New light place **Under the
+  eaves**.
+- **Spaces inside a level:** a block can be part of a level with its own floor, higher or lower
+  (a landing, a storage room over the entry), drawn as its own floor in 3D. Lights placed on it
+  from the photo go on that level.
+
 ## 0.3.0-dev.7
 
 - **Roofs are their own shapes.** Draw any number, each as its outline seen from the street (any

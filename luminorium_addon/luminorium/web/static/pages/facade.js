@@ -15,7 +15,7 @@ window.FacadeEditor = class FacadeEditor {
     this.img = null;            // the loaded photo
     this.tool = "door";
     this.sel = null;            // { kind: "door"|"ground"|"block"|"opening"|"line", id }
-    this.opts = { back: "ridge", opening: "window", floor: null, outside: false, lineAt: L.store("house.lineAt", "floor") };
+    this.opts = { back: "ridge", opening: "window", floor: null, outside: "inside", lineAt: L.store("house.lineAt", "floor") };
     this.roofDraft = null;      // the roof outline being drawn: [[X, Z], ...]
     this.undoStack = [];
     this.redoStack = [];
@@ -40,10 +40,14 @@ window.FacadeEditor = class FacadeEditor {
       blocks: (f.blocks || []).map((b) => ({ ...b })), openings: (f.openings || []).map((o) => ({ ...o })),
       lines: (f.lines || []).map((l) => ({ ...l })),
       roofs: (f.roofs || []).map((r) => ({ ...r, pts: r.pts.map((p) => [...p]) })),
+      edges: (f.edges || []).map((e) => ({ ...e, pts: e.pts.map((p) => [...p]) })),
       floor_depth: f.floor_depth ?? 0.3048,
+      eave: f.eave ?? EAVE_M,
     };
+    this.edgeDraft = null;
     this.roofDraft = null;
     this.solve();
+    this.derive();
     if (this.photo && (!this.img || this.img._for !== JSON.stringify(this.photo))) this.loadImage();
     if (!this.doc.door) this.tool = "door";
     this.paint();
@@ -59,11 +63,12 @@ window.FacadeEditor = class FacadeEditor {
 
   snapshot() { return JSON.stringify(this.doc); }
   commit(before) {
-    if (before === this.snapshot()) return;
+    this.solve();
+    this.derive();
+    if (before === this.snapshot()) { this.paint(); return; }
     this.undoStack.push(before);
     if (this.undoStack.length > 100) this.undoStack.shift();
     this.redoStack.length = 0;
-    this.solve();
     this.scheduleSave();
     this.paint();
   }
@@ -135,38 +140,160 @@ window.FacadeEditor = class FacadeEditor {
 
   // ---- geometry --------------------------------------------------------------------------------
 
-  // The perspective, from the door's four corners (image px: top left, top right, bottom right,
-  // bottom left) and its real size
+  // The camera, from the door's four corners (image px: top left, top right, bottom right,
+  // bottom left) and its real size.
+  //
+  // House coordinates here: X across (from the door's left edge), Z up (from the door's sill),
+  // Y back from the front wall (0), into the house. The door sits `recess` behind the front wall.
+  // The door's homography gives the camera up to its focal length; the focal length comes from
+  // the door's perspective when that's strong enough to measure, else from a typical phone lens
+  // (65° across). Then any plane parallel to the front wall (Y = a set-back or an overhang) and
+  // the ground (Z = the ground) can be mapped to the photo and back.
   solve() {
     this.F2I = this.I2F = null;
+    this.cam = null;
+    this.planes = new Map();
     const d = this.doc && this.doc.door;
-    if (!d) return;
+    if (!d || !this.photo) return;
     const F = [[0, d.h], [d.w, d.h], [d.w, 0], [0, 0]];
-    const H = homography(F, d.pts);
+    let H = homography(F, d.pts);
     if (!H) return;
-    const Hi = invert3(H);
-    if (!Hi) return;
-    this.F2I = H; this.I2F = Hi;
-    const c = applyH(H, [d.w / 2, d.h / 2], true);
-    this.wSign = Math.sign(c[2]) || 1;
+    // scale it so points in front of the camera have w > 0
+    if (applyH(H, [d.w / 2, d.h / 2], true)[2] < 0) H = H.map((row) => row.map((v) => -v));
+    const cam = solveCamera(H, this.photo.w, this.photo.h);
+    if (!cam) return;
+    this.cam = { ...cam, recess: d.recess || 0 };
+    this.cam.pos = { ...cam.pos, Y: cam.pos.Y + this.cam.recess }; // from the front wall
+    const front = this.plane(0);
+    if (!front) return;
+    this.F2I = front.H; this.I2F = front.Hi;
   }
-  toImage(X, Z) {
-    if (!this.F2I) return null;
-    const p = applyH(this.F2I, [X, Z], true);
-    if (Math.sign(p[2]) !== this.wSign || Math.abs(p[2]) < 1e-9) return null;
+  // The homography (and its inverse) for the plane Y = y, parallel to the front wall
+  plane(y) {
+    const key = Math.round(y * 1000);
+    let pl = this.planes.get(key);
+    if (pl) return pl;
+    const c = this.cam;
+    if (!c) return null;
+    const k = y - c.recess;
+    const H = [
+      [c.H[0][0], c.H[0][1], c.H[0][2] + k * c.Kn[0]],
+      [c.H[1][0], c.H[1][1], c.H[1][2] + k * c.Kn[1]],
+      [c.H[2][0], c.H[2][1], c.H[2][2] + k * c.Kn[2]],
+    ];
+    const Hi = invert3(H);
+    if (!Hi) return null;
+    pl = { H, Hi };
+    this.planes.set(key, pl);
+    return pl;
+  }
+  toImage(X, Z, Y = 0) {
+    const pl = this.plane(Y);
+    if (!pl) return null;
+    const p = applyH(pl.H, [X, Z], true);
+    if (p[2] <= 1e-9) return null; // behind the camera
     return { x: p[0] / p[2], y: p[1] / p[2] };
   }
-  toFacade(u, v) {
-    if (!this.I2F) return null;
-    const p = applyH(this.I2F, [u, v], true);
+  toFacade(u, v, Y = 0) {
+    const pl = this.plane(Y);
+    if (!pl) return null;
+    const p = applyH(pl.Hi, [u, v], true);
     if (Math.abs(p[2]) < 1e-12) return null;
     return { X: p[0] / p[2], Z: p[1] / p[2] };
+  }
+  // Where an image point lands on the level ground at height z: {X, Y} (Y: how far back)
+  onGround(u, v, z) {
+    const c = this.cam;
+    if (!c) return null;
+    const M = [
+      [c.H[0][0], c.Kn[0], z * c.H[0][1] + c.H[0][2] - c.recess * c.Kn[0]],
+      [c.H[1][0], c.Kn[1], z * c.H[1][1] + c.H[1][2] - c.recess * c.Kn[1]],
+      [c.H[2][0], c.Kn[2], z * c.H[2][1] + c.H[2][2] - c.recess * c.Kn[2]],
+    ];
+    const Mi = invert3(M);
+    if (!Mi) return null;
+    const p = applyH(Mi, [u, v], true);
+    if (Math.abs(p[2]) < 1e-12) return null;
+    const X = p[0] / p[2], Y = p[1] / p[2];
+    // only in front of the camera, and not absurdly far
+    if (!(Y > c.pos.Y) || Math.abs(Y) > 200) return null;
+    return { X, Y };
+  }
+  // Worked out from the drawing after each change: where the ground is (from the ground line's
+  // two ends), the footprint along the front (each point of the ground line, on the ground), and
+  // the front faces of blocks that follow the ground line.
+  derive() {
+    const g = this.doc.ground;
+    if (!this.cam || !g || !g.pts || g.pts.length < 2) return;
+    const ends = [g.pts[0], g.pts[g.pts.length - 1]].map(([u, v]) => this.toFacade(u, v, 0));
+    if (ends.some((e) => !e)) return;
+    g.z = round3((ends[0].Z + ends[1].Z) / 2);
+    const foot = g.pts.map(([u, v]) => this.onGround(u, v, g.z));
+    g.footprint = foot.every(Boolean) ? foot.map((q) => [round3(q.X), round3(q.Y)]) : null;
+    const auto = this.doc.blocks.filter((b) => b.face === "auto");
+    if (!auto.length || !g.footprint) return;
+    this.keepOnPhoto(() => {
+      for (const b of auto) b.y0 = round3(this.footY((b.x0 + b.x1) / 2) ?? 0);
+    }, [...auto, ...this.doc.openings.filter((o) => auto.some((b) => inRect(o, b))), ...this.doc.lines.filter((l) => auto.some((b) => inRect({ x0: l.x0, x1: l.x1, z0: l.z, z1: l.z }, b)))]);
+  }
+  // How far back the footprint is at X (along the ground line), or null
+  footY(X) {
+    const f = this.doc.ground && this.doc.ground.footprint;
+    if (!f || f.length < 2) return null;
+    const pts = [...f].sort((a, b) => a[0] - b[0]);
+    if (X <= pts[0][0]) return pts[0][1];
+    for (let i = 1; i < pts.length; i++) {
+      if (X <= pts[i][0]) {
+        const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+        return x1 === x0 ? y1 : y0 + ((X - x0) / (x1 - x0)) * (y1 - y0);
+      }
+    }
+    return pts[pts.length - 1][1];
+  }
+  // The roofline: from the left end of the roof edges to the right end, overlaps counted once
+  roofline() {
+    const xs = this.doc.edges.flatMap((e) => e.pts.map((q) => q[0]));
+    return xs.length ? { x0: Math.min(...xs), x1: Math.max(...xs), w: Math.max(...xs) - Math.min(...xs) } : null;
+  }
+
+  // The plane a shape is drawn on (its Y)
+  planeOf(kind, s) {
+    if (!s) return 0;
+    if (kind === "block" || kind === "roof") return s.y0 || 0;
+    if (kind === "edge") return -(this.doc.eave ?? EAVE_M);
+    if (kind === "opening" || kind === "line") {
+      const X = kind === "opening" ? (s.x0 + s.x1) / 2 : (s.x0 + s.x1) / 2;
+      const Z = kind === "opening" ? (s.z0 + s.z1) / 2 : s.z;
+      const b = this.doc.blocks.find((q) => X >= q.x0 && X <= q.x1 && Z >= q.z0 - 0.05 && Z <= q.z1 + 0.05);
+      return b ? b.y0 || 0 : 0;
+    }
+    return 0;
+  }
+  // Keep every shape where it is on the photo while fn() changes the camera or a shape's plane
+  keepOnPhoto(fn, only = null) {
+    const pts = [];
+    const add = (kind, s, get, set) => { if (!only || only.includes(s)) pts.push({ kind, s, img: get().map(([X, Z]) => this.toImage(X, Z, this.planeOf(kind, s))), set }); };
+    for (const b of this.doc.blocks) add("block", b, () => [[b.x0, b.z0], [b.x1, b.z1]], (q) => { [[b.x0, b.z0], [b.x1, b.z1]] = q; });
+    for (const o of this.doc.openings) add("opening", o, () => [[o.x0, o.z0], [o.x1, o.z1]], (q) => { [[o.x0, o.z0], [o.x1, o.z1]] = q; });
+    for (const l of this.doc.lines) add("line", l, () => [[l.x0, l.z], [l.x1, l.z]], (q) => { l.x0 = q[0][0]; l.x1 = q[1][0]; l.z = (q[0][1] + q[1][1]) / 2; });
+    for (const r of this.doc.roofs) add("roof", r, () => r.pts, (q) => { r.pts = q; });
+    for (const e of this.doc.edges) add("edge", e, () => e.pts, (q) => { e.pts = q; });
+    fn();
+    this.solve();
+    for (const p of pts) {
+      if (p.img.some((q) => !q)) continue;
+      const Y = this.planeOf(p.kind, p.s);
+      const back = p.img.map((q) => this.toFacade(q.x, q.y, Y));
+      if (back.some((q) => !q)) continue;
+      p.set(back.map((q) => [q.X, q.Z]));
+    }
+    this.solve();
   }
   // image px <-> canvas px
   i2s(p) { return p && { x: p.x * this.view.k + this.view.x, y: p.y * this.view.k + this.view.y }; }
   s2i(p) { return { x: (p.x - this.view.x) / this.view.k, y: (p.y - this.view.y) / this.view.k }; }
-  f2s(X, Z) { return this.i2s(this.toImage(X, Z)); }
-  s2f(p) { const i = this.s2i(p); return this.toFacade(i.x, i.y); }
+  f2s(X, Z, Y = 0) { return this.i2s(this.toImage(X, Z, Y)); }
+  s2f(p, Y = 0) { const i = this.s2i(p); return this.toFacade(i.x, i.y, Y); }
   // metres per screen pixel near a screen point
   mpp(p) {
     const a = this.s2f(p), b = this.s2f({ x: p.x + 10, y: p.y });
@@ -212,7 +339,7 @@ window.FacadeEditor = class FacadeEditor {
     if (!sel) return null;
     if (sel.kind === "door") return this.doc.door;
     if (sel.kind === "ground") return this.doc.ground;
-    const list = { block: this.doc.blocks, opening: this.doc.openings, line: this.doc.lines, roof: this.doc.roofs }[sel.kind];
+    const list = { block: this.doc.blocks, opening: this.doc.openings, line: this.doc.lines, roof: this.doc.roofs, edge: this.doc.edges }[sel.kind];
     return list ? list.find((s) => s.id === sel.id) || null : null;
   }
 
@@ -269,6 +396,7 @@ window.FacadeEditor = class FacadeEditor {
       { id: "ground", label: "Ground line", key: "G", icon: "M3 17h18M5 21l2-4M10 21l2-4M15 21l2-4", off: needDoor },
       { id: "block", label: "House block", key: "B", icon: "M4 20V9h16v11zM4 20h16", off: needDoor },
       { id: "roof", label: "Roof outline", key: "R", icon: "M3 12l9-8 9 8M5 10v10h14V10", off: needDoor },
+      { id: "edge", label: "Roof edge line", key: "E", icon: "M2 9l7-2 6 2 7-2M4 15h16", off: needDoor },
       { id: "opening", label: "Window or door", key: "N", icon: "M5 4h14v16H5zM12 4v16M5 12h14", off: needDoor },
       { id: "floor", label: "Floor line", key: "F", icon: "M3 8h18M3 16h18M7 8v8", off: needDoor },
       { sep: true },
@@ -283,6 +411,8 @@ window.FacadeEditor = class FacadeEditor {
     this.tool = id;
     if (id !== "measure") this.measure = null;
     if (id !== "roof") this.roofDraft = null;
+    if (id !== "edge") this.edgeDraft = null;
+    if (id !== "ground") this.groundDraft = null;
     if (id === "floor" && !this.opts.floor) this.opts.floor = this.nextFloor();
     this.paint();
     this.canvas.focus({ preventScroll: true });
@@ -304,6 +434,7 @@ window.FacadeEditor = class FacadeEditor {
       { label: "Ground", done: !!d.ground, tool: "ground" },
       { label: "House blocks", done: d.blocks.length > 0, tool: "block" },
       { label: "Roofs", done: d.roofs.length > 0, tool: "roof" },
+      { label: "Roof edges", done: d.edges.length > 0, tool: "edge" },
       { label: "Floors", done: d.lines.some((l) => l.floor), tool: "floor" },
       { label: "Lights", done: lit, tool: "light" },
     ];
@@ -316,8 +447,16 @@ window.FacadeEditor = class FacadeEditor {
     const d = this.doc;
     switch (this.tool) {
       case "door": return d.door ? "Drag the door's corners onto the door frame's corners (zoom in for the best fit). Drag a new box to start again." : `Drag a box around the front door, from one corner of its frame to the other. It's taken as ${fmt(this.doorSize().w)} × ${fmt(this.doorSize().h)}.`;
-      case "ground": return "Tap where the wall meets the ground (or the driveway), anywhere along the front.";
-      case "block": return "Drag a box over each part of the house: from the ground to where the roof starts, wall edge to wall edge. Split levels and garages are their own blocks.";
+      case "ground": {
+        const g = d.ground;
+        if (this.groundDraft) return "Now tap where the wall meets the ground at the other end of the house.";
+        if (!g || !g.pts) return "Tap where the wall meets the ground at one end of the house, then at the other end.";
+        return "Where the front steps in or out, tap the ground line to add a bend, and drag it onto the corner in the photo. Drag the ends to tilt the line. Alt-click a bend to take it out.";
+      }
+      case "edge": return this.edgeDraft
+        ? `${this.edgeDraft.length} point${this.edgeDraft.length === 1 ? "" : "s"}. Tap along the edge; tap the last point again (or press Enter) to finish.`
+        : "Trace the bottom edge of each roof, from one end to the other. Draw one line for each roof level. Only the distance across from end to end counts.";
+      case "block": return "Drag a box over each part of the house: from the ground to where the roof starts, wall edge to wall edge. Split levels, garages and the entry are their own blocks.";
       case "roof": return this.roofDraft
         ? `${this.roofDraft.length} corner${this.roofDraft.length === 1 ? "" : "s"}. Tap the next one; tap the first again (or press Enter) to finish. Backspace takes the last one back, Esc stops.`
         : "Tap each corner of a roof as you see it (eaves, peaks, breaks), all the way round. Draw as many roofs as the house has: the porch overhang and a dormer are roofs of their own.";
@@ -367,6 +506,11 @@ window.FacadeEditor = class FacadeEditor {
   paintOptions() {
     const { el } = L;
     const bits = [];
+    const eaveField = () => lenField("Eaves stick out", this.doc.eave, (v) => {
+      const b = this.snapshot();
+      this.keepOnPhoto(() => { this.doc.eave = v; }, this.doc.edges);
+      this.commit(b);
+    }, 0, 2);
     const lenField = (label, value, set, lo = 0.3, hi = 6, after = null) => el("label.fc-o", el("span", label),
       el("input.input", { value: L.fmtLen(value), inputmode: "decimal", style: { width: "92px" },
         on: { change: (e) => { const v = L.parseLen(e.target.value); if (!(v >= lo && v <= hi)) { L.toast(`Give a size from ${L.fmtLen(lo)} to ${L.fmtLen(hi)}`); e.target.value = L.fmtLen(value); return; } set(v); } } }),
@@ -379,8 +523,19 @@ window.FacadeEditor = class FacadeEditor {
       };
       bits.push(el("span.fc-olabel", "Door size"), lenField("Width", sz.w, (v) => setSize("w", v)), lenField("Height", sz.h, (v) => setSize("h", v)),
         el("button.btn.small", { type: "button", on: { click: () => { setSize("w", 0.9144); setSize("h", 2.032); } } }, "Standard 36\" × 80\""));
+      if (this.doc.door) bits.push(lenField("Set back into the wall by", this.doc.door.recess || 0, (v) => {
+        const b = this.snapshot();
+        this.keepOnPhoto(() => { this.doc.door.recess = v; });
+        this.commit(b);
+      }, 0, 5));
+    } else if (this.tool === "edge") {
+      const rl = this.roofline();
+      bits.push(eaveField(), rl ? el("span.small", `Roofline ${L.fmtLen(rl.w)} across`) : null);
+      if (this.edgeDraft) bits.push(
+        el("button.btn.small.primary", { type: "button", disabled: this.edgeDraft.length < 2 ? "" : null, on: { click: () => this.finishEdge() } }, "Finish"),
+        el("button.btn.small", { type: "button", on: { click: () => { this.edgeDraft = null; this.paint(); } } }, "Cancel"));
     } else if (this.tool === "roof") {
-      bits.push(el("span.fc-olabel", "Goes back"), el("div.seg", { role: "radiogroup", "aria-label": "How the roof goes back" },
+      bits.push(eaveField(), el("span.fc-olabel", "Goes back"), el("div.seg", { role: "radiogroup", "aria-label": "How the roof goes back" },
         ROOF_BACKS.map(([k, label]) =>
           el("button", { type: "button", role: "radio", "aria-checked": String(this.opts.back === k), on: { click: () => { this.opts.back = k; this.paint(); } } }, label))));
       if (this.roofDraft) bits.push(
@@ -404,7 +559,7 @@ window.FacadeEditor = class FacadeEditor {
       const s = this.ctx.selection();
       bits.push(el("span.fc-olabel", s.target ? s.target.name : "No light picked"),
         el("div.seg", { role: "radiogroup", "aria-label": "Where the light is" },
-          [[false, "Inside, by the window"], [true, "Outside, on the wall"]].map(([k, label]) =>
+          [["inside", "Inside, by the window"], ["wall", "Outside, on the wall"], ["eave", "Under the eaves"]].map(([k, label]) =>
             el("button", { type: "button", role: "radio", "aria-checked": String(this.opts.outside === k), on: { click: () => { this.opts.outside = k; this.paint(); } } }, label))));
     } else if (this.tool === "measure" && this.measure) {
       bits.push(el("span.fc-olabel", "Measured"), el("strong", L.fmtLen(this.measure.len)),
@@ -444,6 +599,8 @@ window.FacadeEditor = class FacadeEditor {
           el("dt", "Door sill"), el("dd", d.ground ? `${fmt(-d.ground.z)} above the ground` : "taken as the ground"),
           el("dt", "Blocks"), el("dd", String(d.blocks.length)),
           el("dt", "Roofs"), el("dd", String(d.roofs.length)),
+          this.roofline() ? [el("dt", "Roofline"), el("dd", `${fmt(this.roofline().w)} across`)] : null,
+          this.cam ? [el("dt", "Photo taken from"), el("dd", `${fmt(-this.cam.pos.Y)} away, ${fmt(this.cam.pos.Z - (d.ground ? d.ground.z : 0))} up`)] : null,
           el("dt", "Windows, doors"), el("dd", String(d.openings.length)),
           el("dt", "Floor lines"), el("dd", String(d.lines.filter((l) => l.floor).length))),
         el("p.small.muted", "Tap a shape with Select to change it. Blocks set the house width, and floor lines set each floor's height and span on the house map."),
@@ -456,12 +613,15 @@ window.FacadeEditor = class FacadeEditor {
         field("Name", el("input.input", { value: s.name || "", on: { change: (e) => edit(() => { s.name = e.target.value.slice(0, 60); }) } })),
         el("dl.fc-kv", el("dt", "Width"), el("dd", fmt(s.x1 - s.x0)), el("dt", "Wall height"), el("dd", fmt(s.z1 - s.z0 + (s.below || 0))),
           el("dt", "Bottom"), el("dd", s.below ? `${fmt(s.below)} in the ground` : fmt(s.z0 - o.gz, { signed: true }))),
+        this.faceFields(s, edit, lenInput, field),
+        field("Part of", el("select", { on: { change: (e) => edit(() => { if (e.target.value) s.level = e.target.value; else { delete s.level; delete s.floor; delete s.offset; } }) } },
+          el("option", { value: "" }, "Not set"),
+          this.ctx.floors().map((f) => el("option", { value: f.id, selected: s.level === f.id ? "" : null }, f.name)))),
+        s.level ? this.offsetFields(s, edit, lenInput, field) : null,
+        s.level ? el("label.check.small", el("input", { type: "checkbox", checked: s.floor === s.level, on: { change: (e) => edit(() => { if (e.target.checked) s.floor = s.level; else delete s.floor; }) } }),
+          "Its bottom is that level's floor") : null,
         field("Goes into the ground by", lenInput(s.below, (v) => edit(() => { if (!v) delete s.below; else s.below = Math.min(10, v); }), "0 (a basement: how deep)")),
-        field("Its bottom is the floor of", el("select", { on: { change: (e) => edit(() => { if (e.target.value) s.floor = e.target.value; else delete s.floor; }) } },
-          el("option", { value: "" }, "None"),
-          this.ctx.floors().map((f) => el("option", { value: f.id, selected: s.floor === f.id ? "" : null }, f.name)))),
         field("Depth, front to back", lenInput(s.depth, (v) => edit(() => { if (v === null) delete s.depth; else s.depth = v; }), `${fmt(this.ctx.house().size.depth)} (the house)`)),
-        field("Set back from the front", lenInput(s.y0, (v) => edit(() => { if (v === null) delete s.y0; else s.y0 = v; }), "0")),
         del);
     } else if (this.sel.kind === "opening") {
       body = el("div.fc-sum", el("h3", { window: "Window", door: "Door", garage: "Garage door" }[s.kind]),
@@ -480,6 +640,12 @@ window.FacadeEditor = class FacadeEditor {
         el("dl.fc-kv", el("dt", "The line"), el("dd", `${fmt(s.z - o.gz, { signed: true })} up`),
           el("dt", "The floor"), el("dd", `${fmt(this.floorZ(s) - o.gz, { signed: true })} up`), el("dt", "Spans"), el("dd", fmt(s.x1 - s.x0))),
         el("p.small.muted", `The floor's height and the part of the house it covers come from this line. The ceiling under it is ${fmt(this.doc.floor_depth)} lower (Floors are … thick, with the Floor line tool).`), del);
+    } else if (this.sel.kind === "edge") {
+      const xs = s.pts.map((q) => q[0]);
+      body = el("div.fc-sum", el("h3", "Roof edge line"),
+        el("dl.fc-kv", el("dt", "Across"), el("dd", fmt(Math.max(...xs) - Math.min(...xs))), el("dt", "Points"), el("dd", String(s.pts.length)),
+          this.roofline() ? [el("dt", "Whole roofline"), el("dd", fmt(this.roofline().w))] : null),
+        el("p.small.muted", "Only the distance across counts; where roof edges overlap it's counted once. Drag a point to move it, Alt-click to take it out."), del);
     } else if (this.sel.kind === "roof") {
       const depth = this.ctx.house().size.depth;
       const zs = s.pts.map((q) => q[1]);
@@ -500,7 +666,13 @@ window.FacadeEditor = class FacadeEditor {
         el("p.small.muted", "Its corners set the scale and the perspective for everything else. Change the door size with the Front door tool."),
         el("dl.fc-kv", el("dt", "Size"), el("dd", `${fmt(s.w)} × ${fmt(s.h)}`)));
     } else if (this.sel.kind === "ground") {
-      body = el("div.fc-sum", el("h3", "Ground line"), el("dl.fc-kv", el("dt", "Door sill above it"), el("dd", fmt(-s.z))), del);
+      const foot = s.footprint || [];
+      const ys = foot.map((q) => q[1]);
+      body = el("div.fc-sum", el("h3", "Ground line"),
+        el("dl.fc-kv", el("dt", "Door sill above it"), el("dd", fmt(-s.z)),
+          s.pts ? [el("dt", "Bends"), el("dd", String(Math.max(0, s.pts.length - 2)))] : null,
+          ys.length ? [el("dt", "Front steps in by up to"), el("dd", fmt(Math.max(0, Math.max(...ys) - Math.min(...ys))))] : null),
+        el("p.small.muted", "Blocks set to Follows the ground line take their front from it."), del);
     }
     L.set(this.inspEl, body);
     this.inspEl.style.display = body ? "" : "none";
@@ -511,7 +683,7 @@ window.FacadeEditor = class FacadeEditor {
     const b = this.snapshot();
     if (this.sel.kind === "ground") this.doc.ground = null;
     else {
-      const key = { block: "blocks", opening: "openings", line: "lines", roof: "roofs" }[this.sel.kind];
+      const key = { block: "blocks", opening: "openings", line: "lines", roof: "roofs", edge: "edges" }[this.sel.kind];
       this.doc[key] = this.doc[key].filter((x) => x.id !== this.sel.id);
     }
     this.sel = null;
@@ -558,8 +730,8 @@ window.FacadeEditor = class FacadeEditor {
   }
 
   // A facade polygon on screen; null if part of it is behind the camera
-  fpoly(pts) {
-    const out = pts.map(([X, Z]) => this.f2s(X, Z));
+  fpoly(pts, Y = 0) {
+    const out = pts.map(([X, Z]) => this.f2s(X, Z, Y));
     return out.some((p) => !p) ? null : out;
   }
   path(ctx, pts, close = true) {
@@ -569,34 +741,36 @@ window.FacadeEditor = class FacadeEditor {
   drawShapes(ctx, col) {
     const d = this.doc;
     const isSel = (kind, id) => this.sel && this.sel.kind === kind && (id === undefined || this.sel.id === id);
-    const BLOCK = "#5aa9e6", OPEN = "#9ad0f5", LINE = "#f0b429", GROUND = "#7bc47f", DOOR = "#ff8a3d", ROOF = "#c58cf0";
+    const BLOCK = "#5aa9e6", OPEN = "#9ad0f5", LINE = "#f0b429", GROUND = "#7bc47f", DOOR = "#ff8a3d", ROOF = "#c58cf0", EDGE = "#ff5d6c";
     if (this.ready()) {
       const span = this.span();
       // blocks: wall and roof
       for (const b of d.blocks) {
         const sel = isSel("block", b.id);
-        const wall = this.fpoly([[b.x0, b.z0], [b.x1, b.z0], [b.x1, b.z1], [b.x0, b.z1]]);
+        const by = b.y0 || 0;
+        const wall = this.fpoly([[b.x0, b.z0], [b.x1, b.z0], [b.x1, b.z1], [b.x0, b.z1]], by);
         if (wall) {
           this.path(ctx, wall); ctx.fillStyle = hexA(BLOCK, sel ? 0.28 : 0.14); ctx.fill();
           ctx.lineWidth = sel ? 2.5 : 1.5; ctx.strokeStyle = BLOCK; ctx.stroke();
-          const lab = this.f2s(b.x0, b.z1);
-          if (lab) label(ctx, b.name || "Block", lab.x + 6, lab.y + 16, BLOCK, col);
+          const lab = this.f2s(b.x0, b.z1, by);
+          const face = b.y0 ? (b.y0 < 0 ? ` · sticks out ${L.fmtLen(-b.y0)}` : ` · set back ${L.fmtLen(b.y0)}`) : "";
+          if (lab) label(ctx, `${b.name || "Block"}${face}`, lab.x + 6, lab.y + 16, BLOCK, col);
         }
         if (b.below) {
           // the part in the ground (a basement), dashed below its bottom
-          const under = this.fpoly([[b.x0, b.z0], [b.x1, b.z0], [b.x1, b.z0 - b.below], [b.x0, b.z0 - b.below]]);
+          const under = this.fpoly([[b.x0, b.z0], [b.x1, b.z0], [b.x1, b.z0 - b.below], [b.x0, b.z0 - b.below]], by);
           if (under) {
             this.path(ctx, under); ctx.fillStyle = hexA(BLOCK, 0.08); ctx.fill();
             ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.strokeStyle = BLOCK; ctx.stroke(); ctx.setLineDash([]);
             label(ctx, `${L.fmtLen(b.below)} in the ground`, under[3].x + 6, under[3].y - 6, BLOCK, col);
           }
         }
-        if (sel) this.handles(ctx, this.rectHandles(b), BLOCK);
+        if (sel) this.handles(ctx, this.rectHandles(b, by), BLOCK);
       }
       // roofs: their outlines
       for (const r of d.roofs) {
         const sel = isSel("roof", r.id);
-        const q = this.fpoly(r.pts);
+        const q = this.fpoly(r.pts, r.y0 || 0);
         if (!q) continue;
         this.path(ctx, q); ctx.fillStyle = hexA(ROOF, sel ? 0.3 : 0.16); ctx.fill();
         ctx.lineWidth = sel ? 2.5 : 1.5; ctx.strokeStyle = ROOF; ctx.setLineDash(sel ? [] : [6, 4]); ctx.stroke(); ctx.setLineDash([]);
@@ -606,15 +780,50 @@ window.FacadeEditor = class FacadeEditor {
       }
       for (const o of d.openings) {
         const sel = isSel("opening", o.id);
-        const q = this.fpoly([[o.x0, o.z0], [o.x1, o.z0], [o.x1, o.z1], [o.x0, o.z1]]);
+        const oy = this.planeOf("opening", o);
+        const q = this.fpoly([[o.x0, o.z0], [o.x1, o.z0], [o.x1, o.z1], [o.x0, o.z1]], oy);
         if (!q) continue;
         this.path(ctx, q); ctx.fillStyle = hexA(OPEN, sel ? 0.35 : 0.18); ctx.fill();
         ctx.lineWidth = sel ? 2.5 : 1.5; ctx.strokeStyle = OPEN; ctx.stroke();
-        if (o.kind !== "window") { const c = this.f2s((o.x0 + o.x1) / 2, o.z1); if (c) label(ctx, o.kind === "garage" ? "Garage" : "Door", c.x, c.y - 6, OPEN, col, "center"); }
-        if (sel) this.handles(ctx, this.rectHandles(o), OPEN);
+        if (o.kind !== "window") { const c = this.f2s((o.x0 + o.x1) / 2, o.z1, oy); if (c) label(ctx, o.kind === "garage" ? "Garage" : "Door", c.x, c.y - 6, OPEN, col, "center"); }
+        if (sel) this.handles(ctx, this.rectHandles(o, oy), OPEN);
       }
-      // the ground
-      const gz = d.ground ? d.ground.z : null;
+      // roof edge lines
+      for (const e of d.edges) {
+        const sel = isSel("edge", e.id);
+        const q = this.fpoly(e.pts, this.planeOf("edge", e));
+        if (!q) continue;
+        ctx.lineWidth = sel ? 3.5 : 2.5; ctx.strokeStyle = EDGE; this.path(ctx, q, false); ctx.stroke();
+        if (sel) this.handles(ctx, q.map((p, i) => ({ id: i, s: p })), EDGE);
+      }
+      const rl = this.roofline();
+      if (rl && d.edges.length) {
+        const ey = this.planeOf("edge");
+        const topZ = Math.max(...d.edges.flatMap((e) => e.pts.map((q) => q[1]))) + 0.4;
+        const a = this.f2s(rl.x0, topZ, ey), b = this.f2s(rl.x1, topZ, ey);
+        if (a && b) {
+          ctx.strokeStyle = EDGE; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.setLineDash([]);
+          label(ctx, `Roofline ${L.fmtLen(rl.w)}`, (a.x + b.x) / 2, (a.y + b.y) / 2 - 6, EDGE, col, "center");
+        }
+      }
+      // the ground: a traced line with bends, or (from before) a level line
+      const g = d.ground;
+      if (g && g.pts && g.pts.length >= 2) {
+        const q = g.pts.map(([u, v]) => this.i2s({ x: u, y: v }));
+        ctx.lineWidth = isSel("ground") || this.tool === "ground" ? 3 : 2; ctx.strokeStyle = GROUND; ctx.setLineDash([10, 6]);
+        this.path(ctx, q, false); ctx.stroke(); ctx.setLineDash([]);
+        label(ctx, "Ground", q[0].x + 8, q[0].y - 8, GROUND, col);
+        if (isSel("ground") || this.tool === "ground") this.handles(ctx, q.map((p, i) => ({ id: i, s: p })), GROUND, true);
+        // how far back each bend is
+        if (g.footprint) g.footprint.forEach(([, Y], i) => { if (i > 0 && i < q.length - 1 && Math.abs(Y) > 0.05) label(ctx, Y > 0 ? `${L.fmtLen(Y)} back` : `${L.fmtLen(-Y)} out`, q[i].x, q[i].y + 18, GROUND, col, "center"); });
+      }
+      if (this.groundDraft) {
+        const a = this.i2s({ x: this.groundDraft[0], y: this.groundDraft[1] });
+        ctx.beginPath(); ctx.arc(a.x, a.y, 6, 0, Math.PI * 2); ctx.fillStyle = GROUND; ctx.fill();
+        if (this.hover) { ctx.strokeStyle = GROUND; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(this.hover.x, this.hover.y); ctx.stroke(); ctx.setLineDash([]); }
+      }
+      const gz = g && !g.pts ? g.z : null;
       if (gz !== null) {
         const g = this.fpoly([[span.x0 - 20, gz], [span.x1 + 20, gz]]) || this.fpoly([[span.x0, gz], [span.x1, gz]]);
         if (g) {
@@ -628,7 +837,7 @@ window.FacadeEditor = class FacadeEditor {
       const o0 = this.origin();
       for (const l of d.lines) {
         const sel = isSel("line", l.id);
-        const q = this.fpoly([[l.x0, l.z], [l.x1, l.z]]);
+        const q = this.fpoly([[l.x0, l.z], [l.x1, l.z]], this.planeOf("line", l));
         if (!q) continue;
         ctx.lineWidth = sel ? 4 : 3; ctx.strokeStyle = LINE; this.path(ctx, q, false); ctx.stroke();
         const f = floors.get(l.floor);
@@ -681,6 +890,17 @@ window.FacadeEditor = class FacadeEditor {
         this.handles(ctx, pts.map((p, i) => ({ id: i, s: p })), ROOF, false);
         // the first corner: tap it to close the outline
         ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, 11, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
+      }
+    }
+    if (this.edgeDraft && this.edgeDraft.length) {
+      const ey = this.planeOf("edge");
+      const pts = this.edgeDraft.map(([X, Z]) => this.f2s(X, Z, ey));
+      if (!pts.some((q) => !q)) {
+        ctx.lineWidth = 2.5; ctx.strokeStyle = "#ff5d6c";
+        this.path(ctx, this.hover ? [...pts, this.hover] : pts, false); ctx.stroke();
+        this.handles(ctx, pts.map((p, i) => ({ id: i, s: p })), "#ff5d6c", false);
+        const last = pts[pts.length - 1];
+        ctx.beginPath(); ctx.arc(last.x, last.y, 11, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
       }
     }
     if (this.measure) {
@@ -755,8 +975,51 @@ window.FacadeEditor = class FacadeEditor {
       ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = color; ctx.stroke();
     }
   }
-  rectHandles(r) {
-    return [["x0", "z0"], ["x1", "z0"], ["x1", "z1"], ["x0", "z1"]].map(([kx, kz]) => ({ id: `${kx}${kz}`, kx, kz, s: this.f2s(r[kx], r[kz]) }));
+  rectHandles(r, Y = 0) {
+    return [["x0", "z0"], ["x1", "z0"], ["x1", "z1"], ["x0", "z1"]].map(([kx, kz]) => ({ id: `${kx}${kz}`, kx, kz, s: this.f2s(r[kx], r[kz], Y) }));
+  }
+
+  // Front face and floor height of a block, as the inspector shows them
+  faceFields(s, edit, lenInput, field) {
+    const { el } = L;
+    const mode = s.face || (s.y0 ? (s.y0 < 0 ? "out" : "back") : "line");
+    const setFace = (m, d) => edit(() => this.keepOnPhoto(() => {
+      s.face = m;
+      if (m === "line") s.y0 = 0;
+      else if (m === "out") s.y0 = -Math.abs(d ?? (s.y0 || 0.3048));
+      else if (m === "back") s.y0 = Math.abs(d ?? (s.y0 || 0.3048));
+      else s.y0 = round3(this.footY((s.x0 + s.x1) / 2) ?? 0);
+    }, [s, ...this.doc.openings.filter((o) => inRect(o, s))]));
+    const hasBends = this.doc.ground && this.doc.ground.pts && this.doc.ground.pts.length > 2;
+    const options = [["line", "In line"], ["out", "Sticks out"], ["back", "Set back"], ...(hasBends || mode === "auto" ? [["auto", "Follows the ground line"]] : [])];
+    return el("div.field", el("span", "Its front wall"),
+      el("div.seg", { role: "radiogroup", "aria-label": "Its front wall" }, options.map(([k, label]) =>
+        el("button", { type: "button", role: "radio", "aria-checked": String(mode === k), on: { click: () => setFace(k) } }, label))),
+      mode === "out" || mode === "back" ? lenInput(Math.abs(s.y0 || 0), (v) => setFace(mode, v ?? 0), "how far") : null,
+      el("span.small.muted", mode === "line" ? "In line with the main front wall."
+        : mode === "auto" ? `${L.fmtLen(Math.abs(s.y0 || 0))} ${(s.y0 || 0) < 0 ? "out" : "back"}, from the ground line.`
+          : mode === "out" ? "Closer to the street than the main front wall, like an overhang." : "Further back than the main front wall, like a recessed entry."));
+  }
+  offsetFields(s, edit, lenInput, field) {
+    const { el } = L;
+    const mode = !s.offset ? "same" : s.offset > 0 ? "up" : "down";
+    const set = (m, d) => edit(() => { if (m === "same") delete s.offset; else s.offset = (m === "up" ? 1 : -1) * Math.abs(d ?? (s.offset || 0.6096)); });
+    return el("div.field", el("span", "Its floor"),
+      el("div.seg", { role: "radiogroup", "aria-label": "Its floor" }, [["same", "Same as the level"], ["up", "Higher"], ["down", "Lower"]].map(([k, label]) =>
+        el("button", { type: "button", role: "radio", "aria-checked": String(mode === k), on: { click: () => set(k) } }, label))),
+      mode !== "same" ? lenInput(Math.abs(s.offset), (v) => set(mode, v ?? 0), "by how much") : null,
+      el("span.small.muted", "A space inside the level with its own floor, like a landing or a storage room over the entry."));
+  }
+
+  finishEdge() {
+    const pts = this.edgeDraft;
+    if (!pts || pts.length < 2) return;
+    const before = this.snapshot();
+    const id = uid();
+    this.doc.edges.push({ id, pts: pts.map(([X, Z]) => [X, Z]) });
+    this.edgeDraft = null;
+    this.sel = { kind: "edge", id };
+    this.commit(before);
   }
   // where a floor line puts its floor: on the line, or the floor's thickness above it
   floorZ(line) { return line.z + (line.at === "below" ? this.doc.floor_depth : 0); }
@@ -779,12 +1042,22 @@ window.FacadeEditor = class FacadeEditor {
     this.commit(before);
   }
 
-  // Double-click an edge of the picked roof to add a corner there
+  // Double-click an edge of the picked roof to add a corner there (or a roof edge line, a point)
   dblclick(e) {
     const s = this.shape(this.sel);
+    if (s && this.sel.kind === "edge" && this.tool === "select") {
+      const p = this.local(e), Y = this.planeOf("edge", s);
+      const at = this.nearPolyline(p, s.pts.map(([X, Z]) => this.f2s(X, Z, Y)), 10);
+      const f = this.s2f(p, Y);
+      if (!at || !f) return;
+      const before = this.snapshot();
+      s.pts.splice(at.i + 1, 0, [f.X, f.Z]);
+      this.commit(before);
+      return;
+    }
     if (!s || this.sel.kind !== "roof" || this.tool !== "select") return;
     const p = this.local(e);
-    const q = s.pts.map(([X, Z]) => this.f2s(X, Z));
+    const q = s.pts.map(([X, Z]) => this.f2s(X, Z, s.y0 || 0));
     let best = null;
     for (let i = 0; i < q.length; i++) {
       const a = q[i], b = q[(i + 1) % q.length];
@@ -834,6 +1107,12 @@ window.FacadeEditor = class FacadeEditor {
       if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); this.roofDraft = this.roofDraft.slice(0, -1); if (!this.roofDraft.length) this.roofDraft = null; this.paint(); return; }
       if (e.key === "Escape") { this.roofDraft = null; this.paint(); return; }
     }
+    if (this.edgeDraft) {
+      if (e.key === "Enter") { e.preventDefault(); this.finishEdge(); return; }
+      if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); this.edgeDraft = this.edgeDraft.slice(0, -1); if (!this.edgeDraft.length) this.edgeDraft = null; this.paint(); return; }
+      if (e.key === "Escape") { this.edgeDraft = null; this.paint(); return; }
+    }
+    if (this.groundDraft && e.key === "Escape") { this.groundDraft = null; this.paint(); return; }
     if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); this.remove(); return; }
     if (e.key === "Escape") { this.sel = null; this.drag = null; this.measure = null; this.paint(); return; }
     if (e.key === "Alt") { this.noSnap = true; return; }
@@ -842,33 +1121,61 @@ window.FacadeEditor = class FacadeEditor {
     if (t) { e.preventDefault(); this.setTool(t.id); }
   }
 
-  // Which shape (or handle) is under a screen point
+  // Which shape (or handle) is under a screen point. Each shape is tested on its own plane.
   hitTest(p) {
-    const near = (s, r = 11) => s && Math.hypot(s.x - p.x, s.y - p.y) <= r;
+    const near = (q, r = 11) => q && Math.hypot(q.x - p.x, q.y - p.y) <= r;
     const d = this.doc;
     // handles of the picked shape first
     const s = this.shape(this.sel);
-    if (s && this.sel.kind === "block") for (const h of this.rectHandles(s)) if (near(h.s)) return { ...this.sel, handle: h };
-    if (s && this.sel.kind === "roof") for (let i = 0; i < s.pts.length; i++) if (near(this.f2s(s.pts[i][0], s.pts[i][1]))) return { ...this.sel, handle: { id: i } };
-    if (s && this.sel.kind === "opening") for (const h of this.rectHandles(s)) if (near(h.s)) return { ...this.sel, handle: h };
-    if (s && this.sel.kind === "line") for (const [id, X] of [["a", s.x0], ["b", s.x1]]) if (near(this.f2s(X, s.z))) return { ...this.sel, handle: { id } };
+    const k = this.sel && this.sel.kind;
+    if (s && k === "block") for (const h of this.rectHandles(s, s.y0 || 0)) if (near(h.s)) return { ...this.sel, handle: h };
+    if (s && (k === "roof" || k === "edge")) {
+      const Y = this.planeOf(k, s);
+      for (let i = 0; i < s.pts.length; i++) if (near(this.f2s(s.pts[i][0], s.pts[i][1], Y))) return { ...this.sel, handle: { id: i } };
+    }
+    if (s && k === "opening") for (const h of this.rectHandles(s, this.planeOf("opening", s))) if (near(h.s)) return { ...this.sel, handle: h };
+    if (s && k === "line") for (const [id, X] of [["a", s.x0], ["b", s.x1]]) if (near(this.f2s(X, s.z, this.planeOf("line", s)))) return { ...this.sel, handle: { id } };
+    const g = d.ground;
+    if (g && g.pts && (k === "ground" || this.tool === "ground")) {
+      for (let i = 0; i < g.pts.length; i++) if (near(this.i2s({ x: g.pts[i][0], y: g.pts[i][1] }), 12)) return { kind: "ground", handle: { id: i } };
+    }
     if (d.door) for (let i = 0; i < 4; i++) if (near(this.i2s({ x: d.door.pts[i][0], y: d.door.pts[i][1] }), 12)) return { kind: "door", handle: { id: i } };
     if (!this.ready()) return null;
-    const f = this.s2f(p);
-    if (!f) return null;
+    const f0 = this.s2f(p);
+    if (!f0) return null;
     const tol = this.mpp(p) * 8;
-    for (const l of d.lines) if (Math.abs(f.Z - l.z) <= tol && f.X >= l.x0 - tol && f.X <= l.x1 + tol) return { kind: "line", id: l.id };
-    const inside = (r) => f.X >= r.x0 && f.X <= r.x1 && f.Z >= r.z0 && f.Z <= r.z1;
+    for (const l of d.lines) {
+      const f = this.s2f(p, this.planeOf("line", l)) || f0;
+      if (Math.abs(f.Z - l.z) <= tol && f.X >= l.x0 - tol && f.X <= l.x1 + tol) return { kind: "line", id: l.id };
+    }
+    for (const e of d.edges) if (this.nearPolyline(p, e.pts.map(([X, Z]) => this.f2s(X, Z, this.planeOf("edge", e))), 8) !== null) return { kind: "edge", id: e.id };
+    const insideOn = (r, Y) => { const f = this.s2f(p, Y); return f && f.X >= r.x0 && f.X <= r.x1 && f.Z >= r.z0 && f.Z <= r.z1; };
     const area = (r) => (r.x1 - r.x0) * (r.z1 - r.z0);
-    const op = d.openings.filter(inside).sort((a, b) => area(a) - area(b))[0];
+    const op = d.openings.filter((o) => insideOn(o, this.planeOf("opening", o))).sort((a, b) => area(a) - area(b))[0];
     if (op) return { kind: "opening", id: op.id };
     if (d.door && insidePoly(this.s2i(p), d.door.pts)) return { kind: "door" };
-    const roof = d.roofs.filter((r) => insidePoly({ x: f.X, y: f.Z }, r.pts)).sort((a, b) => polyArea(a.pts) - polyArea(b.pts))[0];
+    const roof = d.roofs.filter((r) => { const f = this.s2f(p, r.y0 || 0); return f && insidePoly({ x: f.X, y: f.Z }, r.pts); })
+      .sort((a, b) => polyArea(a.pts) - polyArea(b.pts))[0];
     if (roof) return { kind: "roof", id: roof.id };
-    const bl = d.blocks.filter(inside).sort((a, b) => area(a) - area(b))[0];
+    const bl = d.blocks.filter((b) => insideOn(b, b.y0 || 0)).sort((a, b) => area(a) - area(b))[0];
     if (bl) return { kind: "block", id: bl.id };
-    if (d.ground && Math.abs(f.Z - d.ground.z) <= tol) return { kind: "ground" };
+    if (g && g.pts && this.nearPolyline(p, g.pts.map(([u, v]) => this.i2s({ x: u, y: v })), 8) !== null) return { kind: "ground" };
+    if (g && !g.pts && Math.abs(f0.Z - g.z) <= tol) return { kind: "ground" };
     return null;
+  }
+
+  // The segment of a screen polyline within r px of p: {i, t} (t along segment i), or null
+  nearPolyline(p, q, r) {
+    if (q.some((x) => !x)) return null;
+    let best = null;
+    for (let i = 0; i + 1 < q.length; i++) {
+      const a = q[i], b = q[i + 1];
+      const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+      const dist = Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+      if (dist <= r && (!best || dist < best.dist)) best = { i, t, dist };
+    }
+    return best;
   }
 
   down(e) {
@@ -889,19 +1196,25 @@ window.FacadeEditor = class FacadeEditor {
     }
     const before = this.snapshot();
     // the door's corners can be dragged with the door tool or Select
+    // The ground line's points can be dragged with the ground tool too
+    if (this.tool === "ground" && this.doc.ground && this.doc.ground.pts) {
+      const hit = this.hitTest(p);
+      if (hit && hit.kind === "ground" && hit.handle) {
+        if (e.altKey) { this.removePoint(hit, before); return; }
+        this.sel = { kind: "ground" };
+        this.drag = { kind: "handle", hit, before, start: p, cur: p };
+        return;
+      }
+    }
     if (this.tool === "door" || this.tool === "select") {
       const hit = this.hitTest(p);
       if (hit && hit.kind === "door" && hit.handle) { this.drag = { kind: "handle", hit, before, start: p, cur: p }; this.sel = { kind: "door" }; return; }
       if (this.tool === "door") { this.drag = { kind: "draw", tool: "door", start: p, cur: p, before }; return; }
-      if (hit && hit.kind === "roof" && hit.handle && e.altKey) {
-        const r = this.shape(hit);
-        if (r.pts.length > 3) { r.pts.splice(hit.handle.id, 1); this.commit(before); }
-        else L.toast("A roof needs at least three corners");
-        return;
-      }
+      if (hit && hit.handle && e.altKey && ["roof", "edge", "ground"].includes(hit.kind)) { this.removePoint(hit, before); return; }
       if (hit) {
         this.sel = { kind: hit.kind, id: hit.id };
-        this.drag = hit.handle ? { kind: "handle", hit, before, start: p, cur: p } : { kind: "moveShape", hit, before, start: p, f0: this.s2f(p), orig: JSON.parse(JSON.stringify(this.shape(this.sel))) };
+        const Y = this.planeOf(hit.kind, this.shape(this.sel));
+        this.drag = hit.handle ? { kind: "handle", hit, before, start: p, cur: p } : { kind: "moveShape", hit, before, start: p, plane: Y, f0: this.s2f(p, Y), i0: this.s2i(p), orig: JSON.parse(JSON.stringify(this.shape(this.sel))) };
         this.paint();
         return;
       }
@@ -969,6 +1282,20 @@ window.FacadeEditor = class FacadeEditor {
     this.render();
   }
 
+  // Take a point out of a roof outline, a roof edge line, or a bend out of the ground line
+  removePoint(hit, before) {
+    const sh = this.shape(hit);
+    if (hit.kind === "ground") {
+      if (hit.handle.id === 0 || hit.handle.id === sh.pts.length - 1) { L.toast("The ends of the ground line stay; drag them instead"); return; }
+      sh.pts.splice(hit.handle.id, 1);
+    } else {
+      const least = hit.kind === "roof" ? 3 : 2;
+      if (sh.pts.length <= least) { L.toast(hit.kind === "roof" ? "A roof needs at least three corners" : "A line needs two points"); return; }
+      sh.pts.splice(hit.handle.id, 1);
+    }
+    this.commit(before);
+  }
+
   dragHandle(d, p) {
     const h = d.hit.handle;
     if (d.hit.kind === "door") {
@@ -977,23 +1304,34 @@ window.FacadeEditor = class FacadeEditor {
       this.solve();
       return;
     }
+    if (d.hit.kind === "ground") {
+      const i = this.s2i(p);
+      this.doc.ground.pts[h.id] = [round1(i.x), round1(i.y)];
+      return;
+    }
     const s = this.shape(d.hit);
-    const f = this.s2f(p);
+    const f = this.s2f(p, this.planeOf(d.hit.kind, s));
     if (!s || !f) return;
     if (d.hit.kind === "line") { if (h.id === "a") s.x0 = f.X; else s.x1 = f.X; return; }
-    if (d.hit.kind === "roof") { s.pts[h.id] = [this.snap(f.X, "x", p, s).v, this.snap(f.Z, "z", p, s).v]; return; }
+    if (d.hit.kind === "roof" || d.hit.kind === "edge") { s.pts[h.id] = [this.snap(f.X, "x", p, s).v, this.snap(f.Z, "z", p, s).v]; return; }
     s[h.kx] = this.snap(f.X, "x", p, s).v;
     s[h.kz] = this.snap(f.Z, "z", p, s).v;
   }
 
   dragShape(d, p) {
-    const f = this.s2f(p);
-    if (!f || !d.f0) return;
     if (Math.hypot(p.x - d.start.x, p.y - d.start.y) > 3) d.moved = true;
     if (!d.moved) return;
     const s = this.shape(d.hit), o = d.orig;
+    if (d.hit.kind === "ground" && o.pts) {
+      const i = this.s2i(p);
+      s.pts = o.pts.map(([u, v]) => [round1(u + i.x - d.i0.x), round1(v + i.y - d.i0.y)]);
+      return;
+    }
+    const f = this.s2f(p, d.plane || 0);
+    if (!f || !d.f0) return;
     let dx = f.X - d.f0.X, dz = f.Z - d.f0.Z;
     if (d.hit.kind === "ground") { s.z = this.snap(o.z + dz, "z", p, s).v; return; }
+    if (d.hit.kind === "edge") { s.pts = o.pts.map(([X, Z]) => [X + dx, Z + dz]); return; }
     if (d.hit.kind === "line") { s.z = this.snap(o.z + dz, "z", p, s).v; s.x0 = o.x0 + dx; s.x1 = o.x1 + dx; return; }
     if (d.hit.kind === "door") return;
     if (d.hit.kind === "roof") { s.pts = o.pts.map(([X, Z]) => [X + dx, Z + dz]); return; }
@@ -1042,7 +1380,8 @@ window.FacadeEditor = class FacadeEditor {
         // a block that starts near the ground starts on it
         const gz = this.doc.ground ? this.doc.ground.z : null;
         if (gz !== null && Math.abs(r.z0 - gz) < 0.3) r.z0 = gz;
-        this.doc.blocks.push({ id, name: `Block ${this.doc.blocks.length + 1}`, ...r });
+        const follows = this.doc.ground && this.doc.ground.pts && this.doc.ground.pts.length > 2;
+        this.doc.blocks.push({ id, name: `Block ${this.doc.blocks.length + 1}`, ...r, ...(follows ? { face: "auto" } : {}) });
         this.sel = { kind: "block", id };
       } else {
         this.doc.openings.push({ id, kind: this.opts.opening, ...r });
@@ -1076,10 +1415,35 @@ window.FacadeEditor = class FacadeEditor {
       const f = this.s2f(p);
       if (!f) return;
       if (d.tool === "ground") {
-        this.doc.ground = { z: f.Z };
+        const i = this.s2i(p);
+        const g = this.doc.ground;
+        if (g && g.pts) {
+          // a tap on the line adds a bend there
+          const at = this.nearPolyline(p, g.pts.map(([u, v]) => this.i2s({ x: u, y: v })), 12);
+          if (!at) { L.toast("Tap on the ground line to add a bend"); return; }
+          g.pts.splice(at.i + 1, 0, [round1(i.x), round1(i.y)]);
+          this.sel = { kind: "ground" };
+          this.commit(d.before);
+          return;
+        }
+        if (!this.groundDraft) { this.groundDraft = [round1(i.x), round1(i.y)]; this.paint(); return; }
+        const pts = [this.groundDraft, [round1(i.x), round1(i.y)]].sort((a, b) => a[0] - b[0]);
+        this.groundDraft = null;
+        this.doc.ground = { z: 0, pts };
         this.sel = { kind: "ground" };
         this.commit(d.before);
         if (!this.doc.blocks.length) this.setTool("block");
+        return;
+      }
+      if (d.tool === "edge") {
+        const Y = this.planeOf("edge");
+        const draft = this.edgeDraft || [];
+        const last = draft.length ? this.f2s(draft[draft.length - 1][0], draft[draft.length - 1][1], Y) : null;
+        if (last && draft.length >= 2 && Math.hypot(last.x - p.x, last.y - p.y) <= 12) { this.finishEdge(); return; }
+        const fe = this.s2f(p, Y);
+        if (!fe) return;
+        this.edgeDraft = [...draft, [fe.X, fe.Z]];
+        this.paint();
         return;
       }
       if (d.tool === "roof") {
@@ -1094,8 +1458,16 @@ window.FacadeEditor = class FacadeEditor {
       }
       if (d.tool === "light") {
         if (!this.ctx.selection().target) { L.toast("Pick a light from the list first"); return; }
+        // the block under the tap, measured on its own wall
+        const area = (r) => (r.x1 - r.x0) * (r.z1 - r.z0);
+        const blk = [...this.doc.blocks].sort((a, b) => area(a) - area(b)).find((b) => {
+          const fb = this.s2f(p, b.y0 || 0);
+          return fb && fb.X >= b.x0 && fb.X <= b.x1 && fb.Z >= b.z0 && fb.Z <= b.z1 + 0.5;
+        });
+        const wallY = blk ? blk.y0 || 0 : 0;
+        const fw = this.s2f(p, wallY) || f;
         const o = this.origin();
-        this.ctx.place(f.X - o.ox, f.Z - o.gz, this.opts.outside);
+        this.ctx.place(fw.X - o.ox, fw.Z - o.gz, this.opts.outside, wallY, blk || null, this.doc.eave);
       }
     }
     this.render();
@@ -1119,7 +1491,51 @@ const ROOF_HELP = {
 };
 const LINE_AT = [["floor", "The floor"], ["below", "The ceiling under it"]];
 
+// Soffits stick out about 24" past the walls on most houses
+const EAVE_M = 0.6096;
+
+// The camera behind a plane's homography H (plane coords X across, Z up -> image px). The focal
+// length comes from H's perspective when two estimates agree, else a typical phone lens (65°
+// across). Returns {H, f, Kn (K times the plane's normal, scaled like H's columns), pos}.
+function solveCamera(H, w, h) {
+  const cx = w / 2, cy = h / 2;
+  const col = (j) => [H[0][j] - cx * H[2][j], H[1][j] - cy * H[2][j], H[2][j]];
+  const p = col(0), q = col(1);
+  const fallback = (w / 2) / Math.tan((65 / 2) * Math.PI / 180);
+  const lo = (w / 2) / Math.tan(55 * Math.PI / 180), hi = (w / 2) / Math.tan(10 * Math.PI / 180);
+  const est = [];
+  const den1 = p[2] * q[2];
+  if (Math.abs(den1) > 1e-12) est.push(-(p[0] * q[0] + p[1] * q[1]) / den1);
+  const den2 = p[2] * p[2] - q[2] * q[2];
+  if (Math.abs(den2) > 1e-12) est.push((q[0] * q[0] + q[1] * q[1] - p[0] * p[0] - p[1] * p[1]) / den2);
+  const good = est.filter((f2) => f2 > lo * lo && f2 < hi * hi).map(Math.sqrt);
+  let f = fallback;
+  if (good.length === 2 && Math.abs(good[0] - good[1]) / Math.max(...good) < 0.25) f = (good[0] + good[1]) / 2;
+  const Kinv = (v) => [(v[0] - cx * v[2]) / f, (v[1] - cy * v[2]) / f, v[2]];
+  const a1 = Kinv([H[0][0], H[1][0], H[2][0]]), a2 = Kinv([H[0][1], H[1][1], H[2][1]]), a3 = Kinv([H[0][2], H[1][2], H[2][2]]);
+  const len = (v) => Math.hypot(v[0], v[1], v[2]);
+  const lam = (len(a1) + len(a2)) / 2;
+  if (!(lam > 0)) return null;
+  let n = [a1[1] * a2[2] - a1[2] * a2[1], a1[2] * a2[0] - a1[0] * a2[2], a1[0] * a2[1] - a1[1] * a2[0]];
+  const nl = len(n) || 1;
+  n = n.map((v) => (v / nl) * lam);
+  if (n[2] < 0) n = n.map((v) => -v); // into the house is away from the camera
+  const Kn = [f * n[0] + cx * n[2], f * n[1] + cy * n[2], n[2]];
+  // where the camera is: a1 X + a2 Z + n Y' = -a3 (Y' measured from the door's plane)
+  const M = [[a1[0], a2[0], n[0]], [a1[1], a2[1], n[1]], [a1[2], a2[2], n[2]]];
+  const Mi = invert3(M);
+  if (!Mi) return null;
+  const sol = [0, 1, 2].map((i) => -(Mi[i][0] * a3[0] + Mi[i][1] * a3[1] + Mi[i][2] * a3[2]));
+  return { H, f, fov: 2 * Math.atan((w / 2) / f) * 180 / Math.PI, measuredLens: f !== fallback, Kn, pos: { X: sol[0], Z: sol[1], Y: sol[2] } };
+}
+
 function uid() { return Math.random().toString(36).slice(2, 10); }
+function round3(v) { return Math.round(v * 1000) / 1000; }
+// whether rectangle a's middle is inside rectangle b
+function inRect(a, b) {
+  const X = (a.x0 + a.x1) / 2, Z = (a.z0 + a.z1) / 2;
+  return X >= b.x0 && X <= b.x1 && Z >= b.z0 - 0.05 && Z <= b.z1 + 0.05;
+}
 function polyArea(pts) {
   let a = 0;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += (pts[j][0] + pts[i][0]) * (pts[j][1] - pts[i][1]);

@@ -452,3 +452,60 @@ async def test_front_photo_sets_width_floors_and_massing(client, lum):
     view = (await client.delete("/api/house/facade")).json()
     assert view["facade"] is None
     assert (await client.get("/api/house/photo")).status_code == 404
+
+
+async def test_recess_ground_line_roof_edges_and_spaces(client, lum):
+    await client.put("/api/house/photo?w=800&h=600", content=JPEG)
+    door = {
+        "pts": [[400, 300], [436, 300], [436, 380], [400, 380]],
+        "w": 0.9144,
+        "h": 2.032,
+        "recess": 0.9,
+    }
+    body = {
+        "door": door,
+        "eave": 0.6,
+        # traced in the photo; the page works out where each point is on the ground
+        "ground": {
+            "z": -0.6,
+            "pts": [[100, 500], [300, 502], [700, 505]],
+            "footprint": [[-4, 0], [1, 1.2], [10, 0]],
+        },
+        "edges": [
+            {"id": "a", "pts": [[-4.5, 5.2], [3.4, 5.2]]},
+            {"id": "b", "pts": [[2.8, 3.0], [10.5, 3.0]]},  # overlaps the first by 0.6 m
+        ],
+        "blocks": [
+            {"id": "m", "name": "Main", "x0": -4, "x1": 10, "z0": -0.6, "z1": 2.8},
+            {
+                "id": "e",
+                "name": "Entry",
+                "x0": 1,
+                "x1": 3,
+                "z0": -0.6,
+                "z1": 2.4,
+                "face": "back",
+                "y0": 0.9,
+                "level": "main_level",
+                "offset": -0.6,
+            },
+        ],
+    }
+    view = (await client.put("/api/house/facade", json=body)).json()
+    m = view["massing"]
+    assert view["facade"]["door"]["recess"] == 0.9
+    assert m["roofline"] == pytest.approx(15.0)  # -4.5 to 10.5, the overlap counted once
+    assert m["footprint"] == [[0, 0], [5, 1.2], [14, 0]]
+    entry = m["blocks"][1]
+    assert entry["y0"] == 0.9 and entry["level"] == "main_level" and entry["offset"] == -0.6
+    for broken in (
+        {**body, "door": {**door, "recess": 9}},
+        {**body, "eave": 3},
+        {**body, "edges": [{"pts": [[0, 1]]}]},
+        {**body, "blocks": [{**body["blocks"][1], "face": "sideways"}]},
+        {**body, "blocks": [{**body["blocks"][1], "level": "attic"}]},
+        {**body, "ground": {**body["ground"], "footprint": [[0, 0]]}},
+    ):
+        assert (await client.put("/api/house/facade", json=broken)).status_code == 400
+    # A light under the eaves
+    assert any(mt["id"] == "soffit" for mt in view["mounts"])
