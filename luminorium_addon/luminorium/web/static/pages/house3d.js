@@ -197,6 +197,40 @@ window.House3D = class House3D {
       12, H - 12, col.muted, 12, "left");
   }
 
+  // ---- windows and doors: on the front wall of their block -----------------------------------
+  openingY(o) {
+    if (o.y !== undefined) return o.y;
+    const blk = this.scene.massing.blocks.find((b) => (o.x0 + o.x1) / 2 >= b.x0 && (o.x0 + o.x1) / 2 <= b.x1);
+    return blk ? blk.y0 || 0 : 0;
+  }
+  // The window or door under a screen point, nearest first
+  hitOpening(sx, sy) {
+    const m = this.scene.massing;
+    if (!m) return null;
+    let best = null;
+    for (const o of m.openings) {
+      if (!o.id) continue;
+      const y = this.openingY(o);
+      const q = [[o.x0, o.z0], [o.x1, o.z0], [o.x1, o.z1], [o.x0, o.z1]].map(([x, z]) => this.project({ x, y, z }));
+      if (q.some((p) => !p)) continue;
+      let inside = false;
+      for (let i = 0, j = q.length - 1; i < q.length; j = i++) {
+        if ((q[i].y > sy) !== (q[j].y > sy) && sx < ((q[j].x - q[i].x) * (sy - q[i].y)) / (q[j].y - q[i].y) + q[i].x) inside = !inside;
+      }
+      const depth = q.reduce((a, p) => a + p.depth, 0) / 4;
+      if (inside && (!best || depth < best.depth)) best = { id: o.id, depth };
+    }
+    return best ? best.id : null;
+  }
+  // Where a screen point meets the upright plane y (a front wall): {x, z}
+  onWall(sx, sy, y) {
+    const cam = this.cam, d = this.ray(sx, sy, cam);
+    if (Math.abs(d.y) < 1e-6) return null;
+    const t = (y - cam.pos.y) / d.y;
+    if (t <= 0) return null;
+    return { x: cam.pos.x + d.x * t, z: cam.pos.z + d.z * t };
+  }
+
   // ---- blocks: picking one and dragging its faces (Shape) --------------------------------------
 
   selectedBlock() {
@@ -485,9 +519,9 @@ window.House3D = class House3D {
     }
     // windows and doors sit on the front wall of the block they're in
     for (const o of this.scene.massing.openings) {
-      const blk = this.scene.massing.blocks.find((b) => (o.x0 + o.x1) / 2 >= b.x0 && (o.x0 + o.x1) / 2 <= b.x1);
-      const y = (blk ? blk.y0 || 0 : 0) - 0.02;
-      face([[o.x0, y, o.z0], [o.x1, y, o.z0], [o.x1, y, o.z1], [o.x0, y, o.z1]], GLASS, o.kind === "window" ? 0.22 : 0.14, 0.9);
+      const y = this.openingY(o) - 0.02;
+      const sel = this.scene.selOpening && o.id === this.scene.selOpening;
+      face([[o.x0, y, o.z0], [o.x1, y, o.z0], [o.x1, y, o.z1], [o.x0, y, o.z1]], sel ? "#ff8a3d" : GLASS, sel ? 0.4 : o.kind === "window" ? 0.22 : 0.14, 0.9);
     }
   }
 
@@ -737,6 +771,12 @@ window.House3D = class House3D {
           this.drag = { kind: "face", face: h, start: pt, dir: { x: (q.x - p.x) / len, y: (q.y - p.y) / len }, ppm: len, block: this.scene.selBlock };
           return;
         }
+        // the picked window or door: along its wall
+        const so = this.scene.selOpening && this.scene.massing && this.scene.massing.openings.find((o) => o.id === this.scene.selOpening);
+        if (so && this.hitOpening(pt.x, pt.y) === so.id) {
+          const y = this.openingY(so), at = this.onWall(pt.x, pt.y, y);
+          if (at) { this.drag = { kind: "openingMove", start: pt, at0: at, y, id: so.id, moved: false }; return; }
+        }
         // the block itself: across the ground, or with Shift up and down
         if (sb && this.rayHitsBlock(pt.x, pt.y, sb)) {
           if (e.shiftKey) {
@@ -788,6 +828,12 @@ window.House3D = class House3D {
       if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 3) d.moved = true;
       const at = this.onPlane(pt.x, pt.y, d.z);
       if (at && d.moved) { d.dx = at.x - d.at0.x; d.dy = at.y - d.at0.y; d.dz = 0; this.h.onBlockMove && this.h.onBlockMove(d.block, d.dx, d.dy, 0, false, d.alt); }
+      return;
+    }
+    if (d.kind === "openingMove") {
+      if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 3) d.moved = true;
+      const at = this.onWall(pt.x, pt.y, d.y);
+      if (at && d.moved) { d.dx = at.x - d.at0.x; d.dz = at.z - d.at0.z; this.h.onOpeningMove && this.h.onOpeningMove(d.id, d.dx, d.dz, false, d.alt); }
       return;
     }
     if (d.kind === "blockLift") {
@@ -872,6 +918,7 @@ window.House3D = class House3D {
       return this.lookFrom(d.dir);
     }
     if (d.kind === "face") { if (d.delta) this.h.onFace && this.h.onFace(d.block, d.face.face, d.delta, true, d.alt); return; }
+    if (d.kind === "openingMove") { if (d.moved && d.dx !== undefined && this.h.onOpeningMove) this.h.onOpeningMove(d.id, d.dx, d.dz, true, d.alt); return; }
     if (d.kind === "blockMove" || d.kind === "blockLift" || d.kind === "axisMove") {
       if (d.moved && d.dx !== undefined && this.h.onBlockMove) this.h.onBlockMove(d.block, d.dx, d.dy, d.dz || 0, true, d.alt);
       return;
@@ -880,6 +927,8 @@ window.House3D = class House3D {
     if (d.kind === "raise" && d.moved) return this.h.onRaise(d.light.id, d.h, true);
     if (d.kind === "orbit" && !d.moved) {
       if (this.mode === "shape") {
+        const op = this.hitOpening(d.start.x, d.start.y);
+        if (op && this.h.onOpening) { this.h.onOpening(op); return; }
         const id = this.hitBlock(d.start.x, d.start.y);
         if (this.h.onBlock) this.h.onBlock(id);
         return;

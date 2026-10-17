@@ -430,7 +430,23 @@ async def test_front_photo_sets_width_floors_and_massing(client, lum):
     assert b["depth"] == 8 and a["depth"] == view["size"]["depth"]
     # Main's ceiling is the underside of the Bedroom floor drawn above it: 12" of floor less
     assert floors["main_level"]["ceiling"] == pytest.approx(3.0 - 0.3048 - 0.6, abs=0.001)
-    assert m["openings"][0] == {"kind": "window", "x0": 9, "x1": 10.2, "z0": 1.0, "z1": 2.2}
+    assert m["openings"][0] == {
+        "id": "w",
+        "kind": "window",
+        "x0": 9,
+        "x1": 10.2,
+        "z0": 1.0,
+        "z1": 2.2,
+        "y": 0.0,
+    }
+    # A window sits on the front wall of the block it's in: pushed back, it goes with it
+    inside = next(
+        bl for bl in body["blocks"] if bl["x0"] <= 5.6 <= bl["x1"] and bl["z0"] <= 1.0 <= bl["z1"]
+    )
+    inside["y0"] = 1.2
+    view = (await client.put("/api/house/facade", json=body)).json()
+    assert view["massing"]["openings"][0]["y"] == 1.2
+    inside.pop("y0")
     # Kept in house.json
     assert lum.house.store.load("house")["facade"]["blocks"][0]["name"] == "Two storey"
 

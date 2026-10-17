@@ -992,7 +992,22 @@ class HouseService:
                     "ridge_y": min(d, r.get("ridge_y", d / 2)),
                 }
             )
-        openings = [{"kind": o["kind"], **world(o)} for o in f.get("openings") or []]
+
+        # Each window or door sits on the front wall of the block it's drawn in (as the front
+        # photo has it): the one around its middle, across and up
+        def wall_y(o: dict) -> float:
+            x, z = (o["x0"] + o["x1"]) / 2, (o["z0"] + o["z1"]) / 2
+            for b in f["blocks"]:
+                if b.get("behind"):
+                    continue
+                if b["x0"] <= x <= b["x1"] and b["z0"] - 0.05 <= z <= b["z1"] + 0.05:
+                    return b.get("y0", 0.0)
+            return 0.0
+
+        openings = [
+            {"id": o.get("id", ""), "kind": o["kind"], **world(o), "y": wall_y(o)}
+            for o in f.get("openings") or []
+        ]
         foot = (f.get("ground") or {}).get("footprint")
         edges = f.get("edges") or []
         xs = [p[0] for e in edges for p in e["pts"]]

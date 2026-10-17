@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.33
+
+- **Windows follow their wall in 3D:** a window or door sits on the front wall of the block it's
+  in, matched across and up as on the front photo (before, only across, so with blocks one over
+  another it could land on the wrong wall). Push that wall back and it goes too.
+- **Move windows and doors in 3D:** in Shape, tap one to pick it, then drag it along its wall or
+  type its width, height, position and sill. It's saved to the front photo's drawing.
+
 ## 0.3.0-dev.32
 
 - **How far from, fixed:** the list only has walls that face the picked wall (alongside it for

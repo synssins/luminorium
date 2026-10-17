@@ -345,7 +345,12 @@ CAD layout"):
     green (back) or blue (up) arrows at its front left bottom corner to move it that way only; or
     type **Move by** across, back and up. The distance moved shows as you drag. Faces, and a moved
     block's sides, snap flush to another block's faces within 6"; hold Alt to stop snapping.
-    **Delete** removes it.
+    **Delete** removes it. **Windows and doors** sit on the front wall of the block they're in
+    (the one around their middle, across and up, as on the front photo; `massing.openings[].y`),
+    so pushing that wall back takes them with it. In Shape, tap one to pick it (orange): drag it
+    along its wall an inch at a time (Alt: free), or type its kind, width, height, how far from
+    the left of the house and its sill (or bottom) above the ground; **Delete** removes it. The
+    change is saved to the front photo's drawing.
     `POST /api/house/blocks` `{x0, x1, y0, depth, z0, z1, name?, level?}`, `DELETE
     /api/house/blocks/{id}`,
     `PUT /api/house/blocks/{id}` `{x0?, x1?, z0?, z1?, y0?, depth?, name?, level?, offset?}` and

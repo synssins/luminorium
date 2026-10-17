@@ -92,6 +92,7 @@
       massing: m,
       top: house.top,
       selBlock: ui.mode3d === "shape" ? ui.block : null,
+      selOpening: ui.mode3d === "shape" ? ui.opening : null,
       floors: house.floors.map((f) => ({ ...f, active: f.id === ui.floor, label: L.fmtLen(f.elevation, { signed: true }) })),
       lights, grid: L.units() === "imperial" ? L.FT : 1,
       placeZ: floorZ(ui.floor), selPart: ui.part, labels: false,
@@ -123,7 +124,19 @@
         view3d.setScene(scene3d());
         if (done) { if (part === null) await placeItem(at); else await placePart(part, at); }
       },
-      onBlock: (id) => { ui.block = id; paint(); },
+      onBlock: (id) => { ui.block = id; ui.opening = null; paint(); },
+      onOpening: (id) => { ui.opening = id; ui.block = null; paint(); },
+      // a window or door dragged along its wall: an inch at a time (Alt: free)
+      onOpeningMove: async (id, dx, dz, done, alt) => {
+        const o = house.massing && house.massing.openings.find((q) => q.id === id);
+        if (!o) return;
+        if (!ui.openBase || ui.openBase.id !== id) ui.openBase = { ...o };
+        const b = ui.openBase;
+        const sx = alt ? dx : L.snapLen(dx), sz = alt ? dz : L.snapLen(dz);
+        Object.assign(o, { x0: b.x0 + sx, x1: b.x1 + sx, z0: b.z0 + sz, z1: b.z1 + sz });
+        view3d.setScene(scene3d());
+        if (done) { ui.openBase = null; await changeOpening(id, (q) => { q.x0 += sx; q.x1 += sx; q.z0 += sz; q.z1 += sz; }); }
+      },
       onFace: async (id, face, delta, done, alt) => {
         const b = house.massing && house.massing.blocks.find((q) => q.id === id);
         if (!b) return;
@@ -534,7 +547,45 @@
       }));
   }
 
+  // A window or door, changed on the front photo's drawing (its own metres there; the same
+  // distances as in 3D)
+  async function changeOpening(id, fn) {
+    const f = JSON.parse(JSON.stringify(house.facade));
+    const o = (f.openings || []).find((q) => q.id === id);
+    if (!o) return;
+    if (fn(o) === false) f.openings = f.openings.filter((q) => q.id !== id);
+    const ok = await run(async () => { house = await api("api/house/facade", { method: "PUT", body: f }); return true; });
+    if (!ok) house = await api("api/house");
+    if (facade) facade.load(house.facade);
+    paint();
+  }
+  function openingPanel(o) {
+    const fmt = L.fmtLen;
+    const KIND = { window: "Window", door: "Door", garage: "Garage door" };
+    const len = (label, value, set) => el("label.field", el("span", label),
+      el("input.input", { value: fmt(value), inputmode: "decimal", on: { change: (e) => {
+        const v = L.parseLen(e.target.value);
+        if (!Number.isFinite(v)) { toast("Give a length, like 2' 6 1/2\""); e.target.value = fmt(value); return; }
+        changeOpening(o.id, (q) => set(q, v));
+      } } }));
+    return el("aside.card.accent.hm-insp", { "aria-label": "Picked window or door" },
+      el("div", el("h2", KIND[o.kind] || "Opening"), el("span.small.muted", "On the front wall of its block. Drag it along the wall in the view, an inch at a time (Alt: free), or type here.")),
+      el("label.field", el("span", "Kind"), el("select", { on: { change: (e) => changeOpening(o.id, (q) => { q.kind = e.target.value; }) } },
+        Object.entries(KIND).map(([k, label]) => el("option", { value: k, selected: o.kind === k ? "" : null }, label)))),
+      el("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" } },
+        len("Width", o.x1 - o.x0, (q, v) => { if (v > 0.1) q.x1 = q.x0 + v; }),
+        len("Height", o.z1 - o.z0, (q, v) => { if (v > 0.1) q.z1 = q.z0 + v; }),
+        len("From the left of the house", o.x0, (q, v) => { const d = v - o.x0; q.x0 += d; q.x1 += d; }),
+        len(o.kind === "window" ? "Sill above the ground" : "Bottom above the ground", o.z0, (q, v) => { const d = v - o.z0; q.z0 += d; q.z1 += d; })),
+      el("div.row", { style: { gap: "8px", flexWrap: "wrap" } },
+        el("button.btn", { type: "button", on: { click: () => { ui.opening = null; paint(); } } }, "Done"),
+        el("button.btn.danger", { type: "button", on: { click: () => { ui.opening = null; changeOpening(o.id, () => false); } } }, "Delete")));
+  }
   function inspector() {
+    if (ui.view === "3d" && ui.mode3d === "shape" && ui.opening) {
+      const o = house.massing && house.massing.openings.find((q) => q.id === ui.opening);
+      if (o) return openingPanel(o);
+    }
     if (ui.view === "3d" && ui.mode3d === "shape") {
       const b = ui.block && house.massing && house.massing.blocks.find((q) => q.id === ui.block);
       return b ? blockPanel(b) : null;
@@ -686,7 +737,7 @@
       disabled: disabled ? "" : null, on: { click } }, svgI(iconD), el("span", label));
   }
   function pickedBlock() { return ui.block && house.massing ? house.massing.blocks.find((q) => q.id === ui.block) || null : null; }
-  function setMode3d(k) { ui.mode3d = k; if (k !== "shape") ui.block = null; ui.aiming = false; paint(); }
+  function setMode3d(k) { ui.mode3d = k; if (k !== "shape") { ui.block = null; ui.opening = null; } ui.aiming = false; paint(); }
   // The 3D view's tools, in groups, with the level shown at the right
   function tools3d() {
     const b = ui.mode3d === "shape" ? pickedBlock() : null;
@@ -822,7 +873,8 @@
       ensure3d();
       const t = ui.sel && target(ui.sel);
       const lineBanner = ui.mode ? el("div.banner", { style: { fontSize: "14px" } }, ui.mode === "line-start" ? "Tap where the first part is." : "Now tap where the last part is.") : null;
-      const hint = ui.mode3d === "shape" ? (ui.block ? "Drag a yellow handle to move that face, or drag the block to move it (Shift+drag: up and down; Alt: no snapping). Or type amounts in the panel." : "Tap a house block to pick it, or Add block in the tool bar.")
+      const hint = ui.mode3d === "shape" && ui.opening ? "Drag the window or door along its wall, or type in the panel. Tap a house block to pick it instead."
+        : ui.mode3d === "shape" ? (ui.block ? "Drag a yellow handle to move that face, or drag the block to move it (Shift+drag: up and down; Alt: no snapping). Or type amounts in the panel." : "Tap a house block, or a window or door, to pick it. Or Add block in the tool bar.")
         : ui.aiming && t ? `Click what ${t.name} should point at: a wall, the ground, or a tree. Drag to turn the view first if you need to.`
         : !t ? "Pick a light: open Lights on the left, or tap one in the view."
         : !t.placed ? `Tap where ${t.name} is on the ${floorName(ui.floor)} floor.`
