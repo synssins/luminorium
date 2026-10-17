@@ -194,7 +194,11 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
     tread at a time (the tread depth stays). Typing keeps the bottom where it is.
     Its build: 2x4, 2x6 or 2x8 with drywall
     (½") or plaster (¾") on each face. **How far from** an outside wall or a parallel wall,
-    **wall face to wall face**, as measured with a tape: typing it moves the wall.
+    **wall face to wall face**, as measured with a tape: typing it moves the wall. The walls it
+    can be measured from are listed nearest first by where they are ("2 · A wall to the left,
+    9' 6" away"), with matching numbered tags on the plan; the chosen one is blue, with a
+    blueprint dimension (ticks at the two faces, the length over the middle). **Pick on the plan**
+    then a tap on a wall chooses it.
   - **Doorways:** on a wall, a width and how far from the wall's end.
   - **Rooms:** a name tied to one of Home Assistant's areas.
   In 3D each wall is a see-through panel from its level's floor to its ceiling.

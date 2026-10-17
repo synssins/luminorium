@@ -544,8 +544,10 @@ window.SiteEditor = class SiteEditor {
         this.lenRow("Length", len, (v) => edit(() => { const k = v / (len || 1); s.b = [round3(s.a[0] + (s.b[0] - s.a[0]) * k), round3(s.a[1] + (s.b[1] - s.a[1]) * k)]; })),
         ref ? el("div.field", el("span", "How far from"),
           el("select.input", { on: { change: (e) => { this.wallRef = e.target.value; this.paint(); } } }, refs.map((r) => el("option", { value: r.id, selected: r.id === ref.id ? "" : null }, r.label))),
+          el("button.btn.small", { type: "button", "aria-pressed": String(!!this.pickRef), on: { click: () => { this.pickRef = !this.pickRef; this.paint(); } } },
+            this.pickRef ? "Tap the wall on the plan…" : "Pick on the plan"),
           this.lenRow("Wall face to wall face", dist, (v) => edit(() => this.setFaceDistance(s, ref, v))),
-          el("span.small.muted", "Measure from the face of one wall to the face of the other, as with a tape.")) : null,
+          el("span.small.muted", "Measure from the face of one wall to the face of the other, as with a tape. The numbers match the tags on the plan; the blue one is shown with its dimension.")) : null,
         del);
     } else if (this.sel.kind === "stairs") {
       const floors = this.ctx.floors();
@@ -634,19 +636,28 @@ window.SiteEditor = class SiteEditor {
   wallThick(w) { return STUD_M[w.studs] + 2 * FINISH_M[w.finish]; }
   vertical(w) { return Math.abs(w.b[0] - w.a[0]) < Math.abs(w.b[1] - w.a[1]); }
   // What a wall can be measured from: the outside walls' inside faces, and parallel walls
+  // The walls a wall can be measured from: the outside walls' inside faces and the walls on its
+  // level that run the same way. Each says where it is and how far, nearest first; `n` is the
+  // number on its tag on the plan.
   wallRefs(w) {
     const refs = [];
     const inner = this.planInner();
+    const vert = this.vertical(w), here = this.wallPos(w);
     if (inner) {
       const bb = bbox(inner);
-      if (this.vertical(w)) refs.push({ id: "L", label: "The left outside wall", pos: bb.x0, face: 0 }, { id: "R", label: "The right outside wall", pos: bb.x1, face: 0 });
-      else refs.push({ id: "F", label: "The front outside wall", pos: bb.y0, face: 0 }, { id: "B", label: "The back outside wall", pos: bb.y1, face: 0 });
+      if (vert) refs.push({ id: "L", name: "The left outside wall", pos: bb.x0, face: 0, span: [bb.y0, bb.y1] }, { id: "R", name: "The right outside wall", pos: bb.x1, face: 0, span: [bb.y0, bb.y1] });
+      else refs.push({ id: "F", name: "The front outside wall", pos: bb.y0, face: 0, span: [bb.x0, bb.x1] }, { id: "B", name: "The back outside wall", pos: bb.y1, face: 0, span: [bb.x0, bb.x1] });
     }
-    this.doc.walls.forEach((o, i) => {
-      if (o === w || o.level !== w.level || this.vertical(o) !== this.vertical(w)) return;
-      const pos = this.vertical(o) ? (o.a[0] + o.b[0]) / 2 : (o.a[1] + o.b[1]) / 2;
-      refs.push({ id: o.id, label: `Wall ${i + 1}`, pos, face: this.wallThick(o) / 2 });
-    });
+    for (const o of this.doc.walls) {
+      if (o === w || o.level !== w.level || this.vertical(o) !== vert) continue;
+      const pos = this.wallPos(o);
+      const way = vert ? (pos < here ? "to the left" : "to the right") : (pos < here ? "toward the front" : "toward the back");
+      const span = vert ? [Math.min(o.a[1], o.b[1]), Math.max(o.a[1], o.b[1])] : [Math.min(o.a[0], o.b[0]), Math.max(o.a[0], o.b[0])];
+      refs.push({ id: o.id, name: `A wall ${way}`, pos, face: this.wallThick(o) / 2, span, wall: o });
+    }
+    for (const r of refs) r.dist = this.faceDistance(w, r);
+    refs.sort((a, b) => a.dist - b.dist);
+    refs.forEach((r, i) => { r.n = i + 1; r.label = `${r.n} · ${r.name}, ${L.fmtLen(r.dist)} away`; });
     return refs;
   }
   wallPos(w) { return this.vertical(w) ? (w.a[0] + w.b[0]) / 2 : (w.a[1] + w.b[1]) / 2; }
@@ -798,6 +809,7 @@ window.SiteEditor = class SiteEditor {
         // stairs from another level that lead here: the same stairs, the other way
         else if (t.to === this.level) this.drawStairs(ctx, stairsSeenFrom(t), isSel("stairs", t.id), col);
       }
+      if (this.sel && this.sel.kind === "wall") this.drawWallDims(ctx, col);
       for (const r of d.rooms) {
         if (r.level !== this.level) continue;
         const p = this.h2s(r.at[0], r.at[1]);
@@ -869,6 +881,62 @@ window.SiteEditor = class SiteEditor {
       label(ctx, L.fmtLen(this.measure.len), (a.x + b.x) / 2, (a.y + b.y) / 2 - 10, "#fff", col, "center");
     }
     this.scaleBar(ctx);
+  }
+  // The picked wall's measuring: a numbered tag on each wall it can be measured from, the chosen
+  // one in blue, and a dimension line between the two faces, as on a blueprint
+  drawWallDims(ctx, col) {
+    const w = this.shape(this.sel);
+    if (!w || w.level !== this.level) return;
+    const refs = this.wallRefs(w);
+    if (!refs.length) return;
+    const ref = refs.find((r) => r.id === this.wallRef) || refs[0];
+    const vert = this.vertical(w);
+    const BLUE = "#5aa9e6";
+    const P = (pos, along) => (vert ? this.h2s(pos, along) : this.h2s(along, pos));
+    const wSpan = vert ? [Math.min(w.a[1], w.b[1]), Math.max(w.a[1], w.b[1])] : [Math.min(w.a[0], w.b[0]), Math.max(w.a[0], w.b[0])];
+    // where the dimension runs: the middle of where the two walls overlap, else of the picked wall
+    const at = (r) => { const lo = Math.max(wSpan[0], r.span[0]), hi = Math.min(wSpan[1], r.span[1]); return lo < hi ? (lo + hi) / 2 : (wSpan[0] + wSpan[1]) / 2; };
+    // the chosen wall, in blue
+    ctx.save();
+    ctx.strokeStyle = BLUE; ctx.globalAlpha = 0.9;
+    if (ref.wall) {
+      const a = this.h2s(ref.wall.a[0], ref.wall.a[1]), b = this.h2s(ref.wall.b[0], ref.wall.b[1]);
+      ctx.lineCap = "square"; ctx.lineWidth = Math.max(3, this.wallThick(ref.wall) * this.view.k);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    } else {
+      const a = P(ref.pos, ref.span[0]), b = P(ref.pos, ref.span[1]);
+      ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.restore();
+    // the dimension: face to face, with ticks at the faces and the length over the middle
+    const along = at(ref), side = Math.sign(ref.pos - this.wallPos(w)) || 1;
+    const f0 = this.wallPos(w) + side * this.wallThick(w) / 2, f1 = ref.pos - side * ref.face;
+    const a = P(f0, along), b = P(f1, along);
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1, ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+    ctx.save();
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    for (const q of [a, b]) {
+      // a blueprint tick: a short slash across the line, and a stop along the face
+      ctx.beginPath(); ctx.moveTo(q.x - 6 * (ux + uy), q.y - 6 * (uy - ux)); ctx.lineTo(q.x + 6 * (ux + uy), q.y + 6 * (uy - ux)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(q.x - 9 * uy, q.y + 9 * ux); ctx.lineTo(q.x + 9 * uy, q.y - 9 * ux); ctx.stroke();
+    }
+    ctx.restore();
+    label(ctx, L.fmtLen(Math.max(0, Math.abs(f1 - f0))), (a.x + b.x) / 2, (a.y + b.y) / 2 - 8, "#ffffff", col, "center");
+    // numbered tags on every wall it can be measured from
+    for (const r of refs) {
+      // a fifth of the way along it, clear of the dimension line in the middle
+      const lo = Math.max(wSpan[0], r.span[0]), hi = Math.min(wSpan[1], r.span[1]);
+      const q = r.wall ? this.h2s(r.wall.a[0] + (r.wall.b[0] - r.wall.a[0]) * 0.2, r.wall.a[1] + (r.wall.b[1] - r.wall.a[1]) * 0.2)
+        : P(r.pos, lo < hi ? lo + (hi - lo) * 0.2 : r.span[0] + (r.span[1] - r.span[0]) * 0.2);
+      const on = r === ref;
+      ctx.beginPath(); ctx.arc(q.x, q.y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = on ? BLUE : "#1b2027"; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = on ? "#ffffff" : BLUE; ctx.stroke();
+      ctx.fillStyle = "#ffffff"; ctx.font = "600 11px 'IBM Plex Sans', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(String(r.n), q.x, q.y + 0.5);
+      ctx.textBaseline = "alphabetic";
+    }
   }
   // Stairs from above: the treads, and an arrow up (or down) the way they go
   drawStairs(ctx, t, sel, col) {
@@ -1054,6 +1122,15 @@ window.SiteEditor = class SiteEditor {
     this.pointers.set(e.pointerId, p);
     if (this.pointers.size === 2) { const [a, b] = [...this.pointers.values()]; this.drag = { kind: "pinch", dist: Math.hypot(a.x - b.x, a.y - b.y), view: { ...this.view }, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }; return; }
     if (this.tool === "pan" || e.button === 1 || e.button === 2) { this.drag = { kind: "pan", start: p, view: { ...this.view } }; return; }
+    if (this.pickRef && this.sel && this.sel.kind === "wall") {
+      const w = this.shape(this.sel), [x, y] = this.s2h(p), tol = 10 / this.view.k;
+      const hit = w && this.wallRefs(w).find((r) => r.wall ? segDist([x, y], r.wall.a, r.wall.b) <= this.wallThick(r.wall) / 2 + tol
+        : Math.abs((this.vertical(w) ? x : y) - r.pos) <= tol);
+      this.pickRef = false;
+      if (hit) this.wallRef = hit.id; else L.toast("That isn't a wall this one can be measured from: pick one that runs the same way");
+      this.paint();
+      return;
+    }
     const before = this.snapshot();
     // with the Wall tool a drag always draws a new wall (from another's end, say); ends are
     // adjusted with Select

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.29
+
+- **Measuring walls, like a blueprint:** a picked wall's "How far from" list says where each wall
+  is and how far, nearest first, numbered to match tags on the plan. The chosen wall shows in
+  blue with a dimension line from face to face. **Pick on the plan** chooses one by tapping it.
+
 ## 0.3.0-dev.28
 
 - **Stairs on both levels:** stairs drawn on one level show on the plan of the level they lead
