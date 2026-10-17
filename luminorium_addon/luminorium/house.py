@@ -541,6 +541,8 @@ class HouseService:
                 {"id": str(e.get("id") or "")[:40], "pts": [[_num(p[0]), _num(p[1])] for p in pts]}
             )
         out["edges"] = edges
+        # 2: roof edge lines measured at the eaves (before, by mistake, on the wall's plane)
+        out["edges_v"] = 2 if body.get("edges_v") == 2 else 1
         floor_depth = _num(body.get("floor_depth", FLOOR_DEPTH_M))
         if not 0 <= floor_depth <= 1:
             raise HouseError("a floor is 0-3 ft thick")

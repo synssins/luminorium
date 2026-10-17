@@ -27,6 +27,7 @@ window.FacadeEditor = class FacadeEditor {
     this.saveTimer = null;
     this.F2I = null; this.I2F = null;
     this.root = L.el("div.fc");
+    this.root.editor = this; // for scripted checks
     this.build();
   }
 
@@ -43,10 +44,12 @@ window.FacadeEditor = class FacadeEditor {
       edges: (f.edges || []).map((e) => ({ ...e, pts: e.pts.map((p) => [...p]) })),
       floor_depth: f.floor_depth ?? 0.3048,
       eave: f.eave ?? EAVE_M,
+      edges_v: f.edges_v || 1,
     };
     this.edgeDraft = null;
     this.roofDraft = null;
     this.solve();
+    this.fixOldEdges();
     this.derive();
     if (this.photo && (!this.img || this.img._for !== JSON.stringify(this.photo))) this.loadImage();
     if (!this.doc.door) this.tool = "door";
@@ -256,6 +259,25 @@ window.FacadeEditor = class FacadeEditor {
     return out;
   }
 
+  // Roof edge lines from before 0.3.0-dev.11 were measured on the wall's plane, not the eaves'.
+  // Move them to the eaves, keeping them where they were drawn on the photo.
+  fixOldEdges() {
+    const d = this.doc;
+    if (d.edges_v >= 2) return;
+    if (!d.edges.length) { d.edges_v = 2; return; }
+    if (!this.cam) return;
+    const Y = this.planeOf("edge");
+    for (const e of d.edges) {
+      e.pts = e.pts.map(([X, Z]) => {
+        const i = this.toImage(X, Z, 0);
+        const f = i && this.toFacade(i.x, i.y, Y);
+        return f ? [round3(f.X), round3(f.Z)] : [X, Z];
+      });
+    }
+    d.edges_v = 2;
+    this.scheduleSave();
+  }
+
   // How far back the footprint is at X (along the ground line), or null
   footY(X) {
     const f = this.doc.ground && this.doc.ground.footprint;
@@ -278,9 +300,9 @@ window.FacadeEditor = class FacadeEditor {
 
   // The plane a shape is drawn on (its Y)
   planeOf(kind, s) {
+    if (kind === "edge") return -(this.doc.eave ?? EAVE_M);
     if (!s) return 0;
     if (kind === "block" || kind === "roof") return s.y0 || 0;
-    if (kind === "edge") return -(this.doc.eave ?? EAVE_M);
     if (kind === "opening" || kind === "line") {
       const X = kind === "opening" ? (s.x0 + s.x1) / 2 : (s.x0 + s.x1) / 2;
       const Z = kind === "opening" ? (s.z0 + s.z1) / 2 : s.z;
@@ -474,8 +496,8 @@ window.FacadeEditor = class FacadeEditor {
         return "Where the front steps in or out, tap the ground line to add a bend, and drag it onto the corner in the photo. Drag the ends to tilt the line. Alt-click a bend to take it out.";
       }
       case "edge": return this.edgeDraft
-        ? `${this.edgeDraft.length} point${this.edgeDraft.length === 1 ? "" : "s"}. Tap along the edge; tap the last point again (or press Enter) to finish.`
-        : "Trace the bottom edge of each roof, from one end to the other. Draw one line for each roof level. Only the distance across from end to end counts.";
+        ? "Now tap the other end of the roof edge."
+        : "Tap one end of a roof's bottom edge, then the other end: one line for each roof level. Tap a line to add a bend where the edge isn't straight, and drag its points to fit. Only the distance across counts.";
       case "block": return "Drag a box over each part of the house: from the ground to where the roof starts, wall edge to wall edge. Split levels, garages and the entry are their own blocks.";
       case "roof": return this.roofDraft
         ? `${this.roofDraft.length} corner${this.roofDraft.length === 1 ? "" : "s"}. Tap the next one; tap the first again (or press Enter) to finish. Backspace takes the last one back, Esc stops.`
@@ -551,9 +573,7 @@ window.FacadeEditor = class FacadeEditor {
     } else if (this.tool === "edge") {
       const rl = this.roofline();
       bits.push(eaveField(), rl ? el("span.small", `Roofline ${L.fmtLen(rl.w)} across`) : null);
-      if (this.edgeDraft) bits.push(
-        el("button.btn.small.primary", { type: "button", disabled: this.edgeDraft.length < 2 ? "" : null, on: { click: () => this.finishEdge() } }, "Finish"),
-        el("button.btn.small", { type: "button", on: { click: () => { this.edgeDraft = null; this.paint(); } } }, "Cancel"));
+      if (this.edgeDraft) bits.push(el("button.btn.small", { type: "button", on: { click: () => { this.edgeDraft = null; this.paint(); } } }, "Cancel"));
     } else if (this.tool === "roof") {
       bits.push(eaveField(), el("span.fc-olabel", "Goes back"), el("div.seg", { role: "radiogroup", "aria-label": "How the roof goes back" },
         ROOF_BACKS.map(([k, label]) =>
@@ -916,11 +936,9 @@ window.FacadeEditor = class FacadeEditor {
       const ey = this.planeOf("edge");
       const pts = this.edgeDraft.map(([X, Z]) => this.f2s(X, Z, ey));
       if (!pts.some((q) => !q)) {
-        ctx.lineWidth = 2.5; ctx.strokeStyle = "#ff5d6c";
-        this.path(ctx, this.hover ? [...pts, this.hover] : pts, false); ctx.stroke();
+        ctx.lineWidth = 2; ctx.strokeStyle = "#ff5d6c"; ctx.setLineDash([6, 5]);
+        this.path(ctx, this.hover ? [...pts, this.hover] : pts, false); ctx.stroke(); ctx.setLineDash([]);
         this.handles(ctx, pts.map((p, i) => ({ id: i, s: p })), "#ff5d6c", false);
-        const last = pts[pts.length - 1];
-        ctx.beginPath(); ctx.arc(last.x, last.y, 11, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
       }
     }
     if (this.measure) {
@@ -1127,11 +1145,7 @@ window.FacadeEditor = class FacadeEditor {
       if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); this.roofDraft = this.roofDraft.slice(0, -1); if (!this.roofDraft.length) this.roofDraft = null; this.paint(); return; }
       if (e.key === "Escape") { this.roofDraft = null; this.paint(); return; }
     }
-    if (this.edgeDraft) {
-      if (e.key === "Enter") { e.preventDefault(); this.finishEdge(); return; }
-      if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); this.edgeDraft = this.edgeDraft.slice(0, -1); if (!this.edgeDraft.length) this.edgeDraft = null; this.paint(); return; }
-      if (e.key === "Escape") { this.edgeDraft = null; this.paint(); return; }
-    }
+    if (this.edgeDraft && ["Escape", "Backspace", "Delete"].includes(e.key)) { e.preventDefault(); this.edgeDraft = null; this.paint(); return; }
     if (this.groundDraft && e.key === "Escape") { this.groundDraft = null; this.paint(); return; }
     if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); this.remove(); return; }
     if (e.key === "Escape") { this.sel = null; this.drag = null; this.measure = null; this.paint(); return; }
@@ -1216,6 +1230,19 @@ window.FacadeEditor = class FacadeEditor {
     }
     const before = this.snapshot();
     // the door's corners can be dragged with the door tool or Select
+    // Roof edge lines' points can be dragged with their tool too
+    if (this.tool === "edge" && !this.edgeDraft) {
+      const Y = this.planeOf("edge");
+      for (const ln of this.doc.edges) {
+        const i = ln.pts.findIndex(([X, Z]) => { const q = this.f2s(X, Z, Y); return q && Math.hypot(q.x - p.x, q.y - p.y) <= 11; });
+        if (i < 0) continue;
+        const hit = { kind: "edge", id: ln.id, handle: { id: i } };
+        if (e.altKey) { this.removePoint(hit, before); return; }
+        this.sel = { kind: "edge", id: ln.id };
+        this.drag = { kind: "handle", hit, before, start: p, cur: p };
+        return;
+      }
+    }
     // The ground line's points can be dragged with the ground tool too
     if (this.tool === "ground" && this.doc.ground && this.doc.ground.pts) {
       const hit = this.hitTest(p);
@@ -1457,13 +1484,26 @@ window.FacadeEditor = class FacadeEditor {
       }
       if (d.tool === "edge") {
         const Y = this.planeOf("edge");
-        const draft = this.edgeDraft || [];
-        const last = draft.length ? this.f2s(draft[draft.length - 1][0], draft[draft.length - 1][1], Y) : null;
-        if (last && draft.length >= 2 && Math.hypot(last.x - p.x, last.y - p.y) <= 12) { this.finishEdge(); return; }
         const fe = this.s2f(p, Y);
         if (!fe) return;
-        this.edgeDraft = [...draft, [fe.X, fe.Z]];
-        this.paint();
+        if (!this.edgeDraft) {
+          // a tap on a line adds a bend there
+          for (const e of this.doc.edges) {
+            const at = this.nearPolyline(p, e.pts.map(([X, Z]) => this.f2s(X, Z, Y)), 10);
+            if (at) {
+              e.pts.splice(at.i + 1, 0, [fe.X, fe.Z]);
+              this.sel = { kind: "edge", id: e.id };
+              this.commit(d.before);
+              return;
+            }
+          }
+          this.edgeDraft = [[fe.X, fe.Z]];
+          this.paint();
+          return;
+        }
+        // the second tap: the line is done
+        this.edgeDraft = [...this.edgeDraft, [fe.X, fe.Z]];
+        this.finishEdge();
         return;
       }
       if (d.tool === "roof") {

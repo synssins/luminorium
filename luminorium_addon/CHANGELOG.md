@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.11
+
+- **Roof edge lines fixed:** they were measured on the wall while being drawn, then shown at the
+  eaves, so a finished line jumped up and came out longer, and the roofline read about 4% too
+  long. Lines drawn before are moved to the eaves, staying where they were drawn on the photo.
+- **Roof edge lines are two taps:** one end, then the other. Tap a line to add a bend where the
+  edge isn't straight, and drag its points to fit.
+
 ## 0.3.0-dev.10
 
 - **Things to check:** the House map lists, in plain words, numbers that don't agree and what's
