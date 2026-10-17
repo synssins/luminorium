@@ -361,28 +361,38 @@
   // ---- things to check --------------------------------------------------------------------------
 
   ui.checksOpen = L.store("house.checksOpen", false);
-  function checksCard() {
+  // Things to check: an alert triangle in the top bar, with how many; a tap opens the list
+  ui.checksOpen = false;
+  function checksButton() {
     const list = [...(house.checks || []), ...(facade ? facade.checks() : [])];
     if (!list.length) return null;
     const warns = list.filter((c) => c.level === "warn").length;
     const TAB = { photo: ["photo", "Front photo"], top: ["top", "Top view"], floors: [null, "Floors & size"] };
-    const first = list.find((c) => c.level === "warn") || list[0];
     const go = (tab) => {
+      ui.checksOpen = false;
       if (tab === "floors") { ui.settings = true; paint(); return; }
       ui.view = TAB[tab][0]; L.save("house.view", ui.view); paint();
     };
-    return el("section.card", { "aria-label": "Things to check", style: { padding: "12px 16px", gap: "8px", borderColor: warns ? "var(--warn-line)" : "var(--line)" } },
-      el("button", { type: "button", "aria-expanded": String(ui.checksOpen), on: { click: () => { ui.checksOpen = !ui.checksOpen; L.save("house.checksOpen", ui.checksOpen); paint(); } },
-        style: { display: "flex", alignItems: "center", gap: "8px", border: "0", background: "none", color: "var(--text)", padding: "0", cursor: "pointer", font: "inherit", textAlign: "left" } },
-        el("span", { style: { display: "inline-flex", transform: ui.checksOpen ? "rotate(90deg)" : "none", transition: "transform .15s" } }, icon("chev", 14)),
-        el("b", { style: { flex: "none" } }, warns ? `${warns} thing${warns === 1 ? "" : "s"} to check` : "Notes"),
-        ui.checksOpen ? el("span.small.muted", list.length > warns ? `· ${list.length - warns} note${list.length - warns === 1 ? "" : "s"}` : "")
-          : el("span.small.muted", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: "0" } }, `· ${first.text}`)),
-      ui.checksOpen ? list.map((c) => el("div.row", { style: { gap: "10px", alignItems: "flex-start" } },
-        el("span", { "aria-hidden": "true", style: { width: "10px", height: "10px", borderRadius: "50%", marginTop: "6px", flex: "none", background: c.level === "warn" ? "var(--warn, #e0a030)" : "var(--info, #5aa9e6)" } }),
-        el("span", { style: { flex: "1" } }, c.text),
-        TAB[c.tab] ? el("button.btn.small", { type: "button", on: { click: () => go(c.tab) } }, `Show me`) : null)) : null);
+    const label = warns ? `${warns} thing${warns === 1 ? "" : "s"} to check` : `${list.length} note${list.length === 1 ? "" : "s"}`;
+    const NS = "http://www.w3.org/2000/svg";
+    const tri = document.createElementNS(NS, "svg");
+    tri.setAttribute("viewBox", "0 0 24 24"); tri.setAttribute("width", "18"); tri.setAttribute("height", "18"); tri.setAttribute("aria-hidden", "true");
+    tri.innerHTML = '<path d="M12 3L2 21h20z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v5M12 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+    const wrap = el("span.alert-wrap");
+    wrap.append(
+      el("button", { type: "button", class: `alert-btn${warns ? " warn" : ""}`, title: label, "aria-label": label, "aria-expanded": String(ui.checksOpen),
+        on: { click: (e) => { e.stopPropagation(); ui.checksOpen = !ui.checksOpen; paint(); } } },
+        tri, el("span.alert-n", String(warns || list.length))),
+      ui.checksOpen ? el("div.alert-pop", { role: "dialog", "aria-label": "Things to check", on: { click: (e) => e.stopPropagation() } },
+        el("b", label),
+        list.map((c) => el("div.row", { style: { gap: "10px", alignItems: "flex-start", flexWrap: "nowrap" } },
+          el("span", { "aria-hidden": "true", style: { width: "10px", height: "10px", borderRadius: "50%", marginTop: "6px", flex: "none", background: c.level === "warn" ? "var(--warn, #e0a030)" : "var(--info, #5aa9e6)" } }),
+          el("span", { style: { flex: "1" } }, c.text),
+          TAB[c.tab] ? el("button.btn.small", { type: "button", on: { click: () => go(c.tab) } }, "Show me") : null))) : null);
+    return wrap;
   }
+  // a tap anywhere else closes the list
+  document.addEventListener("click", () => { if (ui.checksOpen) { ui.checksOpen = false; paint(); } });
 
   // ---- panels ---------------------------------------------------------------------------------
 
@@ -577,7 +587,7 @@
   function paintPage() {
     const placed = house.targets.filter((t) => t.placed).length;
     const extra = L.topExtra();
-    extra.replaceChildren(el("span.small.muted", `${placed} of ${house.targets.length} placed`),
+    extra.replaceChildren(checksButton(), el("span.small.muted", `${placed} of ${house.targets.length} placed`),
       el("button.btn.small", { type: "button", "aria-expanded": String(ui.settings), on: { click: () => { ui.settings = !ui.settings; paint(); } } }, "Floors & size"));
     const floorTabs = el("div.chips", { role: "group", "aria-label": "Floor shown" },
       [...house.floors.map((f) => [f.id, f.name]), [house.outside, "Outside"]].map(([id, name]) =>
@@ -614,7 +624,6 @@
     }
     inspBox = inspector();
     L.set(page,
-      checksCard(),
       settingsPanel(),
       // the photo editors have their own panel: give the photo the room
       el("div", { class: ui.view === "3d" ? "hm" : "hm hm-editor" },

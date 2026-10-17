@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0-dev.19
+
+- **Things to check moved to the top bar:** an alert triangle with how many; tap it for the
+  list. The view gets the space back.
+
 ## 0.3.0-dev.18
 
 - **View cube** at the top right of the 3D view, with X, Y and Z: click a face, an edge or a

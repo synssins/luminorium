@@ -205,7 +205,7 @@ line runs from the light to a ring where the beam lands; from above, to a crossh
 `HouseService.checks()` (in `GET /api/house` as `checks`) and the front photo's own
 (`FacadeEditor.checks()`) are plain arithmetic: numbers that should agree and don't, and things
 being guessed. Each has a `level` (`warn` or `info`), a `tab` to show (`photo`, `top`, `floors`)
-and a sentence. The page lists them above the views (**Things to check**), each with **Show me**.
+and a sentence. The page shows them as an alert triangle in the top bar with how many (amber for things to check, blue for notes only); a tap lists them, each with **Show me**.
 
 | Check | When |
 |---|---|

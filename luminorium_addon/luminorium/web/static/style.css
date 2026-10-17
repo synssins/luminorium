@@ -306,6 +306,17 @@ a.tile:hover { border-color: var(--line2); text-decoration: none; }
   .hm { grid-template-columns: minmax(0, 1fr); grid-template-areas: "views" "insp" "list"; }
 }
 
+/* ---- house map: things to check, in the top bar ---- */
+.alert-wrap { position: relative; display: inline-flex; }
+.alert-btn { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 10px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card2); color: var(--info, #5aa9e6); cursor: pointer; font: inherit; }
+.alert-btn.warn { color: var(--warn, #e0a030); border-color: var(--warn-line, var(--line)); }
+.alert-btn:hover { background: var(--card); }
+.alert-n { font: 600 13px var(--mono); }
+.alert-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; width: min(440px, 90vw); max-height: 60vh; overflow: auto;
+  display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--card); box-shadow: 0 12px 32px rgba(0,0,0,.35); color: var(--text); font-size: 14px; }
+
 /* ---- palettes: the animation preview ---- */
 .anim-preview { height: 18px; border-radius: 9px; overflow: hidden; background: var(--field); }
 .anim-run { height: 100%; background-size: 300% 100%; animation: anim-run 8s linear infinite; }
