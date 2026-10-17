@@ -121,6 +121,7 @@ window.House3D = class House3D {
     // things to draw back to front
     const items = [];
     // the house drawn on the front photo: see-through walls and roofs, windows on the front
+    if (s.top) this.topView(items, P, col);
     if (s.massing) this.massing(items, P, col);
     // else the house volume: outline from the lowest floor to the top of the highest
     const box = s.massing ? [] : [[0, 0], [s.W, 0], [s.W, s.D], [0, s.D]];
@@ -149,6 +150,7 @@ window.House3D = class House3D {
     for (const l of s.lights) {
       const top = P(l.x, l.y, l.z), base = P(l.x, l.y, l.floorZ);
       if (!top) continue;
+      if (l.aim && !l.dim) this.beam(items, P, l);
       for (const p of l.parts) {
         const pp = P(p.x, p.y, p.z);
         if (pp) items.push({ depth: pp.depth, draw: () => this.dot(pp, Math.max(2.5, 0.09 * pp.scale), p.sel ? col.accent : col.info, l.dim) });
@@ -246,6 +248,80 @@ window.House3D = class House3D {
       const y = (blk ? blk.y0 || 0 : 0) - 0.02;
       face([[o.x0, y, o.z0], [o.x1, y, o.z0], [o.x1, y, o.z1], [o.x0, y, o.z1]], GLASS, o.kind === "window" ? 0.22 : 0.14, 0.9);
     }
+  }
+
+  // The top view's drawing: the yard on the ground, the outside walls, each level's walls
+  topView(items, P, col) {
+    const t = this.scene.top;
+    const COLORS = { path: "#c9c2b4", driveway: "#9aa0a6", patio: "#d4a373", pool: "#4cc3f0", bed: "#8d6e4f", lawn: "#6fbf73", tree: "#3f9d4a", bush: "#7cc576", other: "#b0b8c4" };
+    const ground = (pts, color, alpha) => { const q = pts.map(([x, y]) => P(x, y, 0.01)); if (q.every(Boolean)) this.poly(q, color, alpha, color, 0.8); };
+    // flat things first, drawn straight onto the ground
+    for (const y of t.yard) {
+      const c = COLORS[y.kind] || "#b0b8c4";
+      if (y.c) continue;
+      if (y.kind === "path") {
+        const q = y.pts.map(([x, yy]) => P(x, yy, 0.01));
+        if (q.every(Boolean)) for (let i = 0; i + 1 < q.length; i++) this.line(q[i], q[i + 1], hexA(c, 0.8), Math.max(2, (y.width ?? 1.2) * q[i].scale * 0.9));
+      } else ground(y.pts, c, y.kind === "pool" ? 0.45 : 0.3);
+    }
+    for (const y of t.yard) {
+      if (!y.c) continue;
+      const c = COLORS[y.kind];
+      const ring = (z, r) => Array.from({ length: 16 }, (_, i) => [y.c[0] + Math.cos(i / 16 * Math.PI * 2) * r, y.c[1] + Math.sin(i / 16 * Math.PI * 2) * r, z]);
+      const h = y.h ?? (y.kind === "tree" ? Math.max(3, y.r * 1.6) : Math.max(0.6, y.r));
+      const trunk = [P(y.c[0], y.c[1], 0), P(y.c[0], y.c[1], h * 0.45)];
+      items.push({ depth: depthOf(trunk[0], trunk[1]), draw: () => { if (y.kind === "tree") this.line(trunk[0], trunk[1], "#8d6e4f", 2); } });
+      for (const z of [h * (y.kind === "tree" ? 0.55 : 0.2), h * 0.8]) {
+        const q = ring(z, y.r * (z === h * 0.8 ? 0.7 : 1)).map(([a, b, cz]) => P(a, b, cz));
+        items.push({ depth: avgDepth(q), draw: () => this.poly(q, c, 0.18, c, 0.6) });
+      }
+    }
+    // the outside walls from above: an outline on the ground (the blocks show the walls)
+    if (t.plan) {
+      const q = t.plan.map(([x, y]) => P(x, y, 0.02));
+      if (q.every(Boolean)) items.push({ depth: avgDepth(q) + 0.05, draw: () => this.poly(q, col.card2, 0, "#dce2ea", 0.7) });
+    }
+    // interior walls: a see-through panel from each level's floor to its ceiling
+    const levels = new Map(this.scene.floors.map((f) => [f.id, f]));
+    for (const w of t.walls) {
+      const f = levels.get(w.level);
+      if (!f) continue;
+      const z0 = f.elevation, z1 = f.elevation + f.ceiling;
+      const q = [P(w.a[0], w.a[1], z0), P(w.b[0], w.b[1], z0), P(w.b[0], w.b[1], z1), P(w.a[0], w.a[1], z1)];
+      const active = f.active;
+      items.push({ depth: avgDepth(q), draw: () => this.poly(q, "#dce2ea", active ? 0.14 : 0.05, "#dce2ea", active ? 0.6 : 0.2) });
+    }
+  }
+
+  // A light's beam: a faint cone from the light the way it points
+  beam(items, P, l) {
+    const a = l.aim;
+    const h = (a.heading || 0) * Math.PI / 180, t = (a.tilt || 0) * Math.PI / 180;
+    const dir = [-Math.sin(h) * Math.cos(t), -Math.cos(h) * Math.cos(t), Math.sin(t)];
+    // two directions square to it, for the cone's rim
+    const up = Math.abs(dir[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
+    const cr = (u, v) => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const nrm = (v) => { const n = Math.hypot(...v) || 1; return v.map((c) => c / n); };
+    const e1 = nrm(cr(dir, up)), e2 = nrm(cr(dir, e1));
+    const len = 2.5, half = Math.min(75, a.beam / 2) * Math.PI / 180, r = Math.tan(half) * len;
+    const rim = Array.from({ length: 18 }, (_, i) => {
+      const k = (i / 18) * Math.PI * 2, c = Math.cos(k) * r, s = Math.sin(k) * r;
+      return P(l.x + dir[0] * len + e1[0] * c + e2[0] * s, l.y + dir[1] * len + e1[1] * c + e2[1] * s, l.z + dir[2] * len + e1[2] * c + e2[2] * s);
+    });
+    const apex = P(l.x, l.y, l.z);
+    if (!apex || rim.some((q) => !q)) return;
+    const color = l.sel ? "#ff8a3d" : "#f5c25a";
+    items.push({ depth: avgDepth(rim) + 0.1, draw: () => {
+      const ctx = this.ctx;
+      ctx.save(); ctx.globalAlpha = l.sel ? 0.22 : 0.12; ctx.fillStyle = color;
+      for (let i = 0; i < rim.length; i++) { const b = rim[i], c = rim[(i + 1) % rim.length]; ctx.beginPath(); ctx.moveTo(apex.x, apex.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.closePath(); ctx.fill(); }
+      ctx.globalAlpha = l.sel ? 0.8 : 0.4; ctx.strokeStyle = color; ctx.lineWidth = 1;
+      ctx.beginPath(); rim.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.closePath(); ctx.stroke();
+      // the middle of the beam
+      const mid = P(l.x + dir[0] * len, l.y + dir[1] * len, l.z + dir[2] * len);
+      if (mid) { ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(apex.x, apex.y); ctx.lineTo(mid.x, mid.y); ctx.stroke(); }
+      ctx.restore();
+    } });
   }
 
   line(a, b, color, width = 1, dash = []) {

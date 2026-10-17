@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.0-dev.9
+
+- **Top view.** Add a satellite or drone photo from above (a map screenshot works):
+  - **Square up:** drag along any straight wall or roof edge; **Turn** until the street is at
+    the bottom.
+  - **Scale from the roofline:** trace the front roof edge end to end; the front photo's
+    roofline sets the scale (or type the length). **Check front to back** with a second line
+    and a known length: a disagreement over 3% is pointed out.
+  - **Roof outline:** trace it; the outside walls are drawn the eaves' depth inside it, as
+    thick as their build (2x4, 2x6 or 2x8), and set how deep the house is.
+- **Yard:** paths (with a width), driveways, patios, pools, garden beds and lawns (straight or
+  curved), trees and bushes (round, with a height). Shown on the ground in 3D.
+- **Floor plans:** draw a level's walls (kept square to the house), then type how far each is
+  from an outside wall or another wall, face to face; walls are 2x4, 2x6 or 2x8 with drywall or
+  plaster. Doorways and room names (tied to Home Assistant's areas). Walls show in 3D.
+- **Aim lights:** a light can be a flood, a spot, a half (wall light) or all around. From
+  above, drag its arrow to point it and the edge of its beam to widen it; tilt it from
+  straight down to straight up. Its beam shows as a cone in 3D.
+- **Place lights from above**, on a level or outside.
+
 ## 0.3.0-dev.8
 
 - **Front photo, measured properly off the door's plane.** The camera is worked out from the

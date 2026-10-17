@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import house_site
+from .house_site import SiteError
 from .inventory.model import Inventory, Kind, Light
 from .store import JsonStore
 
@@ -32,6 +34,8 @@ DOOR_H_M = 2.032
 ROOF_BACKS = ("extrude", "ridge", "shed")
 OPENINGS = ("window", "door", "garage")
 PHOTO_MAX_BYTES = 15 * 1024 * 1024
+# Lights that point somewhere, and their usual beam width (degrees)
+AIM_KINDS = {"flood": 90, "spot": 25, "wall": 180}
 # Soffits stick out about 24" past the walls on most houses
 EAVE_M = 0.6096
 # Joists and subfloor between a ceiling and the floor above it: about 12"
@@ -271,6 +275,29 @@ class HouseService:
             return round(max(0.0, self.ceiling(floor) - m["below_ceiling"]), 2)
         return float(m["h"])
 
+    def set_aim(self, tid: str, aim: dict | None) -> dict:
+        """Where a light points. kind: flood, spot or wall (a half dome); beam: its width in
+        degrees; tilt: -90 (straight down) to 90 (straight up); heading: degrees clockwise seen
+        from above, 0 facing the street. None: it lights all around (nothing to aim)."""
+        self._check_target(tid)
+        item = self.data["items"].get(tid)
+        if item is None:
+            raise HouseError("place the light first")
+        if not aim:
+            item.pop("aim", None)
+        else:
+            kind = aim.get("kind")
+            if kind not in AIM_KINDS:
+                raise HouseError(f"unknown beam {kind}")
+            beam = _num(aim.get("beam", AIM_KINDS[kind]))
+            tilt = _num(aim.get("tilt", 0))
+            heading = _num(aim.get("heading", 0)) % 360
+            if not 2 <= beam <= 180 or not -90 <= tilt <= 90:
+                raise HouseError("a beam is 2-180° wide, tilted -90° to 90°")
+            item["aim"] = {"kind": kind, "beam": beam, "tilt": tilt, "heading": round(heading, 1)}
+        self._save()
+        return item
+
     def remove(self, tid: str) -> None:
         if self.data["items"].pop(tid, None) is None:
             raise KeyError(tid)
@@ -379,26 +406,82 @@ class HouseService:
     # house coordinates. Drawing house blocks sets the house width; floor lines set each floor's
     # height and span.
 
-    def photo_path(self) -> Path:
-        return self.store.directory / "house_front.img"
+    def photo_path(self, which: str = "front") -> Path:
+        return self.store.directory / ("house_top.img" if which == "top" else "house_front.img")
 
-    def set_photo(self, data: bytes, width: int, height: int) -> dict:
+    def set_photo(self, data: bytes, width: int, height: int, which: str = "front") -> dict:
         if not data or len(data) > PHOTO_MAX_BYTES:
             raise HouseError("the photo must be under 15 MB")
         if photo_type(data) is None:
             raise HouseError("the photo must be a JPEG, PNG or WebP image")
         if not (16 <= width <= 20000 and 16 <= height <= 20000):
             raise HouseError("bad photo size")
-        path = self.photo_path()
+        path = self.photo_path(which)
         tmp = path.with_suffix(".tmp")
         tmp.write_bytes(data)
         tmp.replace(path)
+        if which == "top":
+            site = self.data.get("site") or {}
+            # A new photo needs squaring up and scaling again; the drawing (in metres) is kept
+            for key in ("xf", "square", "ref", "check"):
+                site.pop(key, None)
+            site["photo"] = {"w": int(width), "h": int(height)}
+            self.data["site"] = site
+            self._save()
+            return site
         facade = self.data.get("facade") or {}
         # A new photo needs the door marked again; the drawing is in metres, so it's kept
         facade.update({"photo": {"w": int(width), "h": int(height)}, "door": None})
         self.data["facade"] = facade
         self._save()
         return facade
+
+    # ---- the top view ----------------------------------------------------------------------
+
+    def set_site(self, body: dict) -> dict:
+        """Save the top view (placement, roof outline, yard, floor plans) and apply it: the plan
+        sets how deep the house is."""
+        site = self.data.get("site") or {}
+        inv: Inventory = self.inventory.inventory
+        try:
+            out = house_site.clean_site(body, site.get("photo"), set(self.floors()), set(inv.areas))
+        except SiteError as err:
+            raise HouseError(str(err)) from err
+        self.data["site"] = out
+        plan = self.plan()
+        if plan:
+            back = max(p[1] for p in plan)
+            if back > 1:
+                self.data["size"]["depth"] = round(min(200.0, back), 3)
+        self._save()
+        return out
+
+    def clear_site(self) -> None:
+        self.photo_path("top").unlink(missing_ok=True)
+        self.data["site"] = None
+        self._save()
+
+    def plan(self) -> list[list[float]] | None:
+        """The outside walls: the roof outline on the top view, less the eaves."""
+        site = self.data.get("site") or {}
+        eave = (self.data.get("facade") or {}).get("eave", EAVE_M)
+        return house_site.plan_of(site, eave)
+
+    def top(self) -> dict | None:
+        """The top view's drawing as the 3D view and the page use it."""
+        site = self.data.get("site")
+        if not site:
+            return None
+        ext = site.get("ext_wall", "2x6")
+        return {
+            "plan": self.plan(),
+            "outline": site.get("outline"),
+            "ext_thick": round(house_site.exterior_thickness(ext), 4),
+            "yard": site.get("yard") or [],
+            "walls": house_site.walls_3d(site),
+            "doors": site.get("doors") or [],
+            "rooms": site.get("rooms") or [],
+        }
 
     def clear_facade(self) -> None:
         self.photo_path().unlink(missing_ok=True)
@@ -635,6 +718,17 @@ class HouseService:
             return None
         ox, gz = self.facade_origin()
         depth = self.data["size"]["depth"]
+        plan = self.plan()
+
+        def depth_of(b: dict) -> float:
+            # a block without its own depth goes back as far as the plan does over its width
+            if "depth" in b:
+                return b["depth"]
+            if plan:
+                span = house_site.depth_over(plan, b["x0"] - ox, b["x1"] - ox)
+                if span and span[1] - b.get("y0", 0.0) > 0.5:
+                    return round(span[1] - b.get("y0", 0.0), 3)
+            return depth
 
         def world(r: dict) -> dict:
             return {
@@ -650,7 +744,7 @@ class HouseService:
                 "name": b.get("name", ""),
                 **world(b),
                 "y0": b.get("y0", 0.0),
-                "depth": b.get("depth", depth),
+                "depth": depth_of(b),
             }
             if b.get("below"):
                 # It goes on into the ground (a basement): its bottom is that far under its
@@ -730,6 +824,8 @@ class HouseService:
             "lights": self.data["items"],
             "facade": self.data.get("facade"),
             "massing": self.massing(),
+            "site": self.data.get("site"),
+            "top": self.top(),
         }
 
     def _save(self) -> None:

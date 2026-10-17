@@ -509,3 +509,76 @@ async def test_recess_ground_line_roof_edges_and_spaces(client, lum):
         assert (await client.put("/api/house/facade", json=broken)).status_code == 400
     # A light under the eaves
     assert any(mt["id"] == "soffit" for mt in view["mounts"])
+
+
+async def test_top_view_walls_yard_and_plans(client, lum):
+    r = await client.put("/api/house/photo?which=top&w=1600&h=1200", content=JPEG)
+    assert r.json()["photo"] == {"w": 1600, "h": 1200}
+    assert (await client.get("/api/house/photo?which=top")).content == JPEG
+    body = {
+        "xf": {"s": 0.05, "theta": 0.35, "tx": -20, "ty": 30},
+        "square": {"a": [500, 800], "b": [782, 903], "runs": "across"},
+        "ref": {"pts": [[500, 800], [782, 903]]},
+        "check": {"pts": [[782, 903], [853, 707]], "length": 10.4},
+        # the roof: 15 m across, 10.4 m deep, its front edge 24" out from the wall
+        "outline": [[0, -0.6096], [15, -0.6096], [15, 9.7904], [0, 9.7904]],
+        "ext_wall": "2x6",
+        "yard": [
+            {"id": "d", "kind": "driveway", "pts": [[9, -1], [14, -1], [14, -9]]},
+            {"id": "t", "kind": "tree", "c": [-4, -5], "r": 2.5, "h": 7},
+            {"id": "p", "kind": "path", "pts": [[4, -0.3], [4, -9]], "smooth": True, "width": 1},
+        ],
+        "walls": [
+            {
+                "id": "w",
+                "level": "main_level",
+                "a": [5, 0.5],
+                "b": [5, 8],
+                "studs": "2x8",
+                "finish": "plaster",
+            }
+        ],
+        "doors": [{"id": "dr", "wall": "w", "at": 3, "width": 0.8128}],
+        "rooms": [
+            {"id": "r", "level": "main_level", "at": [2.5, 4], "area": "kitchen", "name": "Kitchen"}
+        ],
+    }
+    view = (await client.put("/api/house/site", json=body)).json()
+    top = view["top"]
+    # the walls are the eaves' depth (24") inside the roof outline
+    assert top["plan"][0] == pytest.approx([0.6096, 0], abs=1e-3)
+    assert top["plan"][2] == pytest.approx([14.3904, 9.1808], abs=1e-3)
+    assert view["size"]["depth"] == pytest.approx(9.181, abs=1e-3)
+    assert top["walls"][0]["thick"] == pytest.approx(0.1842 + 2 * 0.01905, abs=1e-4)
+    assert top["ext_thick"] == pytest.approx(0.1397 + 0.0127 + 0.0111 + 0.019, abs=1e-4)
+    assert [y["kind"] for y in top["yard"]] == ["driveway", "tree", "path"]
+    for broken in (
+        {**body, "yard": [{"kind": "volcano", "pts": [[0, 0], [1, 0], [1, 1]]}]},
+        {**body, "walls": [{**body["walls"][0], "level": "attic"}]},
+        {**body, "walls": [{**body["walls"][0], "studs": "2x12"}]},
+        {**body, "doors": [{"wall": "nowhere", "at": 1}]},
+        {**body, "rooms": [{**body["rooms"][0], "area": "mars"}]},
+        {**body, "square": {**body["square"], "runs": "diagonal"}},
+    ):
+        assert (await client.put("/api/house/site", json=broken)).status_code == 400
+    # A new top photo keeps the drawing but needs placing again
+    r = await client.put("/api/house/photo?which=top&w=800&h=600", content=JPEG)
+    assert "xf" not in r.json() and r.json()["outline"]
+    assert (await client.delete("/api/house/site")).json()["site"] is None
+
+
+async def test_aiming_a_light(client, lum):
+    r = await client.put(f"/api/house/items/{PORCH}/aim", json={"kind": "flood"})
+    assert r.status_code == 400  # not placed yet
+    await client.put(f"/api/house/items/{PORCH}", json={"floor": OUTSIDE, "x": 3, "y": -2})
+    r = await client.put(
+        f"/api/house/items/{PORCH}/aim", json={"kind": "spot", "tilt": 80, "heading": -45}
+    )
+    assert r.json()["aim"] == {"kind": "spot", "beam": 25, "tilt": 80, "heading": 315}
+    # Moving it keeps where it points
+    await client.put(f"/api/house/items/{PORCH}", json={"floor": OUTSIDE, "x": 4, "y": -2})
+    assert lum.house.data["items"][PORCH]["aim"]["kind"] == "spot"
+    for bad in ({"kind": "laser"}, {"kind": "flood", "beam": 300}, {"kind": "flood", "tilt": 120}):
+        assert (await client.put(f"/api/house/items/{PORCH}/aim", json=bad)).status_code == 400
+    r = await client.put(f"/api/house/items/{PORCH}/aim", json=None)
+    assert "aim" not in r.json()

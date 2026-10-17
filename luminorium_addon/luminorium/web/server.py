@@ -124,6 +124,7 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         extra_js = (
             f'<script src="static/pages/house3d.js?v={__version__}"></script>\n'
             f'<script src="static/pages/facade.js?v={__version__}"></script>\n'
+            f'<script src="static/pages/site.js?v={__version__}"></script>\n'
             if key == "house"
             else ""
         )
@@ -475,6 +476,11 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
             )
         )
 
+    @app.put("/api/house/items/{target}/aim")
+    async def house_aim(target: str, body: dict | None = None):
+        """Where a flood, spot or wall light points: {kind, beam, tilt, heading}, or null."""
+        return _house_errors(lambda: lum.house.set_aim(target, body or None))
+
     @app.delete("/api/house/items/{target}")
     async def house_remove(target: str):
         _house_errors(lambda: lum.house.remove(target))
@@ -504,16 +510,19 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         return {"placed": n}
 
     @app.put("/api/house/photo")
-    async def house_photo_put(request: Request, w: int = 0, h: int = 0):
-        """The front photo, as image bytes (the page shrinks it to a JPEG first)."""
+    async def house_photo_put(request: Request, w: int = 0, h: int = 0, which: str = "front"):
+        """The front photo (or `which=top`, the top view), as image bytes (the page shrinks it to
+        a JPEG first)."""
+        if which not in ("front", "top"):
+            raise HTTPException(400, "which is front or top")
         data = await request.body()
-        return _house_errors(lambda: lum.house.set_photo(data, w, h))
+        return _house_errors(lambda: lum.house.set_photo(data, w, h, which))
 
     @app.get("/api/house/photo")
-    async def house_photo_get():
-        path = lum.house.photo_path()
+    async def house_photo_get(which: str = "front"):
+        path = lum.house.photo_path("top" if which == "top" else "front")
         if not path.exists():
-            raise HTTPException(404, "no front photo")
+            raise HTTPException(404, "no photo")
         with path.open("rb") as f:
             kind = photo_type(f.read(16)) or "application/octet-stream"
         return FileResponse(path, media_type=kind, headers={"Cache-Control": "no-cache"})
@@ -521,6 +530,16 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
     @app.put("/api/house/facade")
     async def house_facade(body: dict):
         _house_errors(lambda: lum.house.set_facade(body))
+        return lum.house.view()
+
+    @app.put("/api/house/site")
+    async def house_site_put(body: dict):
+        _house_errors(lambda: lum.house.set_site(body))
+        return lum.house.view()
+
+    @app.delete("/api/house/site")
+    async def house_site_clear():
+        lum.house.clear_site()
         return lum.house.view()
 
     @app.delete("/api/house/facade")
