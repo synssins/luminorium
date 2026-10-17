@@ -825,10 +825,11 @@ window.SiteEditor = class SiteEditor {
       this.handles(ctx, pts, color);
     }
     if (this.drag && this.drag.kind === "wallDraw" && this.drag.b) {
-      const a = this.h2s(this.drag.a[0], this.drag.a[1]), b = this.h2s(this.drag.b[0], this.drag.b[1]);
+      const a0 = this.drag.a2 || this.drag.a;
+      const a = this.h2s(a0[0], a0[1]), b = this.h2s(this.drag.b[0], this.drag.b[1]);
       ctx.lineWidth = Math.max(3, (STUD_M[this.opts.studs] + 2 * FINISH_M[this.opts.finish]) * this.view.k); ctx.strokeStyle = "#ff8a3d";
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-      label(ctx, L.fmtLen(Math.hypot(this.drag.b[0] - this.drag.a[0], this.drag.b[1] - this.drag.a[1])), (a.x + b.x) / 2, (a.y + b.y) / 2 - 10, "#fff", col, "center");
+      label(ctx, L.fmtLen(Math.hypot(this.drag.b[0] - a0[0], this.drag.b[1] - a0[1])), (a.x + b.x) / 2, (a.y + b.y) / 2 - 10, "#fff", col, "center");
     }
     if (this.snapMark && this.drag && (this.drag.kind === "wallDraw" || this.drag.kind === "handle")) {
       const q = this.h2s(...this.snapMark);
@@ -1094,7 +1095,7 @@ window.SiteEditor = class SiteEditor {
     if (d.kind === "handle") { this.dragHandle(d.h, p, [x, y]); this.render(); return; }
     if (d.kind === "moveShape") { this.dragShape(d, [x, y]); this.render(); return; }
     if (d.kind === "measure") { this.measure = { a: d.a, b: [x, y], len: Math.hypot(x - d.a[0], y - d.a[1]) }; this.paintOptions(); this.render(); return; }
-    if (d.kind === "wallDraw") { d.b = this.wallEnd(d.a, [x, y], null, e.altKey); this.render(); return; }
+    if (d.kind === "wallDraw") { d.b = this.wallEnd(d.a, [x, y], null, e.altKey); d.a2 = this.shifted(d.a); this.render(); return; }
     if (d.kind === "stairDraw") { d.b = [x, y]; this.render(); return; }
     if (d.kind === "movePlan") {
       const dx = x - d.h0[0], dy = y - d.h0[1];
@@ -1131,7 +1132,8 @@ window.SiteEditor = class SiteEditor {
     if (h.kind === "wall") {
       const other = h.i === 0 ? s.b : s.a;
       const q = this.wallEnd(other, [x, y], s, this.altHeld, s.angled);
-      if (h.i === 0) s.a = q; else s.b = q;
+      const o2 = this.shifted(other); // onto a corner: the other end slides over with it
+      if (h.i === 0) { s.a = q; s.b = o2; } else { s.b = q; s.a = o2; }
     }
   }
   dragShape(d, [x, y]) {
@@ -1201,6 +1203,7 @@ window.SiteEditor = class SiteEditor {
     }
     if (d.kind === "wallDraw") {
       d.b = this.wallEnd(d.a, [x, y], null, e.altKey);
+      d.a = this.shifted(d.a);
       this.snapMark = null;
       if (!d.b || Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1]) < 0.3) return this.render();
       const id = uid();
@@ -1292,6 +1295,8 @@ window.SiteEditor = class SiteEditor {
     if (this.sel && this.sel.kind === "outline" && d.outline) add(d.outline, true);
     else if (this.sel && this.sel.kind === "yard") { const s = this.shape(this.sel); if (s && s.pts) add(s.pts, s.kind !== "path"); }
   }
+  // The start of a wall being drawn, moved over when its end snapped onto a corner (snapShift)
+  shifted(a) { return this.snapShift ? [round3(a[0] + this.snapShift[0]), round3(a[1] + this.snapShift[1])] : a; }
   // Where a wall's end goes, dragged from its other end `a`: square to the house (unless angled),
   // then onto what's near (snapWall)
   wallEnd(a, p, skip, free, angled = this.opts.angled) {
@@ -1303,15 +1308,30 @@ window.SiteEditor = class SiteEditor {
   // the end stays on the line from it. Marks where it snapped (snapMark); `free` (Alt): no snap.
   snapWall([x, y], from, skip, free) {
     this.snapMark = null;
+    this.snapShift = null;
     if (free) return [round3(x), round3(y)];
-    const tol = 12 / this.view.k;
     const walls = this.doc.walls.filter((w) => w.level === this.level && w !== skip);
+    // Zoomed in, a wall is many pixels thick: an end dropped anywhere on another wall's body
+    // (or the new wall's own half-thickness from it) snaps to its centre line, so corners meet
+    const half = Math.max(this.wallThick(this.opts), ...walls.map((w) => this.wallThick(w))) / 2;
+    const tol = Math.max(12 / this.view.k, 2 * half + 6 / this.view.k);
     const inner = this.planInner() || [];
     const pts = [...walls.flatMap((w) => [w.a, w.b]), ...inner];
     const segs = [...walls.map((w) => [w.a, w.b]), ...inner.map((q, i) => [q, inner[(i + 1) % inner.length]])];
     const across = from ? Math.abs(y - from[1]) < 1e-9 : false; // a square wall running across (y stays)
     let best = null;
     const take = (q) => { const d = Math.hypot(q[0] - x, q[1] - y); if (d <= tol && (!best || d < best.d)) best = { q, d }; };
+    // a square wall ending near another wall's end or a corner: it meets it there, the whole wall
+    // sliding sideways that little (snapShift, for its start) so the corner is clean
+    if (from) {
+      // only a slide of up to two wall thicknesses: further off, it's not meant for that corner
+      for (const q of pts) if (Math.abs(across ? q[1] - y : q[0] - x) <= 2 * half) take(q);
+      if (best) {
+        this.snapMark = best.q;
+        this.snapShift = across ? [0, best.q[1] - y] : [best.q[0] - x, 0];
+        return best.q.map(round3);
+      }
+    }
     // ends and corners
     for (const q of pts) {
       if (!from) take(q);

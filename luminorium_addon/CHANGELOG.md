@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.25
+
+- **Walls snap at any zoom:** zoomed in, an end dropped anywhere on another wall's body snaps to
+  its centre line (the snap reach was a fixed 12 pixels, less than a wall's width up close).
+- **Clean corners:** a wall ending near another wall's end, or a corner of the outside walls,
+  slides sideways onto it (by up to two wall thicknesses), so the two meet square instead of one
+  overhanging. Dragging a wall's end onto a corner does the same.
+
 ## 0.3.0-dev.24
 
 - Fixed: the 3D view stopped drawing (no house, no lights, no view cube) once a level had stairs
