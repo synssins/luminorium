@@ -340,11 +340,13 @@ window.SiteEditor = class SiteEditor {
       { id: "light", label: "Place a light", key: "L", icon: "M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z", off: needScale },
       { id: "aim", label: "Aim a light", key: "A", icon: "M12 12l8-5v10zM12 12h-8M4 9v6", off: needScale },
       { id: "measure", label: "Measure", key: "M", icon: "M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2", off: needScale },
+      { id: "across", label: "Measure across", key: "X", icon: "M3 5v14M21 5v14M9 8v8M15 8v8M3 12h18", off: needScale || !this.doc.outline },
     ];
   }
   setTool(id) {
     const t = this.TOOLS().find((x) => x.id === id);
     if (!t || t.off) return;
+    if (id !== "across") this.chain = null;
     this.tool = id;
     this.draft = null;
     this.measure = null;
@@ -398,6 +400,9 @@ window.SiteEditor = class SiteEditor {
         return s.target ? `Tap where ${s.target.name} is (${this.levelName()}${this.level === OUT ? "" : " level"}).` : "Pick a light from the list, then tap where it is.";
       }
       case "aim": return this.sel && this.sel.kind === "light" ? "Tap what it should light (the ground, a tree, a bush) to point it there, or drag the arrow to turn it. Drag the edge of its beam to widen it. Tilt it in the panel." : "Tap a light to aim it.";
+      case "across": return !this.chain || !this.chain.items.length
+        ? `Tap the walls in order straight across the ${this.levelName()} plan, as you measured them: an outside wall first if you can, then each wall in between, then the far wall.`
+        : "Keep tapping walls in order across, then type each tape measurement in the panel.";
       case "measure": return this.measure ? `${fmt(this.measure.len)} · drag again to measure something else` : "Drag from one point to another to measure it.";
       case "pan": return "Drag to move. Scroll or pinch to zoom.";
       default: return "Tap something to pick it; drag it or its handles. Delete removes it.";
@@ -463,7 +468,7 @@ window.SiteEditor = class SiteEditor {
       bits.push(el("div.chips", Object.entries(YARD_LABEL).map(([k, label]) => el("button.chip", { type: "button", "aria-pressed": String(this.opts.yard === k), on: { click: () => { this.opts.yard = k; this.draft = null; this.paint(); } } }, label))));
       if (!["tree", "bush"].includes(this.opts.yard)) bits.push(el("label.check.small", el("input", { type: "checkbox", checked: this.opts.smooth, on: { change: (e) => { this.opts.smooth = e.target.checked; this.render(); } } }), "Curved"));
       if (this.draft) bits.push(el("button.btn.small.primary", { type: "button", on: { click: () => this.finishDraft() } }, "Finish"));
-    } else if (["wall", "door", "room", "stairs"].includes(this.tool)) {
+    } else if (["wall", "door", "room", "stairs", "across"].includes(this.tool)) {
       bits.push(el("span.fc-olabel", "Level"), this.levelChips(false));
       if (this.tool === "wall") {
         bits.push(this.buildSelect(this.opts, (k, v) => { this.opts[k] = v; this.paint(); }),
@@ -504,6 +509,7 @@ window.SiteEditor = class SiteEditor {
     const del = el("button.btn.small.danger", { type: "button", on: { click: () => this.remove() } }, "Delete");
     let body = null;
     if (!this.open()) body = null;
+    else if (this.tool === "across") body = this.chainPanel();
     else if (!s) {
       const err = this.checkError();
       const outer = this.planOuter();
@@ -782,7 +788,7 @@ window.SiteEditor = class SiteEditor {
       if (sel || this.tool === "outline") this.handles(ctx, d.outline, "#c58cf0");
     }
     // the floor plan of the level shown
-    const showPlan = ["wall", "door", "room", "stairs", "select", "light", "aim"].includes(this.tool);
+    const showPlan = ["wall", "door", "room", "stairs", "select", "light", "aim", "across"].includes(this.tool);
     if (showPlan) {
       for (const w of d.walls) {
         if (w.level !== this.level) continue;
@@ -809,7 +815,8 @@ window.SiteEditor = class SiteEditor {
         // stairs from another level that lead here: the same stairs, the other way
         else if (t.to === this.level) this.drawStairs(ctx, stairsSeenFrom(t), isSel("stairs", t.id), col);
       }
-      if (this.sel && this.sel.kind === "wall") this.drawWallDims(ctx, col);
+      if (this.sel && this.sel.kind === "wall" && this.tool !== "across") this.drawWallDims(ctx, col);
+      if (this.tool === "across") this.drawChain(ctx, col);
       for (const r of d.rooms) {
         if (r.level !== this.level) continue;
         const p = this.h2s(r.at[0], r.at[1]);
@@ -881,6 +888,180 @@ window.SiteEditor = class SiteEditor {
       label(ctx, L.fmtLen(this.measure.len), (a.x + b.x) / 2, (a.y + b.y) / 2 - 10, "#fff", col, "center");
     }
     this.scaleBar(ctx);
+  }
+  // ---- Measure across: tape measurements across a level, face to face ---------------------------
+  // A chain is walls tapped in order straight across the plan (all running the same way):
+  // items are {out: "L"|"R"|"F"|"B"} (an outside wall's inside face) or {id} (a wall on the plan);
+  // gaps[i] is the tape measurement from item i's face to item i+1's face.
+  chainPos(it) {
+    if (it.out) { const bb = bbox(this.planInner()); return { L: bb.x0, R: bb.x1, F: bb.y0, B: bb.y1 }[it.out]; }
+    const w = this.doc.walls.find((q) => q.id === it.id);
+    return w ? this.wallPos(w) : null;
+  }
+  chainHalf(it) { if (it.out) return 0; const w = this.doc.walls.find((q) => q.id === it.id); return w ? this.wallThick(w) / 2 : 0; }
+  chainName(it) {
+    if (it.out) return { L: "The left outside wall", R: "The right outside wall", F: "The front outside wall", B: "The back outside wall" }[it.out];
+    return "A wall";
+  }
+  // What the plan has now between each pair, face to face, and across the whole chain
+  chainNow() {
+    const c = this.chain, pos = c.items.map((it) => this.chainPos(it)), half = c.items.map((it) => this.chainHalf(it));
+    const gaps = pos.slice(1).map((v, i) => Math.abs(v - pos[i]) - half[i] - half[i + 1]);
+    const n = pos.length;
+    const span = n > 1 ? Math.abs(pos[n - 1] - pos[0]) - half[0] - half[n - 1] : 0;
+    return { pos, half, gaps, span };
+  }
+  chainTap([x, y]) {
+    const tol = 10 / this.view.k;
+    if (!this.chain) this.chain = { items: [], gaps: [], axis: null, along: null };
+    const c = this.chain;
+    const last = c.items[c.items.length - 1];
+    if (last && last.out && c.items.length > 1) { L.toast("That's the far wall. Clear the chain to start again."); return; }
+    // what was tapped: a wall on this level, else an outside wall's inside face
+    let it = null, axis = null;
+    const w = this.doc.walls.filter((q) => q.level === this.level).find((q) => segDist([x, y], q.a, q.b) <= this.wallThick(q) / 2 + tol);
+    if (w) { it = { id: w.id }; axis = this.vertical(w) ? "x" : "y"; }
+    else {
+      const inner = this.planInner();
+      if (inner) {
+        const bb = bbox(inner);
+        const near = [["L", "x", Math.abs(x - bb.x0)], ["R", "x", Math.abs(x - bb.x1)], ["F", "y", Math.abs(y - bb.y0)], ["B", "y", Math.abs(y - bb.y1)]]
+          .filter(([, , dd]) => dd <= tol + 0.1).sort((a, b) => a[2] - b[2])[0];
+        if (near) { it = { out: near[0] }; axis = near[1]; }
+      }
+    }
+    if (!it) { L.toast("Tap a wall, or the inside of an outside wall"); return; }
+    if (c.axis && axis !== c.axis) { L.toast(c.axis === "y" ? "Pick walls that run across the house: the chain goes front to back" : "Pick walls that run front to back: the chain goes across"); return; }
+    if (c.items.some((q) => (q.id && q.id === it.id) || (q.out && q.out === it.out))) { L.toast("That wall is in the chain already"); return; }
+    // in order: each one further the same way
+    if (c.items.length >= 2) {
+      const pos = c.items.map((q) => this.chainPos(q)), dir = Math.sign(pos[1] - pos[0]), v = this.chainPos(it);
+      if (Math.sign(v - pos[pos.length - 1]) !== dir) { L.toast("Tap them in order, straight across"); return; }
+    }
+    if (!c.items.length) { c.axis = axis; c.along = axis === "x" ? y : x; }
+    if (c.items.length) c.gaps.push(null);
+    c.items.push(it);
+    this.paint();
+  }
+  chainPanel() {
+    const { el } = L;
+    const fmt = L.fmtLen;
+    const c = this.chain;
+    const intro = el("p.small.muted", { style: { margin: 0 } }, "For tape measurements across a level: from the inside face of an outside wall, across each room and hall, to the inside face of the far wall. Tap the walls in that order on the plan, then type each measurement here. Walls in between are taken as their build (2x4 with drywall unless you set one).");
+    if (!c || c.items.length < 2) return el("div.fc-sum", el("h3", "Measure across"), intro,
+      c && c.items.length ? el("span.small", `1 · ${this.chainName(c.items[0])}: now tap the next wall.`) : null);
+    const now = this.chainNow();
+    const rows = [];
+    c.items.forEach((it, i) => {
+      rows.push(el("div.small", { style: { fontWeight: "600" } }, `${i + 1} · ${this.chainName(it)}`));
+      if (i < c.gaps.length) {
+        rows.push(this.lenRow(`Face to face, ${i + 1} to ${i + 2}`, c.gaps[i], (v) => { c.gaps[i] = v; this.paint(); }),
+          el("span.small.muted", `On the plan now: ${fmt(Math.max(0, now.gaps[i]))}`));
+      }
+    });
+    const typed = c.gaps.every((g) => g > 0);
+    const inner = c.items.slice(1, -1).reduce((a, it) => a + 2 * this.chainHalf(it), 0);
+    const measured = typed ? c.gaps.reduce((a, g) => a + g, 0) + inner : null;
+    const ends = c.items[0].out && c.items[c.items.length - 1].out;
+    const off = measured != null ? measured - now.span : null;
+    const bits = [];
+    if (measured != null) {
+      bits.push(el("dl.fc-kv", el("dt", "Your measurements"), el("dd", fmt(measured)), el("dt", "On the plan"), el("dd", fmt(now.span)),
+        el("dt", "Off by"), el("dd", Math.abs(off) < 0.0127 ? "they match" : `${off >= 0 ? "+" : "−"}${fmt(Math.abs(off))}`)));
+      const scale = ends ? this.chainScale(measured, now.span) : null;
+      if (scale && Math.abs(off) > 0.0254) {
+        bits.push(el("p.small", { style: { margin: 0 } }, `The tape says the inside is ${fmt(measured)} ${c.axis === "y" ? "front to back" : "across"}. Rescaling the top view to fit makes the house ${fmt(scale.after)} ${c.axis === "y" ? "deep" : "wide"} outside (now ${fmt(scale.before)}), and the roofline ${fmt(scale.roofline)}${scale.front ? ` (the front photo says ${fmt(scale.front)})` : ""}.`),
+          el("button.btn.small.primary", { type: "button", on: { click: () => this.chainPlace(true) } }, "Rescale to fit, then place the walls"),
+          el("button.btn.small", { type: "button", on: { click: () => this.chainPlace(false) } }, "Place the walls, keep the scale"));
+      } else bits.push(el("button.btn.small.primary", { type: "button", on: { click: () => this.chainPlace(false) } }, "Place the walls"),
+        ends || Math.abs(off) <= 0.0254 ? null : el("span.small.muted", "The last gap takes up the difference: the far wall stays where it is."));
+    }
+    return el("div.fc-sum", el("h3", "Measure across"), ...rows, ...bits,
+      el("button.btn.small", { type: "button", on: { click: () => { this.chain = null; this.paint(); } } }, "Clear and start again"));
+  }
+  // What rescaling the photo would do: the roof outline traced on it scales; the outside walls
+  // are the eaves' depth in from it, and their inside face their thickness in from that
+  chainScale(measured, span) {
+    const ext = (EXT_WALL[this.doc.ext_wall] || EXT_WALL["2x6"]) + this.eave();
+    const f = (measured + 2 * ext) / (span + 2 * ext);
+    const outer = this.planOuter(), bb = outer ? bbox(outer) : null;
+    const front = this.frontRoofline();
+    const ref = this.doc.ref, length = ref && (ref.length || (front && front.w));
+    if (!bb || !length || !(f > 0.5 && f < 2)) return null;
+    const before = this.chain.axis === "y" ? bb.y1 - bb.y0 : bb.x1 - bb.x0;
+    const eave = this.eave();
+    return { f, before, after: (before + 2 * eave) * f - 2 * eave, roofline: length * f, front: front && front.w, length };
+  }
+  // Place the chain's walls at the typed distances from the first one (after rescaling the photo,
+  // when asked). Walls ending on a moved wall move their ends with it, so rooms stay closed.
+  chainPlace(rescale) {
+    const c = this.chain, d = this.doc;
+    const before = this.snapshot();
+    if (rescale) {
+      const now = this.chainNow();
+      const inner = c.items.slice(1, -1).reduce((a, it) => a + 2 * this.chainHalf(it), 0);
+      const sc = this.chainScale(c.gaps.reduce((a, g) => a + g, 0) + inner, now.span);
+      if (!sc) return;
+      const old = d.xf;
+      d.ref.length = round3(sc.length * sc.f);
+      this.place();
+      // the plan's walls, rooms and stairs keep their places on the photo, as the outline does
+      const mv = ([x, y]) => { const [u, v] = this.h2p(x, y, old); return this.p2h(u, v, d.xf).map(round3); };
+      for (const w of d.walls) { w.a = mv(w.a); w.b = mv(w.b); }
+      for (const r of d.rooms) r.at = mv(r.at);
+      for (const t of d.stairs) { const [a, b] = [mv([t.x0, t.y0]), mv([t.x1, t.y1])]; t.x0 = Math.min(a[0], b[0]); t.x1 = Math.max(a[0], b[0]); t.y0 = Math.min(a[1], b[1]); t.y1 = Math.max(a[1], b[1]); }
+    }
+    const i0 = c.axis === "x" ? 0 : 1, i1 = 1 - i0;
+    const pos = c.items.map((it) => this.chainPos(it));
+    const dir = Math.sign(pos[pos.length - 1] - pos[0]) || 1;
+    let face = pos[0] + dir * this.chainHalf(c.items[0]);
+    for (let i = 1; i < c.items.length; i++) {
+      const it = c.items[i];
+      if (it.out) break; // the far outside wall stays put
+      const w = d.walls.find((q) => q.id === it.id);
+      const h = this.wallThick(w) / 2, old = this.wallPos(w), want = round3(face + dir * (c.gaps[i - 1] + h));
+      const lo = Math.min(w.a[i1], w.b[i1]) - 0.05, hi = Math.max(w.a[i1], w.b[i1]) + 0.05;
+      // ends of other walls that met this one
+      for (const o of d.walls) {
+        if (o === w || o.level !== w.level) continue;
+        for (const e of [o.a, o.b]) if (Math.abs(e[i0] - old) < 0.03 && e[i1] >= lo && e[i1] <= hi) e[i0] = want;
+      }
+      w.a[i0] = want; w.b[i0] = want;
+      face = want + dir * h;
+    }
+    this.chain = { ...c, gaps: [...c.gaps] };
+    this.commit(before);
+    L.toast(rescale ? "Rescaled, and the walls are where you measured them" : "The walls are where you measured them");
+  }
+  drawChain(ctx, col) {
+    const c = this.chain;
+    if (!c || !c.items.length || !this.planInner()) return;
+    const P = (pos, along) => (c.axis === "x" ? this.h2s(pos, along) : this.h2s(along, pos));
+    const now = this.chainNow();
+    const dir = c.items.length > 1 ? Math.sign(now.pos[1] - now.pos[0]) || 1 : 1;
+    ctx.save();
+    for (let i = 0; i + 1 < c.items.length; i++) {
+      const f0 = now.pos[i] + dir * now.half[i], f1 = now.pos[i + 1] - dir * now.half[i + 1];
+      const a = P(f0, c.along), b = P(f1, c.along);
+      const len = Math.hypot(b.x - a.x, b.y - a.y) || 1, ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      for (const q of [a, b]) {
+        ctx.beginPath(); ctx.moveTo(q.x - 6 * (ux + uy), q.y - 6 * (uy - ux)); ctx.lineTo(q.x + 6 * (ux + uy), q.y + 6 * (uy - ux)); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(q.x - 9 * uy, q.y + 9 * ux); ctx.lineTo(q.x + 9 * uy, q.y - 9 * ux); ctx.stroke();
+      }
+      const typed = c.gaps[i];
+      label(ctx, typed ? `${L.fmtLen(typed)} (now ${L.fmtLen(Math.max(0, now.gaps[i]))})` : L.fmtLen(Math.max(0, now.gaps[i])), (a.x + b.x) / 2, (a.y + b.y) / 2 - 8, typed ? "#5aa9e6" : "#ffffff", col, "center");
+    }
+    c.items.forEach((it, i) => {
+      const q = P(now.pos[i], c.along);
+      ctx.beginPath(); ctx.arc(q.x, q.y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = "#5aa9e6"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#ffffff"; ctx.stroke();
+      ctx.fillStyle = "#ffffff"; ctx.font = "600 11px 'IBM Plex Sans', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(String(i + 1), q.x, q.y + 0.5);
+      ctx.textBaseline = "alphabetic";
+    });
+    ctx.restore();
   }
   // The picked wall's measuring: a numbered tag on each wall it can be measured from, the chosen
   // one in blue, and a dimension line between the two faces, as on a blueprint
@@ -1144,6 +1325,7 @@ window.SiteEditor = class SiteEditor {
     }
     const [x, y] = this.s2h(p);
     if (this.tool === "square") { this.drag = { kind: "squareDraw", start: p, cur: p, before }; return; }
+    if (this.tool === "across") { this.chainTap([x, y]); return; }
     if (this.tool === "measure") { this.measure = null; this.drag = { kind: "measure", a: [x, y], start: p }; return; }
     if (this.tool === "wall" && this.movePlan) {
       const pick = (list) => list.filter((q) => q.level === this.level).map((q) => ({ q, o: JSON.parse(JSON.stringify(q)) }));

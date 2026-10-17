@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.30
+
+- **Measure across** (Top view): tap the walls in the order you measured them across a level,
+  type each tape measurement (face to face), and **Place the walls** puts each wall where you
+  measured it; walls that met a moved wall follow it. When the chain runs from one outside wall
+  to the other and the total disagrees with the plan, **Rescale to fit** sets the top view's
+  scale from your tape, showing the house's new depth and roofline first.
+
 ## 0.3.0-dev.29
 
 - **Measuring walls, like a blueprint:** a picked wall's "How far from" list says where each wall

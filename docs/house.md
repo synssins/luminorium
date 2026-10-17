@@ -199,6 +199,19 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
     9' 6" away"), with matching numbered tags on the plan; the chosen one is blue, with a
     blueprint dimension (ticks at the two faces, the length over the middle). **Pick on the plan**
     then a tap on a wall chooses it.
+  - **Measure across** (X): tape measurements straight across a level. Tap the walls in the order
+    measured: an outside wall's inside face first if you can, each wall in between, then the far
+    wall (all running the same way, in order). Type each face-to-face measurement in the panel;
+    the plan shows each gap as a blueprint dimension (typed in blue, with what the plan has now).
+    Walls in between count as their build (2x4 with drywall by default). **Place the walls**
+    moves each wall in between to its measured place from the first one (walls ending on a moved
+    wall move their ends with it); the far outside wall stays, so the last gap takes any
+    difference. When both ends are outside walls and the total is off by more than 1", the panel
+    says how deep (or wide) the house would be and what the roofline would become, and offers
+    **Rescale to fit, then place the walls**: it sets the scale line's length so the inside
+    matches the tape (the roof outline, eaves and outside walls included), keeping the outline,
+    yard, walls, rooms and stairs where they are on the photo. That can disagree with the front
+    photo's roofline; the panel shows both.
   - **Doorways:** on a wall, a width and how far from the wall's end.
   - **Rooms:** a name tied to one of Home Assistant's areas.
   In 3D each wall is a see-through panel from its level's floor to its ceiling.
