@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-dev.22
+
+- **Moving blocks in 3D:** drag a block across the ground; **Shift+drag** moves it up and down;
+  red, green and blue arrows at its corner move it across, back or up only; **Move by** takes
+  typed amounts. The distance shows as you drag. **Alt** turns snapping off.
+- Shift with the left button no longer slides the view (the right button and the wheel do).
+
 ## 0.3.0-dev.21
 
 - **Add blocks in 3D:** in Shape, **Add a block** (or beside the picked one). Drag it to move it,

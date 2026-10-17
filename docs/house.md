@@ -275,8 +275,8 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
   down to its floor (lit ones glow); a strip's parts are small dots. Lights on other floors are
   dimmed. The view is drawn by `pages/house3d.js`, a small perspective renderer on a 2D canvas
   (no 3D library to download, so it works offline).
-  - Drag empty space to turn the view; drag with the right button or the wheel (or Shift and the
-    left button, or two fingers) to slide it; scroll or pinch to zoom.
+  - Drag empty space to turn the view; drag with the right button or the wheel (or two fingers) to
+    slide it; scroll or pinch to zoom.
   - **The view cube** (top right) turns with the view, with X (across), Y (back) and Z (up) at its
     corner. Click a face (FRONT, BACK, LEFT, RIGHT, TOP, BOTTOM), an edge or a corner to look from
     there; the view turns smoothly. **⌂** goes back to the usual view and takes the slide away.
@@ -286,8 +286,12 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
     amount, **splits it front to back** (the front part keeps the depth typed; a new block behind
     it, "(back)", takes the rest, with its own top, level and floor), and sets its level and floor.
     **Add a block** (or **Add a block beside it**, flush to the picked one's right side) makes a
-    block in 3D, not on the photo: drag it to move it and its six handles to size it. Faces, and a
-    moved block's sides, snap flush to another block's faces within 6". **Delete** removes it.
+    block in 3D, not on the photo: its six yellow handles size it. To move it: drag the block
+    across the ground (X and Y); Shift+drag it up and down (Z); or drag one of the red (across),
+    green (back) or blue (up) arrows at its front left bottom corner to move it that way only; or
+    type **Move by** across, back and up. The distance moved shows as you drag. Faces, and a moved
+    block's sides, snap flush to another block's faces within 6"; hold Alt to stop snapping.
+    **Delete** removes it.
     `POST /api/house/blocks` `{x0, x1, y0, depth, z0, z1, name?, level?}`, `DELETE
     /api/house/blocks/{id}`,
     `PUT /api/house/blocks/{id}` `{x0?, x1?, z0?, z1?, y0?, depth?, name?, level?, offset?}` and

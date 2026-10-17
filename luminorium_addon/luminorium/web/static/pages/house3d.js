@@ -192,7 +192,7 @@ window.House3D = class House3D {
     this.drawCube(col, W);
     // a hint (the page shows it under the view on narrow screens)
     if (W >= 520) this.text(this.aimMode ? "Aim: click what the light should point at (a wall, the ground, a tree)"
-      : this.mode === "shape" ? "Shape: tap a block, then drag a handle to move that face · right-drag to slide"
+      : this.mode === "shape" ? "Shape: drag a yellow handle to size · drag the block to move it, Shift+drag up and down, or drag an arrow · Alt: no snapping"
       : this.mode === "raise" ? "Raise: drag the picked light up or down" : "Drag to turn · right-drag or wheel-drag to slide · scroll or pinch to zoom · drag the picked light to move it",
       12, H - 12, col.muted, 12, "left");
   }
@@ -235,6 +235,14 @@ window.House3D = class House3D {
       ctx.restore();
       this._handles.push({ ...f, p, q });
     }
+    if (b.behind) this.drawAxes(b);
+    const mv = this.drag && ["blockMove", "blockLift", "axisMove"].includes(this.drag.kind) && this.drag.moved ? this.drag : null;
+    if (mv) {
+      const parts = [["across", mv.dx], ["back", mv.dy], ["up", mv.dz]].filter(([, v]) => Math.abs(v || 0) >= 0.005)
+        .map(([name, v]) => `${name} ${v >= 0 ? "+" : "−"}${L.fmtLen(Math.abs(v))}`);
+      const p = this.project({ x: (b.x0 + b.x1) / 2, y: (b.y0 || 0) + b.depth / 2, z: b.z1 });
+      if (p && parts.length) this.text(parts.join(" · "), p.x + 12, p.y - 14, "#ffd166", 13, "left", true);
+    }
     if (this.drag && this.drag.kind === "face" && this.drag.delta !== undefined) {
       const d = this.drag, p = this.project(d.face.at);
       if (p) {
@@ -242,6 +250,43 @@ window.House3D = class House3D {
         this.text(`${d.face.label} ${sign}${L.fmtLen(Math.abs(d.delta))}`, p.x + 12, p.y - 12, "#ffd166", 13, "left", true);
       }
     }
+  }
+  // Red (across, X), green (back, Y) and blue (up, Z) arrows from the block's front left bottom
+  // corner (away from the face handles in the middle of each face): drag one to move the block
+  // that way only
+  blockAxes(b) {
+    const from = { x: b.x0, y: b.y0 || 0, z: b.z0 };
+    const len = Math.max(0.8, Math.min(1.8, Math.min(b.x1 - b.x0, b.depth, b.z1 - b.z0) * 0.6));
+    return [
+      { name: "across", color: "#ff5d6c", from, axis: { x: 1, y: 0, z: 0 }, len },
+      { name: "back", color: "#7bc47f", from, axis: { x: 0, y: 1, z: 0 }, len },
+      { name: "up", color: "#5aa9e6", from, axis: { x: 0, y: 0, z: 1 }, len },
+    ];
+  }
+  drawAxes(b) {
+    const ctx = this.ctx;
+    this._axes = [];
+    for (const a of this.blockAxes(b)) {
+      const p = this.project(a.from), q = this.project(add(a.from, scale(a.axis, a.len)));
+      if (!p || !q) continue;
+      const active = this.drag && this.drag.kind === "axisMove" && this.drag.axis.name === a.name;
+      ctx.save(); ctx.strokeStyle = a.color; ctx.fillStyle = a.color; ctx.lineWidth = active ? 4 : 3;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+      const ang = Math.atan2(q.y - p.y, q.x - p.x);
+      ctx.beginPath(); ctx.moveTo(q.x + 4 * Math.cos(ang), q.y + 4 * Math.sin(ang));
+      ctx.lineTo(q.x - 10 * Math.cos(ang - 0.45), q.y - 10 * Math.sin(ang - 0.45)); ctx.lineTo(q.x - 10 * Math.cos(ang + 0.45), q.y - 10 * Math.sin(ang + 0.45)); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      this._axes.push({ ...a, p, q });
+    }
+  }
+  hitAxis(pt) {
+    for (const a of this._axes || []) {
+      const dx = a.q.x - a.p.x, dy = a.q.y - a.p.y, l2 = dx * dx + dy * dy;
+      if (!l2) continue;
+      const t = Math.max(0, Math.min(1, ((pt.x - a.p.x) * dx + (pt.y - a.p.y) * dy) / l2));
+      if (t > 0.25 && Math.hypot(pt.x - (a.p.x + t * dx), pt.y - (a.p.y + t * dy)) <= 8) return a;
+    }
+    return null;
   }
   hitHandle(pt) {
     for (const h of this._handles || []) {
@@ -672,8 +717,17 @@ window.House3D = class House3D {
       if (this._home && Math.hypot(pt.x - this._home.x, pt.y - this._home.y) <= 10) { this.drag = { kind: "cube", home: true, start: pt }; return; }
       const dir = this.cubeHit(pt);
       if (dir) { this.drag = { kind: "cube", dir, start: pt }; return; }
-      // Shape: a face handle of the picked block
+      // Shape: a face handle of the picked block (its axis arrows come first, below)
       if (this.mode === "shape") {
+        const sb = this.selectedBlock();
+        // an axis arrow (first: it's on a corner, away from the face handles): that way only
+        const ax = sb && sb.behind ? this.hitAxis(pt) : null;
+        if (ax) {
+          const p = this.project(ax.from), q = this.project(add(ax.from, ax.axis));
+          const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+          this.drag = { kind: "axisMove", axis: ax, start: pt, dir: { x: (q.x - p.x) / len, y: (q.y - p.y) / len }, ppm: len, block: sb.id };
+          return;
+        }
         const h = this.hitHandle(pt);
         if (h) {
           const p = this.project(h.at), q = this.project(add(h.at, h.axis));
@@ -681,9 +735,14 @@ window.House3D = class House3D {
           this.drag = { kind: "face", face: h, start: pt, dir: { x: (q.x - p.x) / len, y: (q.y - p.y) / len }, ppm: len, block: this.scene.selBlock };
           return;
         }
-        // dragging the picked block itself moves it
-        const sb = this.selectedBlock();
+        // the block itself: across the ground, or with Shift up and down
         if (sb && this.rayHitsBlock(pt.x, pt.y, sb)) {
+          if (e.shiftKey) {
+            const c = { x: (sb.x0 + sb.x1) / 2, y: (sb.y0 || 0) + sb.depth / 2, z: sb.z0 };
+            const p = this.project(c), q = this.project(add(c, { x: 0, y: 0, z: 1 }));
+            this.drag = { kind: "blockLift", start: pt, ppm: Math.abs(q.y - p.y) || 1, block: sb.id, moved: false };
+            return;
+          }
           const at = this.onPlane(pt.x, pt.y, sb.z0);
           if (at) { this.drag = { kind: "blockMove", start: pt, at0: at, block: sb.id, z: sb.z0, moved: false }; return; }
         }
@@ -695,8 +754,8 @@ window.House3D = class House3D {
       this.drag = { kind: "pinch", dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: this.zoom, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, pan: { ...this.pan } };
       return;
     }
-    // the wheel (middle button), the right button, or Shift with the left: slide the view
-    if (e.button === 1 || e.button === 2 || e.shiftKey) {
+    // the wheel (middle button) or the right button: slide the view
+    if (e.button === 1 || e.button === 2) {
       e.preventDefault();
       this.drag = { kind: "pan", start: pt, pan: { ...this.pan }, moved: false };
       return;
@@ -722,16 +781,30 @@ window.House3D = class House3D {
       return;
     }
     if (d.kind === "cube") return;
+    d.alt = e.altKey; // Alt: no snapping
     if (d.kind === "blockMove") {
       if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 3) d.moved = true;
       const at = this.onPlane(pt.x, pt.y, d.z);
-      if (at && d.moved) { d.dx = at.x - d.at0.x; d.dy = at.y - d.at0.y; if (this.h.onBlockMove) this.h.onBlockMove(d.block, d.dx, d.dy, false); }
+      if (at && d.moved) { d.dx = at.x - d.at0.x; d.dy = at.y - d.at0.y; d.dz = 0; this.h.onBlockMove && this.h.onBlockMove(d.block, d.dx, d.dy, 0, false, d.alt); }
+      return;
+    }
+    if (d.kind === "blockLift") {
+      if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 3) d.moved = true;
+      d.dx = 0; d.dy = 0; d.dz = L.snapLen(-(pt.y - d.start.y) / d.ppm);
+      if (d.moved) this.h.onBlockMove && this.h.onBlockMove(d.block, 0, 0, d.dz, false, d.alt);
+      return;
+    }
+    if (d.kind === "axisMove") {
+      const along = L.snapLen(((pt.x - d.start.x) * d.dir.x + (pt.y - d.start.y) * d.dir.y) / d.ppm);
+      d.moved = true; d.delta = along;
+      d.dx = d.axis.axis.x * along; d.dy = d.axis.axis.y * along; d.dz = d.axis.axis.z * along;
+      this.h.onBlockMove && this.h.onBlockMove(d.block, d.dx, d.dy, d.dz, false, d.alt);
       return;
     }
     if (d.kind === "face") {
       const along = (pt.x - d.start.x) * d.dir.x + (pt.y - d.start.y) * d.dir.y;
       d.delta = L.snapLen(along / d.ppm);
-      this.h.onFace && this.h.onFace(d.block, d.face.face, d.delta, false);
+      this.h.onFace && this.h.onFace(d.block, d.face.face, d.delta, false, d.alt);
       return;
     }
     if (d.kind === "pinch" && this.pointers.size === 2) {
@@ -796,8 +869,11 @@ window.House3D = class House3D {
       if (d.home) return this.animateTo(-0.55, 0.62, { x: 0, y: 0, z: 0 });
       return this.lookFrom(d.dir);
     }
-    if (d.kind === "face") { if (d.delta) this.h.onFace && this.h.onFace(d.block, d.face.face, d.delta, true); return; }
-    if (d.kind === "blockMove") { if (d.moved && d.dx !== undefined && this.h.onBlockMove) this.h.onBlockMove(d.block, d.dx, d.dy, true); return; }
+    if (d.kind === "face") { if (d.delta) this.h.onFace && this.h.onFace(d.block, d.face.face, d.delta, true, d.alt); return; }
+    if (d.kind === "blockMove" || d.kind === "blockLift" || d.kind === "axisMove") {
+      if (d.moved && d.dx !== undefined && this.h.onBlockMove) this.h.onBlockMove(d.block, d.dx, d.dy, d.dz || 0, true, d.alt);
+      return;
+    }
     if (d.kind === "move" && d.moved && d.at) return this.h.onMove(d.light.id, d.part, d.at.x, d.at.y, true);
     if (d.kind === "raise" && d.moved) return this.h.onRaise(d.light.id, d.h, true);
     if (d.kind === "orbit" && !d.moved) {

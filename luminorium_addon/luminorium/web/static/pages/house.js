@@ -122,24 +122,24 @@
         if (done) { if (part === null) await placeItem(at); else await placePart(part, at); }
       },
       onBlock: (id) => { ui.block = id; paint(); },
-      onFace: async (id, face, delta, done) => {
+      onFace: async (id, face, delta, done, alt) => {
         const b = house.massing && house.massing.blocks.find((q) => q.id === id);
         if (!b) return;
         if (!ui.faceBase || ui.faceBase.id !== id) ui.faceBase = { ...b };
         const base = ui.faceBase;
-        const change = snapChange(base, faceChange(base, face, delta));
+        const change = alt ? faceChange(base, face, delta) : snapChange(base, faceChange(base, face, delta));
         Object.assign(b, change);
         view3d.setScene(scene3d());
         if (done) { ui.faceBase = null; await changeBlock(id, change); }
       },
-      onBlockMove: async (id, dx, dy, done) => {
+      onBlockMove: async (id, dx, dy, dz, done, alt) => {
         const b = house.massing && house.massing.blocks.find((q) => q.id === id);
         if (!b) return;
         if (!b.behind) { if (done) toast("This block is drawn on the front photo: move it there, or drag its faces here"); return; }
         if (!ui.faceBase || ui.faceBase.id !== id) ui.faceBase = { ...b };
         const base = ui.faceBase;
-        const m = snapMove(base, dx, dy);
-        const change = { x0: base.x0 + m.dx, x1: base.x1 + m.dx, y0: (base.y0 || 0) + m.dy };
+        const m = alt ? { dx, dy, dz } : snapMove(base, dx, dy, dz);
+        const change = moveChange(base, m);
         Object.assign(b, change);
         view3d.setScene(scene3d());
         if (done) { ui.faceBase = null; await changeBlock(id, change); }
@@ -294,8 +294,16 @@
     else if ("depth" in out) out.depth = Math.max(0.3, snapTo(b.id, "y", y0 + out.depth) - y0);
     return out;
   }
+  // A whole block moved by m (dx, dy, dz) as new values
+  function moveChange(b, m) {
+    const change = {};
+    if (m.dx) { change.x0 = b.x0 + m.dx; change.x1 = b.x1 + m.dx; }
+    if (m.dy) change.y0 = (b.y0 || 0) + m.dy;
+    if (m.dz) { change.z0 = b.z0 + m.dz; change.z1 = b.z1 + m.dz; }
+    return change;
+  }
   // Moving a whole block: whichever of its sides comes close to another block's lines up
-  function snapMove(b, dx, dy) {
+  function snapMove(b, dx, dy, dz = 0) {
     const pick = (axis, lo, hi, d) => {
       const a = snapTo(b.id, axis, lo + d) - (lo + d), c = snapTo(b.id, axis, hi + d) - (hi + d);
       if (Math.abs(a) < 1e-9 && Math.abs(c) < 1e-9) return d;
@@ -304,7 +312,11 @@
       return d + (Math.abs(a) <= Math.abs(c) ? a : c);
     };
     const y0 = b.y0 || 0;
-    return { dx: pick("x", b.x0, b.x1, dx), dy: pick("y", y0, y0 + b.depth, dy) };
+    return {
+      dx: dx ? pick("x", b.x0, b.x1, dx) : 0,
+      dy: dy ? pick("y", y0, y0 + b.depth, dy) : 0,
+      dz: dz ? pick("z", b.z0, b.z1, dz) : 0,
+    };
   }
   async function changeBlock(id, change) {
     const ok = await run(async () => { house = await api(`api/house/blocks/${encodeURIComponent(id)}`, { method: "PUT", body: change }); return true; });
@@ -342,6 +354,19 @@
     if (ok) { if (facade) facade.load(house.facade); ui.block = null; }
     paint();
   }
+  // Move a block by typed amounts: across (right), back (away from the street), up
+  function moveByBox(b) {
+    const v = { across: 0, back: 0, up: 0 };
+    const box = (name, label) => el("label.field", el("span", label),
+      el("input.input", { value: "0", inputmode: "decimal", style: { width: "92px" },
+        on: { change: (e) => { const t = e.target.value.trim(); const neg = /^[-−]/.test(t); const n = L.parseLen(t.replace(/^[-−]/, "")); if (!Number.isFinite(n)) { toast("Not a length"); e.target.value = "0"; return; } v[name] = neg ? -n : n; } } }));
+    return el("section", { "aria-label": "Move by", style: { display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
+      el("h3", "Move by"),
+      el("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" } },
+        box("across", "Across →"), box("back", "Back ↑"), box("up", "Up")),
+      el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, moveChange(b, { dx: v.across, dy: v.back, dz: v.up })) } }, "Move"),
+      el("span.small.muted", "Less than 0 moves the other way (left, toward the street, down). In the view: drag the block across the ground, Shift+drag it up or down, or drag one of its arrows; hold Alt to stop snapping."));
+  }
   function blockPanel(b) {
     const fmt = L.fmtLen;
     const faces = view3d ? view3d.blockFaces(b) : [];
@@ -365,7 +390,8 @@
         el("div.row", { style: { gap: "8px" } }, amountInput,
           el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, faceChange(b, ui.moveFace, amount)) } }, "Out"),
           el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, faceChange(b, ui.moveFace, -amount)) } }, "In")),
-        el("span.small.muted", b.behind ? "Or drag a yellow handle in the view; drag the block itself to move it." : "Or drag a yellow handle in the view. This block is drawn on the front photo, so it moves there.")),
+        el("span.small.muted", b.behind ? "Or drag a yellow handle in the view." : "Or drag a yellow handle in the view. This block is drawn on the front photo, so it moves there.")),
+      b.behind ? moveByBox(b) : null,
       el("section", { "aria-label": "Split", style: { display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
         el("h3", "Split front to back"),
         el("label.field", el("span", "The front part is"), frontInput),
