@@ -863,6 +863,50 @@ class HouseService:
         self._save()
         return b
 
+    def add_block(self, body: dict) -> dict:
+        """A new block made in 3D (house metres: x0, x1, y0, depth, z0, z1; name; level). It isn't
+        on the front photo."""
+        f = self.data.get("facade") or {}
+        if not f.get("door"):
+            raise HouseError("measure the house from the front photo first")
+        ox, gz = self.facade_origin()
+        x0, x1 = sorted((_num(body.get("x0", 0)), _num(body.get("x1", 3))))
+        z0, z1 = sorted((_num(body.get("z0", 0)), _num(body.get("z1", 2.4))))
+        depth = _num(body.get("depth", 3))
+        if x1 - x0 < 0.3 or z1 - z0 < 0.3 or not 0.3 <= depth <= 200:
+            raise HouseError("a block is at least 1 ft each way")
+        blocks = f.setdefault("blocks", [])
+        n = len(blocks) + 1
+        while any(b.get("id") == f"b{n}" for b in blocks):
+            n += 1
+        block = {
+            "id": f"b{n}",
+            "name": str(body.get("name") or f"Block {n}")[:60],
+            "x0": round(x0 + ox, 3),
+            "x1": round(x1 + ox, 3),
+            "z0": round(z0 + gz, 3),
+            "z1": round(z1 + gz, 3),
+            "y0": _num(body.get("y0", 0)),
+            "depth": depth,
+            "behind": True,
+            "face": "back",
+        }
+        if body.get("level"):
+            if body["level"] not in self.floors():
+                raise HouseError(f"unknown floor {body['level']}")
+            block["level"] = body["level"]
+        blocks.append(block)
+        self._apply_facade()
+        self._save()
+        return block
+
+    def remove_block(self, bid: str) -> None:
+        f = self.data.get("facade") or {}
+        b = self._block(bid)
+        f["blocks"].remove(b)
+        self._apply_facade()
+        self._save()
+
     def split_block(self, bid: str, front_depth: float) -> dict:
         """Split a block front to back: the front part keeps `front_depth`, a new block behind
         it takes the rest, with the same left, right, top, bottom and level to start with."""

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.21
+
+- **Add blocks in 3D:** in Shape, **Add a block** (or beside the picked one). Drag it to move it,
+  and its handles (all six faces now, the bottom too) to size it. Faces snap flush to other
+  blocks' faces as they come within 6". **Delete** removes one.
+
 ## 0.3.0-dev.20
 
 - **Walls join cleanly:** ends snap to other walls' ends and the outside walls' inside corners,

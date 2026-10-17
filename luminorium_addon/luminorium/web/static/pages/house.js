@@ -127,7 +127,19 @@
         if (!b) return;
         if (!ui.faceBase || ui.faceBase.id !== id) ui.faceBase = { ...b };
         const base = ui.faceBase;
-        const change = faceChange(base, face, delta);
+        const change = snapChange(base, faceChange(base, face, delta));
+        Object.assign(b, change);
+        view3d.setScene(scene3d());
+        if (done) { ui.faceBase = null; await changeBlock(id, change); }
+      },
+      onBlockMove: async (id, dx, dy, done) => {
+        const b = house.massing && house.massing.blocks.find((q) => q.id === id);
+        if (!b) return;
+        if (!b.behind) { if (done) toast("This block is drawn on the front photo: move it there, or drag its faces here"); return; }
+        if (!ui.faceBase || ui.faceBase.id !== id) ui.faceBase = { ...b };
+        const base = ui.faceBase;
+        const m = snapMove(base, dx, dy);
+        const change = { x0: base.x0 + m.dx, x1: base.x1 + m.dx, y0: (base.y0 || 0) + m.dy };
         Object.assign(b, change);
         view3d.setScene(scene3d());
         if (done) { ui.faceBase = null; await changeBlock(id, change); }
@@ -255,9 +267,44 @@
     if (face === "x1") return { x1: b.x1 + delta };
     if (face === "x0") return { x0: b.x0 - delta };
     if (face === "z1") return { z1: b.z1 + delta };
+    if (face === "z0") return { z0: b.z0 - delta };
     if (face === "depth") return { depth: Math.max(0.3, b.depth + delta) };
     if (face === "y0") return { y0: y0 - delta, depth: Math.max(0.3, b.depth + delta) };
     return {};
+  }
+  // A face that comes within 6" of another block's face lines up with it
+  const SNAP_M = 0.1524;
+  function snapTo(id, axis, v) {
+    let best = null;
+    for (const o of house.massing.blocks) {
+      if (o.id === id) continue;
+      const vals = axis === "x" ? [o.x0, o.x1] : axis === "y" ? [o.y0 || 0, (o.y0 || 0) + o.depth] : [o.z0, o.z1];
+      for (const c of vals) if (Math.abs(c - v) <= SNAP_M && (best === null || Math.abs(c - v) < Math.abs(best - v))) best = c;
+    }
+    return best ?? v;
+  }
+  function snapChange(b, change) {
+    const out = { ...change };
+    if ("x0" in out) out.x0 = snapTo(b.id, "x", out.x0);
+    if ("x1" in out) out.x1 = snapTo(b.id, "x", out.x1);
+    if ("z0" in out) out.z0 = snapTo(b.id, "z", out.z0);
+    if ("z1" in out) out.z1 = snapTo(b.id, "z", out.z1);
+    const y0 = "y0" in out ? out.y0 : b.y0 || 0;
+    if ("y0" in out) { const sy = snapTo(b.id, "y", out.y0); out.depth = Math.max(0.3, out.depth + (out.y0 - sy)); out.y0 = sy; }
+    else if ("depth" in out) out.depth = Math.max(0.3, snapTo(b.id, "y", y0 + out.depth) - y0);
+    return out;
+  }
+  // Moving a whole block: whichever of its sides comes close to another block's lines up
+  function snapMove(b, dx, dy) {
+    const pick = (axis, lo, hi, d) => {
+      const a = snapTo(b.id, axis, lo + d) - (lo + d), c = snapTo(b.id, axis, hi + d) - (hi + d);
+      if (Math.abs(a) < 1e-9 && Math.abs(c) < 1e-9) return d;
+      if (Math.abs(a) < 1e-9) return d + c;
+      if (Math.abs(c) < 1e-9) return d + a;
+      return d + (Math.abs(a) <= Math.abs(c) ? a : c);
+    };
+    const y0 = b.y0 || 0;
+    return { dx: pick("x", b.x0, b.x1, dx), dy: pick("y", y0, y0 + b.depth, dy) };
   }
   async function changeBlock(id, change) {
     const ok = await run(async () => { house = await api(`api/house/blocks/${encodeURIComponent(id)}`, { method: "PUT", body: change }); return true; });
@@ -273,6 +320,26 @@
       ui.block = blocks[blocks.length - 1].id; // the new back part
       toast("Split. The back part is picked: drag its top down, or set its level.");
     }
+    paint();
+  }
+  async function addBlock(next) {
+    const W = house.size.width, D = house.size.depth;
+    // beside the picked block (flush to its right side), else behind the house
+    const body = next
+      ? { x0: next.x1, x1: next.x1 + 3, y0: next.y0 || 0, depth: next.depth, z0: next.z0, z1: next.z1, level: next.level || null }
+      : { x0: W / 2 - 1.5, x1: W / 2 + 1.5, y0: D, depth: 3, z0: 0, z1: 2.7 };
+    const ok = await run(async () => { house = await api("api/house/blocks", { method: "POST", body }); return true; });
+    if (ok) {
+      if (facade) facade.load(house.facade);
+      const blocks = house.massing.blocks;
+      ui.block = blocks[blocks.length - 1].id;
+      toast("Added. Drag it to move it; drag its handles to size it. Its faces snap flush to other blocks.");
+    }
+    paint();
+  }
+  async function deleteBlock(b) {
+    const ok = await run(async () => { house = await api(`api/house/blocks/${encodeURIComponent(b.id)}`, { method: "DELETE" }); return true; });
+    if (ok) { if (facade) facade.load(house.facade); ui.block = null; }
     paint();
   }
   function blockPanel(b) {
@@ -298,7 +365,7 @@
         el("div.row", { style: { gap: "8px" } }, amountInput,
           el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, faceChange(b, ui.moveFace, amount)) } }, "Out"),
           el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, faceChange(b, ui.moveFace, -amount)) } }, "In")),
-        el("span.small.muted", "Or drag a yellow handle in the view.")),
+        el("span.small.muted", b.behind ? "Or drag a yellow handle in the view; drag the block itself to move it." : "Or drag a yellow handle in the view. This block is drawn on the front photo, so it moves there.")),
       el("section", { "aria-label": "Split", style: { display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
         el("h3", "Split front to back"),
         el("label.field", el("span", "The front part is"), frontInput),
@@ -312,7 +379,10 @@
             el("button", { type: "button", role: "radio", "aria-checked": String(mode === k), on: { click: () => changeBlock(b.id, { offset: k === "same" ? 0 : (k === "up" ? 1 : -1) * off }) } }, label))),
           mode !== "same" ? el("input.input", { value: fmt(off), inputmode: "decimal", style: { width: "100px" },
             on: { change: (e) => { const v = L.parseLen(e.target.value); if (!(v >= 0)) return; off = v; changeBlock(b.id, { offset: (mode === "up" ? 1 : -1) * v }); } } }) : null) : null),
-      el("button.btn", { type: "button", on: { click: () => { ui.block = null; paint(); } } }, "Done"));
+      el("div.row", { style: { gap: "8px", flexWrap: "wrap" } },
+        el("button.btn", { type: "button", on: { click: () => { ui.block = null; paint(); } } }, "Done"),
+        el("button.btn", { type: "button", on: { click: () => addBlock(b) } }, "Add a block beside it"),
+        el("button.btn.danger", { type: "button", on: { click: () => deleteBlock(b) } }, "Delete")));
   }
 
   async function setFixtures(t, count) {
@@ -440,7 +510,8 @@
       const b = ui.block && house.massing && house.massing.blocks.find((q) => q.id === ui.block);
       if (b) return blockPanel(b);
       return el("aside.card.hm-insp", el("h2", "Shape"),
-        el("p.muted", { style: { margin: 0 } }, "Tap a house block in the view to pick it. Then drag the yellow handles on its sides, back and top, or type how far to move a face. Split a block to give the back part its own height and level."));
+        el("p.muted", { style: { margin: 0 } }, "Tap a house block in the view to pick it. Then drag the yellow handles on its faces, or type how far to move a face; drag a block you added to move it. Faces snap flush to other blocks. Split a block to give the back part its own height and level."),
+        house.massing ? el("button.btn.primary", { type: "button", on: { click: () => addBlock(null) } }, "Add a block") : null);
     }
     const t = ui.sel && target(ui.sel);
     if (!t) return el("aside.card.hm-insp",

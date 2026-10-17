@@ -764,3 +764,31 @@ async def test_stairs_and_angled_walls_on_the_plan(client, lum):
         {**site, "stairs": [{**site["stairs"][0], "x1": 6.1}]},
     ):
         assert (await client.put("/api/house/site", json=bad)).status_code == 400
+
+
+async def test_blocks_added_and_deleted_in_3d(client, lum):
+    assert (await client.post("/api/house/blocks", json={})).status_code == 400  # no front photo
+    await client.put("/api/house/photo?w=800&h=600", content=JPEG)
+    door = {"pts": [[400, 300], [436, 300], [436, 380], [400, 380]], "w": 0.9144, "h": 2.032}
+    await client.put(
+        "/api/house/facade",
+        json={
+            "door": door,
+            "ground": {"z": 0},
+            "blocks": [{"id": "a", "x0": 0, "x1": 8, "z0": 0, "z1": 5}],
+        },
+    )
+    body = {"x0": 8, "x1": 11, "y0": 0, "depth": 4, "z0": 0, "z1": 2.7, "level": "main_level"}
+    view = (await client.post("/api/house/blocks", json=body)).json()
+    new = view["massing"]["blocks"][-1]
+    assert (new["x0"], new["x1"], new["depth"], new["z1"]) == (8, 11, 4, 2.7)
+    assert new["behind"] is True and new["level"] == "main_level"
+    assert view["size"]["width"] == 11  # the house is wider now
+    # it moves freely
+    view = (
+        await client.put(f"/api/house/blocks/{new['id']}", json={"x0": 9, "x1": 12, "y0": 2})
+    ).json()
+    assert next(b for b in view["massing"]["blocks"] if b["id"] == new["id"])["y0"] == 2
+    view = (await client.delete(f"/api/house/blocks/{new['id']}")).json()
+    assert [b["id"] for b in view["massing"]["blocks"]] == ["a"]
+    assert (await client.post("/api/house/blocks", json={**body, "x1": 8.1})).status_code == 400

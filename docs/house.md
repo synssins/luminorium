@@ -285,6 +285,11 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
     (or 5 cm) at a time. The panel shows its size and moves a face **Out** or **In** by a typed
     amount, **splits it front to back** (the front part keeps the depth typed; a new block behind
     it, "(back)", takes the rest, with its own top, level and floor), and sets its level and floor.
+    **Add a block** (or **Add a block beside it**, flush to the picked one's right side) makes a
+    block in 3D, not on the photo: drag it to move it and its six handles to size it. Faces, and a
+    moved block's sides, snap flush to another block's faces within 6". **Delete** removes it.
+    `POST /api/house/blocks` `{x0, x1, y0, depth, z0, z1, name?, level?}`, `DELETE
+    /api/house/blocks/{id}`,
     `PUT /api/house/blocks/{id}` `{x0?, x1?, z0?, z1?, y0?, depth?, name?, level?, offset?}` and
     `POST /api/house/blocks/{id}/split` `{front_depth}`, in house metres. Blocks behind others
     (`behind`) aren't on the front photo. The house's left edge is fixed (`facade.ox`) once there

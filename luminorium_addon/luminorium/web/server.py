@@ -476,6 +476,17 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
             )
         )
 
+    @app.post("/api/house/blocks")
+    async def house_block_add(body: dict):
+        """A new block from 3D: {x0, x1, y0, depth, z0, z1, name?, level?} in house metres."""
+        _house_errors(lambda: lum.house.add_block(body))
+        return lum.house.view()
+
+    @app.delete("/api/house/blocks/{block}")
+    async def house_block_remove(block: str):
+        _house_errors(lambda: lum.house.remove_block(block))
+        return lum.house.view()
+
     @app.put("/api/house/blocks/{block}")
     async def house_block(block: str, body: dict):
         """Move a house block's faces from 3D: {x0?, x1?, z0?, z1?, y0?, depth?} in house metres."""

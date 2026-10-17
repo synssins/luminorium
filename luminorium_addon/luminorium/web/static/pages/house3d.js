@@ -211,6 +211,7 @@ window.House3D = class House3D {
       { face: "x0", label: "Left side", at: { x: b.x0, y: ym, z: zm }, axis: { x: -1, y: 0, z: 0 } },
       { face: "depth", label: "Back", at: { x: xm, y: y1, z: zm }, axis: { x: 0, y: 1, z: 0 } },
       { face: "z1", label: "Top", at: { x: xm, y: ym, z: b.z1 }, axis: { x: 0, y: 0, z: 1 } },
+      { face: "z0", label: "Bottom", at: { x: xm, y: ym, z: b.z0 }, axis: { x: 0, y: 0, z: -1 } },
     ];
     faces.push({ face: "y0", label: "Front", at: { x: xm, y: y0, z: zm }, axis: { x: 0, y: -1, z: 0 } });
     return faces;
@@ -247,6 +248,13 @@ window.House3D = class House3D {
       if (Math.hypot(pt.x - h.p.x, pt.y - h.p.y) <= 12 || Math.hypot(pt.x - h.q.x, pt.y - h.q.y) <= 12) return h;
     }
     return null;
+  }
+  // Whether a screen point is over a block (even with others in front of it)
+  rayHitsBlock(sx, sy, b) {
+    const cam = this.cam;
+    if (!cam) return false;
+    const y0 = b.y0 || 0;
+    return rayBox(cam.pos, this.ray(sx, sy, cam), [b.x0, y0, b.z0], [b.x1, y0 + b.depth, b.z1]) !== null;
   }
   // The block a screen point is on (nearest), or null
   hitBlock(sx, sy) {
@@ -673,6 +681,12 @@ window.House3D = class House3D {
           this.drag = { kind: "face", face: h, start: pt, dir: { x: (q.x - p.x) / len, y: (q.y - p.y) / len }, ppm: len, block: this.scene.selBlock };
           return;
         }
+        // dragging the picked block itself moves it
+        const sb = this.selectedBlock();
+        if (sb && this.rayHitsBlock(pt.x, pt.y, sb)) {
+          const at = this.onPlane(pt.x, pt.y, sb.z0);
+          if (at) { this.drag = { kind: "blockMove", start: pt, at0: at, block: sb.id, z: sb.z0, moved: false }; return; }
+        }
       }
     }
     if (this.pointers.size === 2) {
@@ -708,6 +722,12 @@ window.House3D = class House3D {
       return;
     }
     if (d.kind === "cube") return;
+    if (d.kind === "blockMove") {
+      if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 3) d.moved = true;
+      const at = this.onPlane(pt.x, pt.y, d.z);
+      if (at && d.moved) { d.dx = at.x - d.at0.x; d.dy = at.y - d.at0.y; if (this.h.onBlockMove) this.h.onBlockMove(d.block, d.dx, d.dy, false); }
+      return;
+    }
     if (d.kind === "face") {
       const along = (pt.x - d.start.x) * d.dir.x + (pt.y - d.start.y) * d.dir.y;
       d.delta = L.snapLen(along / d.ppm);
@@ -777,6 +797,7 @@ window.House3D = class House3D {
       return this.lookFrom(d.dir);
     }
     if (d.kind === "face") { if (d.delta) this.h.onFace && this.h.onFace(d.block, d.face.face, d.delta, true); return; }
+    if (d.kind === "blockMove") { if (d.moved && d.dx !== undefined && this.h.onBlockMove) this.h.onBlockMove(d.block, d.dx, d.dy, true); return; }
     if (d.kind === "move" && d.moved && d.at) return this.h.onMove(d.light.id, d.part, d.at.x, d.at.y, true);
     if (d.kind === "raise" && d.moved) return this.h.onRaise(d.light.id, d.h, true);
     if (d.kind === "orbit" && !d.moved) {
