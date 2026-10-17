@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0-dev.23
+
+- **House map, CAD-style layout:** the tools for the view shown sit in a tool bar across the top
+  (3D: Move, Raise, Shape, Add block, Split, Aim, Home/Front/Top/Side views and the level shown;
+  the photo tabs: their drawing tools). A rail on the left opens Lights, Levels, Rooms, House
+  blocks and Yard, and folds away to icons. The picked thing's settings are on the right; with
+  nothing picked in 3D the view takes the room.
+- The view tabs moved to the top bar. A stray "null" after Things to check is gone.
+
 ## 0.3.0-dev.22
 
 - **Moving blocks in 3D:** drag a block across the ground; **Shift+drag** moves it up and down;

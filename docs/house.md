@@ -270,6 +270,25 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
 
 ## The page
 
+The page is laid out like a CAD app (0.3.0-dev.23; mocked on the design canvas as "House map,
+CAD layout"):
+
+- **The top bar:** the view tabs (**3D**, **Front photo**, **Top view**), Things to check, how
+  many lights are placed, and **Floors & size**.
+- **The tool bar** across the top of the map holds the tools for the view shown, each an icon over
+  its name. 3D: **Move**, **Raise**, **Shape**; **Add block** and **Split** (in half; the panel
+  splits at a typed depth); **Aim** (for a picked flood or spot); **Home**, **Front**, **Top** and
+  **Side** views; the level shown, at the right. The photo tabs: the editor's drawing tools,
+  Undo, Redo and Fit.
+- **The rail** on the left: **Lights**, **Levels**, **Rooms**, **House blocks** and **Yard**. Each
+  opens its pane; tapping it again (or the pane's fold arrow) folds it away to just the icons
+  (remembered). Levels picks the level shown; a room or a yard shape opens the Top view with it
+  picked; a house block opens 3D in Shape with it picked.
+- **The right panel:** the settings for what's picked (a light, a house block) in 3D, and the
+  editor's options and panel on the photo tabs. With nothing picked in 3D it closes and the view
+  takes the room.
+- Below 1181 px wide it stacks: the view, the panel, the rail (across) and its pane.
+
 - **3D** (the default tab): the house as a volume. Each floor is a slab at its height, over its
   span, with its ceiling outline, above a ground grid. Every placed light is an orb with a line
   down to its floor (lit ones glow); a strip's parts are small dots. Lights on other floors are
@@ -299,7 +318,7 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
     (`behind`) aren't on the front photo. The house's left edge is fixed (`facade.ox`) once there
     are blocks, so moving a block's left face doesn't shift what's placed by it.
   - Tap a light to pick it. A light (or part) not placed yet goes where you then tap the floor,
-    on the floor chosen above the view. Tapping off a placed light lets go of it: it only moves
+    on the level chosen at the right of the tool bar. Tapping off a placed light lets go of it: it only moves
     when dragged.
   - **Move:** drag the picked light, or one of its parts, across its floor.
   - **Raise:** drag it up or down; it stops at the ceiling.
@@ -307,8 +326,7 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
 - **Front photo** (the second tab): the drawing tools above.
 - **Top view** (the third tab): the photo from above, the yard, floor plans, and aiming.
 - **Fits the window** on a big screen (1181 px wide and 600 px tall or more): nothing scrolls the
-  page; the list and the panel scroll inside themselves and the view takes the rest. On the
-  photo tabs the editor's own panel replaces the page's, to give the photo the room.
+  page; the panes and the panel scroll inside themselves and the view takes the rest.
 - **Guessed floors** (`set: false` in `floors`, heights followed from the set ones) are drawn
   dashed in 3D and labelled "(guessed)".
 - **The list:** every light by HA floor; Outside holds the areas with no floor. Each level folds

@@ -19,6 +19,8 @@
     view: ["3d", "photo", "top"].includes(L.store("house.view", "3d")) ? L.store("house.view", "3d") : "3d", // "3d" | "photo" | "top"
     mode3d: "move",                     // "move" | "raise" in the 3D view
     folded: new Set(L.store("house.folded", [])), // levels folded away in the list
+    // the panel open on the left: lights, levels, rooms, blocks, yard, or "" for none
+    panel: ["lights", "levels", "rooms", "blocks", "yard", ""].includes(L.store("house.panel", "lights")) ? L.store("house.panel", "lights") : "lights",
   };
   let house = null;
   let inventory = null;
@@ -484,7 +486,7 @@
         list.map((c) => el("div.row", { style: { gap: "10px", alignItems: "flex-start", flexWrap: "nowrap" } },
           el("span", { "aria-hidden": "true", style: { width: "10px", height: "10px", borderRadius: "50%", marginTop: "6px", flex: "none", background: c.level === "warn" ? "var(--warn, #e0a030)" : "var(--info, #5aa9e6)" } }),
           el("span", { style: { flex: "1" } }, c.text),
-          TAB[c.tab] ? el("button.btn.small", { type: "button", on: { click: () => go(c.tab) } }, "Show me") : null))) : null);
+          TAB[c.tab] ? el("button.btn.small", { type: "button", on: { click: () => go(c.tab) } }, "Show me") : null))) : "");
     return wrap;
   }
   // a tap anywhere else closes the list
@@ -502,7 +504,8 @@
       groups.get(key).push(t);
     }
     const order = [...house.floors.map((f) => f.id), house.outside].filter((k) => groups.has(k));
-    return el("aside.card.hm-list", { "aria-label": "Lights to place", style: { padding: "14px", gap: "8px" } },
+    return el("div.hm-pane", { "aria-label": "Lights to place" },
+      paneHead("Lights"),
       el("label.search", { style: { flex: "none" } }, icon("search", 16), el("span.sr", "Find a light"),
         el("input", { type: "search", placeholder: "Find a light", value: ui.search, on: { input: (e) => { ui.search = e.target.value.toLowerCase(); paintList(); } } })),
       order.map((k) => {
@@ -534,14 +537,10 @@
   function inspector() {
     if (ui.view === "3d" && ui.mode3d === "shape") {
       const b = ui.block && house.massing && house.massing.blocks.find((q) => q.id === ui.block);
-      if (b) return blockPanel(b);
-      return el("aside.card.hm-insp", el("h2", "Shape"),
-        el("p.muted", { style: { margin: 0 } }, "Tap a house block in the view to pick it. Then drag the yellow handles on its faces, or type how far to move a face; drag a block you added to move it. Faces snap flush to other blocks. Split a block to give the back part its own height and level."),
-        house.massing ? el("button.btn.primary", { type: "button", on: { click: () => addBlock(null) } }, "Add a block") : null);
+      return b ? blockPanel(b) : null;
     }
     const t = ui.sel && target(ui.sel);
-    if (!t) return el("aside.card.hm-insp",
-      el("h2", "Pick a light"), el("p.muted", { style: { margin: 0 } }, "Choose one on the left, then tap where it is: on the floor in 3D, on the Front photo, or from above in the Top view. In 3D, drag it to fine-tune, and use Raise to set its height."));
+    if (!t) return null;
     const item = t.item;
     const floor = item ? item.floor : floorOfTarget(t);
     const ceil = ceilingOf(floor);
@@ -652,10 +651,136 @@
     return form;
   }
 
+  // ---- the tool bar, the rail and the panes -------------------------------------------------------
+
+  const NS = "http://www.w3.org/2000/svg";
+  function svgI(d, size = 20) {
+    const s = document.createElementNS(NS, "svg");
+    s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("width", String(size)); s.setAttribute("height", String(size)); s.setAttribute("aria-hidden", "true");
+    s.setAttribute("fill", "none"); s.setAttribute("stroke", "currentColor"); s.setAttribute("stroke-width", "1.8");
+    s.setAttribute("stroke-linecap", "round"); s.setAttribute("stroke-linejoin", "round");
+    const p = document.createElementNS(NS, "path"); p.setAttribute("d", d); s.append(p);
+    return s;
+  }
+  const I = {
+    move: "M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3",
+    raise: "M12 20V4M7 9l5-5 5 5M5 20h14",
+    shape: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5",
+    add: "M12 5v14M5 12h14",
+    split: "M4 5h16v14H4zM12 5v14",
+    aim: "M12 12l8-5v10zM4 12h8M4 9v6",
+    home: "M3 11l9-8 9 8M5 10v10h14V10",
+    front: "M4 5h16v14H4zM9 19v-6h6v6",
+    top: "M4 12l8-6 8 6-8 6z",
+    side: "M4 19V9l8-5 8 5v10z",
+    bulb: "M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z",
+    levels: "M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5",
+    rooms: "M4 4h16v16H4zM4 12h9M13 4v16",
+    blocks: "M3 20V10h8v10M11 20V6h10v14M3 20h18",
+    yard: "M12 3a5 5 0 0 0-5 5c0 3 5 9 5 9s5-6 5-9a5 5 0 0 0-5-5zM4 21h16",
+    fold: "M15 6l-6 6 6 6",
+  };
+  // One tool: an icon over a short name
+  function tool(label, iconD, { pressed = null, disabled = false, title = null, click }) {
+    return el("button.hm-tool", { type: "button", title: title || label, "aria-pressed": pressed === null ? null : String(pressed),
+      disabled: disabled ? "" : null, on: { click } }, svgI(iconD), el("span", label));
+  }
+  function pickedBlock() { return ui.block && house.massing ? house.massing.blocks.find((q) => q.id === ui.block) || null : null; }
+  function setMode3d(k) { ui.mode3d = k; if (k !== "shape") ui.block = null; ui.aiming = false; paint(); }
+  // The 3D view's tools, in groups, with the level shown at the right
+  function tools3d() {
+    const b = ui.mode3d === "shape" ? pickedBlock() : null;
+    const t = ui.sel && target(ui.sel);
+    const canAim = !!(t && t.item && t.item.aim);
+    const W = window.House3D;
+    const grp = (...xs) => el("div.hm-grp", { role: "group" }, ...xs);
+    return [
+      grp(tool("Move", I.move, { pressed: ui.mode3d === "move", title: "Drag a light across its floor", click: () => setMode3d("move") }),
+        tool("Raise", I.raise, { pressed: ui.mode3d === "raise", title: "Drag a light up or down", click: () => setMode3d("raise") }),
+        tool("Shape", I.shape, { pressed: ui.mode3d === "shape", title: "Pick a house block and drag its faces", click: () => setMode3d("shape") })),
+      grp(tool("Add block", I.add, { disabled: !house.massing, title: house.massing ? "Add a house block (beside the picked one)" : "Draw the house on the Front photo first",
+        click: () => { ui.mode3d = "shape"; addBlock(b); } }),
+        tool("Split", I.split, { disabled: !b, title: b ? "Split the picked block front to back, in half (set where in the panel)" : "Pick a block in Shape first",
+          click: () => splitBlock(b.id, Math.round((b.depth / 2) / 0.0254) * 0.0254) })),
+      grp(tool("Aim", I.aim, { pressed: !!ui.aiming, disabled: !canAim, title: canAim ? "Click what the picked light should point at" : "Pick a flood or spot light first",
+        click: () => { ui.aiming = !ui.aiming; paint(); } })),
+      grp(tool("Home", I.home, { click: () => view3d && view3d.animateTo(-0.55, 0.62, { x: 0, y: 0, z: 0 }) }),
+        tool("Front", I.front, { title: "Look from the street", click: () => view3d && view3d.lookFrom({ x: 0, y: -1, z: 0 }) }),
+        tool("Top", I.top, { title: "Look down from above", click: () => view3d && view3d.lookFrom({ x: 0, y: 0, z: 1 }) }),
+        tool("Side", I.side, { title: "Look from the right side", click: () => view3d && view3d.lookFrom({ x: 1, y: 0, z: 0 }) })),
+      W ? el("span.hm-fill") : null,
+      el("div.chips", { role: "group", "aria-label": "Level shown" },
+        [...house.floors.map((f) => [f.id, f.name]), [house.outside, "Outside"]].map(([id, name]) =>
+          el("button.chip", { type: "button", "aria-pressed": String(ui.floor === id), on: { click: () => { ui.floor = id; paint(); } } }, name))),
+    ];
+  }
+
+  const PANES = [
+    ["lights", "Lights", I.bulb], ["levels", "Levels", I.levels], ["rooms", "Rooms", I.rooms],
+    ["blocks", "House blocks", I.blocks], ["yard", "Yard", I.yard],
+  ];
+  function openPane(k) { ui.panel = ui.panel === k ? "" : k; L.save("house.panel", ui.panel); paint(); }
+  function rail() {
+    return el("nav.hm-rail", { "aria-label": "Panels" }, PANES.map(([k, label, d]) =>
+      el("button", { type: "button", title: label, "aria-label": label, "aria-pressed": String(ui.panel === k), on: { click: () => openPane(k) } }, svgI(d, 22))));
+  }
+  function paneHead(title) {
+    return el("div.hm-pane-head", el("h2", title),
+      el("button.hm-fold", { type: "button", title: "Fold away", "aria-label": `Fold the ${title.toLowerCase()} away`, on: { click: () => openPane(ui.panel) } }, svgI(I.fold, 18)));
+  }
+  const rowBtn = (on, click, ...kids) => el("button.hm-row", { type: "button", "aria-pressed": String(!!on), on: { click } }, ...kids);
+  function levelsPane() {
+    const fmt = L.fmtLen;
+    return el("div.hm-pane", { "aria-label": "Levels" }, paneHead("Levels"),
+      el("span.small.muted", "Your Home Assistant floors, bottom up from the ground outside. Tap one to show it in 3D and in the Top view."),
+      [...house.floors].sort((a, b) => b.elevation - a.elevation).map((f) => rowBtn(ui.floor === f.id, () => { ui.floor = f.id; if (site) site.level = f.id; paint(); },
+        el("span", { style: { flex: "1" } }, f.name), el("span.small.muted.mono", `${fmt(f.elevation)} · ${fmt(f.ceiling)}`))),
+      rowBtn(ui.floor === house.outside, () => { ui.floor = house.outside; if (site) site.level = house.outside; paint(); }, el("span", { style: { flex: "1" } }, "Outside")),
+      el("button.btn.small", { type: "button", on: { click: () => { ui.settings = true; paint(); } } }, "Floors & size"));
+  }
+  // Rooms and yard shapes are drawn in the Top view: a tap there shows and picks one
+  function showInTop(sel, level) {
+    ui.view = "top"; L.save("house.view", "top");
+    ensureSite();
+    if (level) site.level = level;
+    site.sel = sel;
+    paint();
+  }
+  function roomsPane() {
+    const rooms = (house.site && house.site.rooms) || [];
+    const areas = new Map(inventory.areas.map((a) => [a.id, a.name]));
+    const levels = [...house.floors].sort((a, b) => b.elevation - a.elevation).filter((f) => rooms.some((r) => r.level === f.id));
+    return el("div.hm-pane", { "aria-label": "Rooms" }, paneHead("Rooms"),
+      rooms.length ? levels.map((f) => el("div.hm-group", el("span.hm-glabel", f.name),
+        rooms.filter((r) => r.level === f.id).map((r) => rowBtn(site && site.sel && site.sel.kind === "room" && site.sel.id === r.id && ui.view === "top",
+          () => showInTop({ kind: "room", id: r.id }, r.level), el("span", { style: { flex: "1" } }, r.name || areas.get(r.area) || "Room")))))
+        : el("p.small.muted", { style: { margin: 0 } }, "No rooms yet. In the Top view, draw the walls of a level, then use the Room tool to name each room."));
+  }
+  const YARD = { path: "Path", driveway: "Driveway", patio: "Patio", pool: "Pool", bed: "Garden bed", lawn: "Lawn", tree: "Tree", bush: "Bush" };
+  function yardPane() {
+    const yard = (house.site && house.site.yard) || [];
+    return el("div.hm-pane", { "aria-label": "Yard" }, paneHead("Yard"),
+      yard.length ? yard.map((y) => rowBtn(site && site.sel && site.sel.kind === "yard" && site.sel.id === y.id && ui.view === "top",
+        () => showInTop({ kind: "yard", id: y.id }, house.outside), el("span", { style: { flex: "1" } }, y.name || YARD[y.kind] || "Yard shape")))
+        : el("p.small.muted", { style: { margin: 0 } }, "No yard shapes yet. In the Top view, use the Yard tool to draw paths, the driveway, beds and trees."));
+  }
+  function blocksPane() {
+    const blocks = (house.massing && house.massing.blocks) || [];
+    const pick = (id) => { ui.view = "3d"; L.save("house.view", "3d"); ui.mode3d = "shape"; ui.block = id; paint(); };
+    return el("div.hm-pane", { "aria-label": "House blocks" }, paneHead("House blocks"),
+      blocks.length ? blocks.map((b, i) => rowBtn(ui.view === "3d" && ui.mode3d === "shape" && ui.block === b.id, () => pick(b.id),
+        el("span", { style: { flex: "1" } }, b.name || `Block ${i + 1}`), el("span.small.muted", b.behind ? "added" : "photo")))
+        : el("p.small.muted", { style: { margin: 0 } }, "The house's blocks come from the Front photo: draw the house there first."),
+      house.massing ? el("button.btn.small", { type: "button", on: { click: () => { ui.view = "3d"; ui.mode3d = "shape"; addBlock(pickedBlock()); } } }, "Add a block") : null);
+  }
+  function leftPane() {
+    return { lights: listPanel, levels: levelsPane, rooms: roomsPane, blocks: blocksPane, yard: yardPane }[ui.panel]?.() || null;
+  }
+
   // ---- paint ----------------------------------------------------------------------------------
 
   let views = null;
-  let listBox = null;
+  let listBox = null; // the open left pane (it scrolls)
   function repaintViews() {
     if (!views) return;
     if (ui.view === "3d") { view3d.mode = ui.mode3d; view3d.aimMode = !!ui.aiming; view3d.setScene(scene3d()); return; }
@@ -663,13 +788,13 @@
   function paintList() {
     if (!listBox) return;
     const top = listBox.scrollTop;
-    listBox.replaceWith(listBox = listPanel());
+    L.set(listBox, leftPane());
     listBox.scrollTop = top;
   }
-  let inspBox = null;
+  let inspBox = null; // the right panel
   function paintSide() {
     paintList();
-    if (inspBox) inspBox.replaceWith(inspBox = inspector());
+    if (inspBox && ui.view === "3d") { const c = inspector(); L.set(inspBox, c); inspBox.hidden = !c; }
   }
 
   function paint() {
@@ -683,50 +808,46 @@
   }
   function paintPage() {
     const placed = house.targets.filter((t) => t.placed).length;
-    const extra = L.topExtra();
-    extra.replaceChildren(checksButton(), el("span.small.muted", `${placed} of ${house.targets.length} placed`),
-      el("button.btn.small", { type: "button", "aria-expanded": String(ui.settings), on: { click: () => { ui.settings = !ui.settings; paint(); } } }, "Floors & size"));
-    const floorTabs = el("div.chips", { role: "group", "aria-label": "Floor shown" },
-      [...house.floors.map((f) => [f.id, f.name]), [house.outside, "Outside"]].map(([id, name]) =>
-        el("button.chip", { type: "button", "aria-pressed": String(ui.floor === id), on: { click: () => { ui.floor = id; paint(); } } }, name)));
-    views = {};
-    listBox = listPanel();
-    const lineBanner = ui.mode ? el("div.banner", { style: { fontSize: "14px" } }, ui.mode === "line-start" ? "Tap where the first part is." : "Now tap where the last part is.") : null;
     const viewTabs = el("div.tabs", { role: "tablist", "aria-label": "View" },
       [["3d", "3D"], ["photo", "Front photo"], ["top", "Top view"]].map(([k, label]) => el("button", { type: "button", role: "tab", "aria-selected": String(ui.view === k),
         on: { click: () => { ui.view = k; L.save("house.view", k); paint(); } } }, label)));
-    let main;
+    L.topExtra().replaceChildren(...[viewTabs, el("span.hm-fill"), checksButton(), el("span.small.muted", `${placed} of ${house.targets.length} placed`),
+      el("button.btn.small", { type: "button", "aria-expanded": String(ui.settings), on: { click: () => { ui.settings = !ui.settings; paint(); } } }, "Floors & size")].filter(Boolean));
+    views = {};
+    const pane = leftPane();
+    listBox = el("aside.hm-left", { hidden: pane ? null : "" }, pane);
+    inspBox = el("aside.hm-right");
+    let bar, stage;
     if (ui.view === "3d") {
       ensure3d();
       const t = ui.sel && target(ui.sel);
-      const hint = ui.mode3d === "shape" ? (ui.block ? "Drag a yellow handle to move that face; the distance shows as you go. Or type an amount in the panel." : "Tap a house block to pick it.")
+      const lineBanner = ui.mode ? el("div.banner", { style: { fontSize: "14px" } }, ui.mode === "line-start" ? "Tap where the first part is." : "Now tap where the last part is.") : null;
+      const hint = ui.mode3d === "shape" ? (ui.block ? "Drag a yellow handle to move that face, or drag the block to move it (Shift+drag: up and down; Alt: no snapping). Or type amounts in the panel." : "Tap a house block to pick it, or Add block in the tool bar.")
         : ui.aiming && t ? `Click what ${t.name} should point at: a wall, the ground, or a tree. Drag to turn the view first if you need to.`
-        : !t ? "Pick a light from the list, or tap one."
+        : !t ? "Pick a light: open Lights on the left, or tap one in the view."
         : !t.placed ? `Tap where ${t.name} is on the ${floorName(ui.floor)} floor.`
         : ui.mode3d === "raise" ? "Drag the picked light up or down."
-        : ui.mode3d === "move" && t.placed ? "Drag the picked light to move it. Tap anywhere else to let go of it." : "Drag the picked light across its floor.";
-      main = el("section.card", { "aria-label": "The house in 3D", style: { padding: "14px 16px" } },
-        el("div.row", { style: { justifyContent: "space-between" } },
-          el("div.seg", { role: "radiogroup", "aria-label": "What dragging does" },
-            [["move", "Move"], ["raise", "Raise"], ["shape", "Shape"]].map(([k, label]) => el("button", { type: "button", role: "radio", "aria-checked": String(ui.mode3d === k),
-              title: k === "shape" ? "Pick a house block and drag its faces" : null,
-              on: { click: () => { ui.mode3d = k; if (k !== "shape") ui.block = null; paint(); } } }, label)))),
-        floorTabs, lineBanner, canvas3d, el("span.small.muted", hint));
-    } else if (ui.view === "top") {
-      ensureSite();
-      main = el("section.card", { "aria-label": "The house from above", style: { padding: "14px 16px" } }, site.root);
+        : "Drag the picked light to move it. Tap anywhere else to let go of it.";
+      bar = tools3d();
+      stage = [lineBanner, canvas3d, el("span.small.muted", hint)];
+      const c = inspector();
+      L.set(inspBox, c); inspBox.hidden = !c;
     } else {
-      ensureFacade();
-      main = el("section.card", { "aria-label": "The front photo", style: { padding: "14px 16px" } }, facade.root);
+      const ed = ui.view === "top" ? (ensureSite(), site) : (ensureFacade(), facade);
+      // the editor's tools go in the tool bar, its options and panel on the right
+      bar = [ed.toolbar];
+      ed.toolbar.setAttribute("aria-orientation", "horizontal");
+      stage = [ed.root];
+      L.set(inspBox, ed.optionsBar, ed.inspEl);
     }
-    inspBox = inspector();
     L.set(page,
       settingsPanel(),
-      // the photo editors have their own panel: give the photo the room
-      el("div", { class: ui.view === "3d" ? "hm" : "hm hm-editor" },
-        listBox,
-        el("div.hm-views", viewTabs, main),
-        ui.view === "3d" ? inspBox : null));
+      el("div.hm-cad", { "aria-label": "House map" },
+        el("div.hm-bar", { role: "toolbar", "aria-label": ui.view === "3d" ? "3D tools" : "Drawing tools" }, bar),
+        el("div.hm-work",
+          rail(), listBox,
+          el("section.hm-stage", { "aria-label": { "3d": "The house in 3D", top: "The house from above", photo: "The front photo" }[ui.view] }, stage),
+          inspBox)));
     repaintViews();
     if (ui.view === "photo") facade.paint();
     if (ui.view === "top") site.paint();
