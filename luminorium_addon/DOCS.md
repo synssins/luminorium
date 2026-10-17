@@ -98,6 +98,24 @@ Place every light where it really is, in 3D, without a floorplan or the camera.
 Sizes and heights are in feet and inches when Home Assistant uses imperial units (Settings ›
 Units changes it). Type them as `8' 6"`, `8 ft 6 in`, `102 in`, or just `8.5`.
 
+**Measuring the house from photos.** Three steps, each optional, each making the map more exact:
+
+1. **Front photo:** the door sets the scale. Box it, tap the ground at both ends of the house
+   (tap the line to add a bend where the front steps in or out), drag a box over each part of the
+   house and say if its front sticks out or is set back, trace the roof edges and roofs, and drag
+   along each floor. A recessed door: give **Set back into the wall by**.
+2. **Top view:** a screenshot of your house on a satellite map. Drag along a straight wall to
+   square it up, trace the front roof edge end to end (the front photo gives its length), then
+   the roof's outline: the walls are drawn the eaves' depth inside it. Add the yard: paths,
+   driveways, patios, pools, beds, trees and bushes.
+3. **Floor plans** (in the top view): draw each level's walls, then type how far each is from
+   another wall, face to face, as you'd measure with a tape. Add doorways and name the rooms.
+
+Then aim floods and spots from the top view: drag the arrow to point them, tilt them up or down
+in the panel. **Things to check** at the top of the House map says when numbers don't agree
+(the roof measures differently from the front and from above, a floor is out of order, a light
+is outside the walls), with **Show me** to go there.
+
 **The quickest start is a photo of the front.** Under **House map › Front photo**, add a photo
 taken straight on from across the street, then follow the steps along the top: box the front door
 (36" × 80" unless you change it) and fit its corners; tap the ground; drag a box over each part of

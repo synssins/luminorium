@@ -433,6 +433,30 @@
     toast(`${t.name}: ${floorName(floor)}, ${L.fmtLen(h)} up`);
   }
 
+  // ---- things to check --------------------------------------------------------------------------
+
+  ui.checksOpen = L.store("house.checksOpen", true);
+  function checksCard() {
+    const list = [...(house.checks || []), ...(facade ? facade.checks() : [])];
+    if (!list.length) return null;
+    const warns = list.filter((c) => c.level === "warn").length;
+    const TAB = { photo: ["photo", "Front photo"], top: ["top", "Top view"], floors: [null, "Floors & size"] };
+    const go = (tab) => {
+      if (tab === "floors") { ui.settings = true; paint(); return; }
+      ui.view = TAB[tab][0]; L.save("house.view", ui.view); paint();
+    };
+    return el("section.card", { "aria-label": "Things to check", style: { padding: "12px 16px", gap: "8px", borderColor: warns ? "var(--warn-line)" : "var(--line)" } },
+      el("button", { type: "button", "aria-expanded": String(ui.checksOpen), on: { click: () => { ui.checksOpen = !ui.checksOpen; L.save("house.checksOpen", ui.checksOpen); paint(); } },
+        style: { display: "flex", alignItems: "center", gap: "8px", border: "0", background: "none", color: "var(--text)", padding: "0", cursor: "pointer", font: "inherit", textAlign: "left" } },
+        el("span", { style: { display: "inline-flex", transform: ui.checksOpen ? "rotate(90deg)" : "none", transition: "transform .15s" } }, icon("chev", 14)),
+        el("b", warns ? `${warns} thing${warns === 1 ? "" : "s"} to check` : "Notes"),
+        el("span.small.muted", list.length > warns ? `· ${list.length - warns} note${list.length - warns === 1 ? "" : "s"}` : "")),
+      ui.checksOpen ? list.map((c) => el("div.row", { style: { gap: "10px", alignItems: "flex-start" } },
+        el("span", { "aria-hidden": "true", style: { width: "10px", height: "10px", borderRadius: "50%", marginTop: "6px", flex: "none", background: c.level === "warn" ? "var(--warn, #e0a030)" : "var(--info, #5aa9e6)" } }),
+        el("span", { style: { flex: "1" } }, c.text),
+        TAB[c.tab] ? el("button.btn.small", { type: "button", on: { click: () => go(c.tab) } }, `Show me`) : null)) : null);
+  }
+
   // ---- panels ---------------------------------------------------------------------------------
 
   function listPanel() {
@@ -617,6 +641,7 @@
     }
     inspBox = inspector();
     L.set(page,
+      checksCard(),
       settingsPanel(),
       el("div.hm",
         listBox,

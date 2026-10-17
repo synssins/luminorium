@@ -267,6 +267,22 @@ def plan_of(site: dict, eave: float) -> list[list[float]] | None:
     return inset(outline, eave)
 
 
+def photo_to_house(xf: dict, u: float, v: float) -> tuple[float, float]:
+    """A top-view photo point (px) in house metres, as the page places the photo."""
+    c, s = math.cos(xf["theta"]), math.sin(xf["theta"])
+    x, y = u, -v
+    return (c * x - s * y) * xf["s"] + xf["tx"], (s * x + c * y) * xf["s"] + xf["ty"]
+
+
+def inside(poly: list[list[float]], x: float, y: float) -> bool:
+    hit = False
+    for i in range(len(poly)):
+        (x0, y0), (x1, y1) = poly[i - 1], poly[i]
+        if (y0 > y) != (y1 > y) and x < (x1 - x0) * (y - y0) / (y1 - y0) + x0:
+            hit = not hit
+    return hit
+
+
 def walls_3d(site: dict) -> list[dict]:
     """Interior walls with their thickness, for the 3D view."""
     out = []

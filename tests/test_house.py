@@ -582,3 +582,39 @@ async def test_aiming_a_light(client, lum):
         assert (await client.put(f"/api/house/items/{PORCH}/aim", json=bad)).status_code == 400
     r = await client.put(f"/api/house/items/{PORCH}/aim", json=None)
     assert "aim" not in r.json()
+
+
+async def test_checks_point_out_numbers_that_disagree(client, lum):
+    assert (await client.get("/api/house")).json()["checks"] == []
+    await client.put("/api/house/photo?w=800&h=600", content=JPEG)
+    texts = lambda v: [c["text"] for c in v["checks"]]  # noqa: E731
+    assert any("Mark the front door" in t for t in texts((await client.get("/api/house")).json()))
+    door = {"pts": [[400, 300], [436, 300], [436, 380], [400, 380]], "w": 0.9144, "h": 2.032}
+    body = {
+        "door": door,
+        "edges": [{"id": "e", "pts": [[-2, 5], [13, 5]]}],  # 15 m across from the front
+        "blocks": [{"id": "b", "x0": -1.4, "x1": 12.4, "z0": 0, "z1": 5}],
+        "lines": [{"id": "l", "floor": "main_level", "x0": -1.4, "x1": 12.4, "z": 0.6}],
+    }
+    view = (await client.put("/api/house/facade", json=body)).json()
+    assert any(c["text"].startswith("No ground line") for c in view["checks"])
+    assert any("Guessed from the others" in t for t in texts(view))
+    await client.put("/api/house/photo?which=top&w=1600&h=1200", content=JPEG)
+    site = {
+        "xf": {"s": 0.05, "theta": 0, "tx": 0, "ty": 0},
+        # 16 m across from above: 7% more than the front photo's 15 m
+        "outline": [[0, -0.6], [16, -0.6], [16, 9.8], [0, 9.8]],
+        # front to back: 300 px = 15 m measured, against 10.4 m given
+        "check": {"pts": [[100, 0], [100, -300]], "length": 10.4},
+    }
+    view = (await client.put("/api/house/site", json=site)).json()
+    warns = [c["text"] for c in view["checks"] if c["level"] == "warn"]
+    assert any("from above but" in t and "front photo" in t for t in warns)
+    assert any(t.startswith("Front to back") for t in warns)
+    # An inside light outside the walls
+    await client.put(
+        "/api/house/items/light.master_closet_light",
+        json={"floor": "main_level", "x": 30, "y": 4},
+    )
+    view = (await client.get("/api/house")).json()
+    assert any("outside the walls" in c["text"] for c in view["checks"])

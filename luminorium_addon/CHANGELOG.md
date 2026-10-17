@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0-dev.10
+
+- **Things to check:** the House map lists, in plain words, numbers that don't agree and what's
+  being guessed: the roof measuring differently from the front and from above, a front-to-back
+  check that's off, floors out of order, low ceilings, guessed floors, an inside light outside
+  the walls, a wall outside the house, a door too small in the photo, a photo taken from far to
+  the side, a tilted ground line. Each has **Show me**.
+- Docs for the front photo's camera, the top view, floor plans, aiming and the checks.
+
 ## 0.3.0-dev.9
 
 - **Top view.** Add a satellite or drone photo from above (a map screenshot works):

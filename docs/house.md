@@ -83,12 +83,23 @@ you stand. Every flash is restored afterwards, and nothing is sent in read-only 
 A photo of the front of the house, measured from its front door. Code: `pages/facade.js`
 (`FacadeEditor`), `HouseService.set_photo`, `set_facade`, `massing` in `house.py`.
 
+- **The camera, from the door.** The door's four corners and its size give a homography; from
+  it the editor works out the camera (`solveCamera` in `facade.js`): its focal length from the
+  door's perspective when two estimates agree, else a typical phone lens (65° across), then
+  where it stood. With the camera, any plane parallel to the front wall (`Y` = a set-back or an
+  overhang) and the level ground (`Z` = the ground) maps to the photo and back. Each shape is
+  measured on its own plane: blocks and roofs on their front face, windows on their block's,
+  roof edge lines at the eaves (`Y` = -eave). Changing a plane (a block's front face, the door's
+  recess, the eaves) keeps every shape where it is on the photo and measures it again
+  (`keepOnPhoto`).
 - **Scale and perspective from the door.** The user boxes the front door and drags its four
   corners onto the frame's corners. The door is 36" × 80" (0.9144 × 2.032 m) unless changed. A
   homography from those four points (direct linear transform, solved in the page) turns any point
   on the photo into metres on the plane of the front wall, and back. Things set back from the door
   come out a little small; a straight-on photo from across the street keeps that small.
-- **Facade metres:** shapes are stored from the door's bottom left corner, `X` across and `Z` up.
+- **Facade metres:** shapes are stored from the door's bottom left corner, `X` across and `Z` up;
+  `Y` is how far back from the main front wall (0), into the house. The door sits **Set back into
+  the wall by** `door.recess` behind it.
   The **ground line** turns `Z` into height above the ground (the door sill is often a step or two
   up), and the leftmost block's left edge is the house's `x = 0`.
 - **Drawing tools** (a toolbar beside the photo, each with a key):
@@ -97,12 +108,13 @@ A photo of the front of the house, measured from its front door. Code: `pages/fa
   | Select | V | Picks a shape; drag it or its handles, Delete removes it |
   | Pan | H | Moves the photo (also: Space, the middle button, or two fingers; scroll or pinch zooms) |
   | Front door | D | Drag a box round the door, then fit its four corners. Door size in the bar above |
-  | Ground line | G | Tap where the wall meets the ground |
-  | House block | B | Drag a box from the ground to the eaves, wall edge to wall edge. Split levels and the garage are their own blocks. A block can **go into the ground** by a length (a basement), and **its bottom can be a floor** (that floor's height comes from it, unless a floor line sets it) |
+  | Ground line | G | Tap where the wall meets the ground at one end of the house, then at the other. Tap the line to add a bend where the front steps in or out, and drag it onto the corner; drag the ends to tilt it; Alt-click a bend to take it out. The ground's height is the ends' average; each point is found on the ground (`onGround`), giving the front **footprint** (how far back or out each bend is) |
+  | House block | B | Drag a box from the ground to the eaves, wall edge to wall edge. Split levels, the garage and the entry are their own blocks. **Its front wall:** in line, sticks out (an overhang), set back (a recessed entry), or follows the ground line (from its footprint). **Part of** a level, with **its floor** the same as the level's or higher or lower (a landing, storage over the entry); **its bottom is that level's floor** sets the level's height. It can **go into the ground** by a length (a basement) |
   | Roof outline | R | Tap each corner of a roof as seen from the street, all the way round; tap the first corner (or Enter) to finish, Backspace takes the last one back, Esc stops. Any number of roofs, any shape (a porch overhang and a dormer are roofs of their own). Each says how it **goes back**: **slopes to a ridge** (the outline is the front slope; a trapezoid makes a hip roof), **same shape all the way back** (a gable facing the street, or a flat roof), or **one slope to the back** (a shed roof); plus its depth, how far back the ridge is, and how far it's set back (less than 0 sticks out toward the street). Drag a corner to move it, double-click an edge to add one, Alt-click a corner to take it out |
+  | Roof edge line | E | Trace the bottom edge of each roof level, end to end (one line per level). The **roofline** is from the leftmost point to the rightmost, overlaps counted once; it scales the top view. **Eaves stick out** (24" unless changed) |
   | Window or door | N | Drag a box over a window, door or garage door |
   | Floor line | F | Pick an HA floor, then drag along where that floor is (a tap runs it across the block it's on). The line marks **the floor**, or **the ceiling under it** (where the siding changes between storeys): then the floor is a floor's thickness higher. **Floors are … thick** (12" unless changed) |
-  | Place a light | L | Tap where the light picked in the list is: **inside, by the window** (30 cm in, on the floor under that point) or **outside, on the wall** |
+  | Place a light | L | Tap where the light picked in the list is, measured on the block tapped: **inside, by the window** (30 cm in, on the block's level, else the floor under that point), **outside, on the wall**, or **under the eaves** (half the eaves' depth out, mount Under the eaves) |
   | Measure | M | Drag between two points for the distance |
 
   Undo and redo (Ctrl+Z, Ctrl+Shift+Z) cover every change. Edges snap to the ones already drawn
@@ -123,6 +135,66 @@ A photo of the front of the house, measured from its front door. Code: `pages/fa
 - The photo is shrunk in the page to 2400 px and saved as a JPEG, as `house_front.img` in the
   config folder. A new photo keeps the drawing but needs the door marked again.
 
+## The top view
+
+A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `site` in
+`house.json`; the photo is `house_top.img`.
+
+- **Placing the photo:** photo px (`u` right, `v` down) to house metres: flip `v`, turn by
+  `theta`, scale by `s`, shift by `(tx, ty)` (`xf`).
+  - **Square up:** one line along any straight wall or roof edge, running **across the front** or
+    **front to back**, turns the photo square. **Turn** adds quarter turns until the street is at
+    the bottom.
+  - **Scale from the roofline:** the front roof edge traced end to end. Only the distance across
+    between its two ends counts (after squaring). It equals the front photo's roofline, or a typed
+    length; the left end goes to the roofline's left end, the eaves' depth in front of the wall.
+  - **Check front to back** (optional): a second line and its known length. Over 3% apart is a
+    check (below).
+  Changing the placement keeps what's traced where it is on the photo.
+- **Roof outline:** its corners, in house metres. The **outside walls** are the outline pulled in
+  by the eaves (`inset`), as thick as their build (2x4, 2x6 or 2x8: studs, drywall, sheathing and
+  siding). The deepest point sets the house's depth, and blocks without their own depth go back
+  as far as the plan does over their width.
+- **Yard:** paths (a centre line and a width), driveways, patios, pools, garden beds, lawns
+  (outlines, straight or **curved**: a smooth curve through the points), trees and bushes (a
+  centre, a radius, an optional height). Drawn on the ground in 3D.
+- **Floor plans,** one per level:
+  - **Walls:** tap where one starts and ends; it stays square to the house and snaps to other
+    walls' ends and the outside walls' inside faces. Its build: 2x4, 2x6 or 2x8 with drywall
+    (½") or plaster (¾") on each face. **How far from** an outside wall or a parallel wall,
+    **wall face to wall face**, as measured with a tape: typing it moves the wall.
+  - **Doorways:** on a wall, a width and how far from the wall's end.
+  - **Rooms:** a name tied to one of Home Assistant's areas.
+  In 3D each wall is a see-through panel from its level's floor to its ceiling.
+- **Lights from above:** place a light on a level or outside. **Aim a light:** tap it; it is
+  **All around** (bulbs, ceiling lights), a **Flood** (90°), a **Spot** (25°) or a **Half** (a
+  wall light, up to 180°). Drag its arrow to turn it and the edge of its beam to widen it; tilt it
+  from straight down to straight up in the panel. Stored on the item as `aim: {kind, beam, tilt,
+  heading}`: heading in degrees clockwise from above, 0 facing the street. Drawn as a wedge from
+  above (a circle when it points straight up or down) and a cone in 3D.
+
+## Checks
+
+`HouseService.checks()` (in `GET /api/house` as `checks`) and the front photo's own
+(`FacadeEditor.checks()`) are plain arithmetic: numbers that should agree and don't, and things
+being guessed. Each has a `level` (`warn` or `info`), a `tab` to show (`photo`, `top`, `floors`)
+and a sentence. The page lists them above the views (**Things to check**), each with **Show me**.
+
+| Check | When |
+|---|---|
+| Mark the front door | a front photo without a door |
+| No ground line | heights are measured from the door sill |
+| Roof across, from above vs the front | more than 3% apart |
+| Front to back, from above vs the length given | more than 3% apart |
+| Floors out of Home Assistant's order | a floor at or below the one HA has under it |
+| Low ceiling | under 6 ft |
+| Guessed floors | some floors set, others following them |
+| Inside light outside the walls | an inside light outside the plan |
+| Wall outside the house | a floor plan wall beyond the outside walls |
+| Small door (page) | the door under 40 px wide in the photo |
+| Photo from the side (page) | the camera further off to the side than 70% of its distance |
+| Ground line tilted (page) | its ends more than 1 ft apart in height |
+
 ## API
 
 | Request | Body | Result |
@@ -139,6 +211,15 @@ A photo of the front of the house, measured from its front door. Code: `pages/fa
 | `GET /api/house/photo` | | the image |
 | `PUT /api/house/facade` | `{door: {pts: [[u, v] ×4: top left, top right, bottom right, bottom left], w, h}, ground: {z}, floor_depth?: 0.3048, blocks: [{id, name, x0, x1, z0, z1, depth?, y0?, below?, floor?}], roofs: [{id, name, pts: [[X, Z], …3–40], back: ridge\|extrude\|shed, depth?, y0?, ridge_y?}], openings: [{id, kind: window\|door\|garage, x0, x1, z0, z1}], lines: [{id, floor, x0, x1, z, at: floor\|below}]}` (facade metres) | the view, with the house width and floors applied; `400` without a photo or for a bad shape |
 | `DELETE /api/house/facade` | | the view; removes the photo and the drawing |
+| `PUT /api/house/photo?which=top&w=&h=` | the image bytes | the top view; it must be placed again |
+| `GET /api/house/photo?which=top` | | the image |
+| `PUT /api/house/site` | `{xf: {s, theta, tx, ty}, square: {a, b, runs: across\|depth}, turns, ref: {pts, length?}, check: {pts, length}, outline: [[x, y]…], ext_wall: 2x4\|2x6\|2x8, yard: [{id, kind, name, pts?, smooth?, width?, c?, r?, h?}], walls: [{id, level, a, b, studs, finish}], doors: [{id, wall, at, width}], rooms: [{id, level, at, area, name}]}` | the view; `400` for an unknown level, area, build, wall or yard kind |
+| `DELETE /api/house/site` | | the view; removes the top photo and its drawing |
+| `PUT /api/house/items/{target}/aim` | `{kind: flood\|spot\|wall, beam?, tilt?, heading?}` or `null` | the item; `400` before it's placed or out of range |
+
+`GET /api/house` also returns `site` (the top view as saved), `top` (`{plan, outline, ext_thick,
+yard, walls (with thickness), doors, rooms}`) and `checks`. `massing` adds `footprint` (the front
+along the ground), `roofline` and `eave`; its blocks add `level` and `offset` for spaces.
 
 `GET /api/house` also returns `facade` (the drawing as saved) and `massing` (`null` until a door
 and a block are drawn, else `{blocks, openings, roofs}` in house metres, for the 3D view; a
@@ -166,7 +247,8 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
   - **Move:** drag the picked light, or one of its parts, across its floor.
   - **Raise:** drag it up or down; it stops at the ceiling.
 - **Front photo** (the second tab): the drawing tools above.
-- **Plan & side** (the third tab), for exact positions:
+- **Top view** (the third tab): the photo from above, the yard, floor plans, and aiming.
+- **Plan & side** (the fourth tab), for exact positions:
 - **From above:** the plan, with a 1 m grid (5 m lines heavier) and the house outline. The chosen
   floor's span is highlighted, and lights on other floors are dimmed. Tap empty ground to place
   the selected light or part; drag it to move it (5 cm steps).

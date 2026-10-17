@@ -808,6 +808,96 @@ class HouseService:
         target = self.master_of(element) or element
         return self.world(target)
 
+    # ---- checks ----------------------------------------------------------------------------
+    #
+    # Plain arithmetic, no guessing: numbers that should agree and don't, and things not done
+    # yet that the map is guessing instead. Each says what to look at and where (`tab`).
+
+    def checks(self) -> list[dict]:
+        out: list[dict] = []
+
+        def add(level: str, tab: str, text: str) -> None:
+            out.append({"level": level, "tab": tab, "text": text})
+
+        inv: Inventory = self.inventory.inventory
+        f = self.data.get("facade") or {}
+        site = self.data.get("site") or {}
+        floors = self.floors()
+        if f.get("photo") and not f.get("door"):
+            add(
+                "info",
+                "photo",
+                "Mark the front door on the front photo: everything is measured from it.",
+            )
+        if f.get("door") and not f.get("ground"):
+            add("warn", "photo", "No ground line yet, so heights are measured from the door sill.")
+        # the roofline from the front against the roof outline from above
+        m = self.massing()
+        if m and m.get("roofline") and site.get("outline"):
+            xs = [p[0] for p in site["outline"]]
+            above = max(xs) - min(xs)
+            front = m["roofline"]
+            if abs(above - front) / front > 0.03:
+                add(
+                    "warn",
+                    "top",
+                    f"The roof is {_ft(above)} across from above but {_ft(front)} on the front "
+                    "photo. Check the roof edge lines on both, or the roof outline's corners.",
+                )
+        # the front-to-back check line on the top view
+        chk, xf = site.get("check"), site.get("xf")
+        if chk and xf and chk.get("length") and len(chk.get("pts") or []) >= 2:
+            a = house_site.photo_to_house(xf, *chk["pts"][0])
+            b = house_site.photo_to_house(xf, *chk["pts"][-1])
+            deep = abs(b[1] - a[1])
+            err = (deep - chk["length"]) / chk["length"]
+            if abs(err) > 0.03:
+                add(
+                    "warn",
+                    "top",
+                    f"Front to back, the top view measures {_ft(deep)}, not the "
+                    f"{_ft(chk['length'])} given ({err:+.0%}). The photo may lean, or the scale "
+                    "line is off.",
+                )
+        # floors: in Home Assistant's order, with room for their ceilings
+        real = sorted(
+            (fl for fl in inv.floors.values() if fl.id in floors and fl.level is not None),
+            key=lambda fl: fl.level,
+        )
+        for lo, hi in zip(real, real[1:], strict=False):
+            if floors[hi.id]["elevation"] <= floors[lo.id]["elevation"]:
+                add(
+                    "warn",
+                    "floors",
+                    f"{hi.name} is at or below {lo.name}, but Home Assistant has it above.",
+                )
+        for fl in real:
+            if floors[fl.id]["ceiling"] < 1.83:
+                add("warn", "floors", f"{fl.name}'s ceiling is under 6 ft.")
+        unset = [fl.name for fl in real if "elevation" not in self.data["floors"].get(fl.id, {})]
+        if unset and len(unset) < len(real):
+            add(
+                "info",
+                "photo",
+                f"Guessed from the others: {', '.join(unset)}. Draw a floor line for each, or "
+                "set a block's bottom as its floor.",
+            )
+        # lights against the walls from above
+        plan = self.plan()
+        if plan:
+            for tid, item in self.data["items"].items():
+                if item["floor"] == OUTSIDE:
+                    continue
+                if not house_site.inside(plan, item["x"], item["y"]):
+                    name = next((t["name"] for t in self.targets() if t["id"] == tid), tid)
+                    add("warn", "top", f"{name} is inside on the map, but outside the walls.")
+            for w in site.get("walls") or []:
+                for x, y in (w["a"], w["b"]):
+                    if not house_site.inside(house_site.inset(plan, -0.3), x, y):
+                        add("warn", "top", "A wall on the floor plan goes outside the house.")
+                        break
+        return out
+
     def view(self) -> dict:
         inv: Inventory = self.inventory.inventory
         floors = self.floors()
@@ -826,10 +916,17 @@ class HouseService:
             "massing": self.massing(),
             "site": self.data.get("site"),
             "top": self.top(),
+            "checks": self.checks(),
         }
 
     def _save(self) -> None:
         self.store.save("house", self.data)
+
+
+def _ft(m: float) -> str:
+    """A length as feet and inches, for the checks' wording."""
+    inches = round(m / 0.0254)
+    return f"{inches // 12}' {inches % 12}\""
 
 
 def _migrate_roofs(facade: dict | None) -> None:

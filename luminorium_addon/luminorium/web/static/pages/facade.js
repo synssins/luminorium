@@ -236,6 +236,26 @@ window.FacadeEditor = class FacadeEditor {
       for (const b of auto) b.y0 = round3(this.footY((b.x0 + b.x1) / 2) ?? 0);
     }, [...auto, ...this.doc.openings.filter((o) => auto.some((b) => inRect(o, b))), ...this.doc.lines.filter((l) => auto.some((b) => inRect({ x0: l.x0, x1: l.x1, z0: l.z, z1: l.z }, b)))]);
   }
+  // What the front photo itself says to check (the server checks the rest)
+  checks() {
+    const out = [];
+    const d = this.doc;
+    if (!d || !this.cam || !d.door) return out;
+    const fmt = L.fmtLen;
+    const px = Math.hypot(d.door.pts[1][0] - d.door.pts[0][0], d.door.pts[1][1] - d.door.pts[0][1]);
+    if (px < 40) out.push({ level: "info", tab: "photo", text: `The door is only ${Math.round(px)} pixels wide in the photo, so measurements are rough. Zoom in when fitting its corners, or use a closer photo.` });
+    const xs = d.blocks.flatMap((b) => [b.x0, b.x1]);
+    const mid = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : d.door.w / 2;
+    const away = -this.cam.pos.Y;
+    if (away > 0 && Math.abs(this.cam.pos.X - mid) > 0.7 * away) out.push({ level: "warn", tab: "photo", text: "The front photo was taken from well off to the side, so the far end of the house measures less reliably. A photo from straight across the street is best." });
+    const g = d.ground;
+    if (g && g.pts && g.pts.length >= 2) {
+      const ends = [g.pts[0], g.pts[g.pts.length - 1]].map(([u, v]) => this.toFacade(u, v, 0));
+      if (ends.every(Boolean) && Math.abs(ends[0].Z - ends[1].Z) > 0.3) out.push({ level: "warn", tab: "photo", text: `The ground line's ends are ${fmt(Math.abs(ends[0].Z - ends[1].Z))} apart in height. Either the yard slopes along the front, or one end is off.` });
+    }
+    return out;
+  }
+
   // How far back the footprint is at X (along the ground line), or null
   footY(X) {
     const f = this.doc.ground && this.doc.ground.footprint;
