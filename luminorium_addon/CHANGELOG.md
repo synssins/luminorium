@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.34
+
+- **Pick several, copy and paste** (Top view): Ctrl+click picks several walls, rooms, stairs or
+  yard shapes; drag them together or delete them. Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste
+  onto the level shown in the same place, so a stack of walls copies from one floor to the next
+  (doorways come too). Ctrl+A picks everything on the level, Ctrl+D duplicates, Esc lets go. The
+  panel has buttons for the same, and **Copy to** a level.
+
 ## 0.3.0-dev.33
 
 - **Windows follow their wall in 3D:** a window or door sits on the front wall of the block it's

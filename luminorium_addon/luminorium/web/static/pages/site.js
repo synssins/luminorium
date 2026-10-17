@@ -18,6 +18,7 @@ window.SiteEditor = class SiteEditor {
     this.photo = null;
     this.img = null;
     this.tool = "square";
+    this.picks = [];          // several picked (Ctrl+click): [{ kind, id }]
     this.sel = null;          // { kind: "outline"|"yard"|"wall"|"door"|"room"|"square"|"ref"|"check", id }
     this.level = null;        // the level whose floor plan is shown
     this.opts = { yard: "path", studs: "2x4", finish: "drywall", smooth: false, angled: false };
@@ -81,7 +82,7 @@ window.SiteEditor = class SiteEditor {
   }
   undo() { if (!this.undoStack.length) return; this.redoStack.push(this.snapshot()); this.doc = JSON.parse(this.undoStack.pop()); this.afterHistory(); }
   redo() { if (!this.redoStack.length) return; this.undoStack.push(this.snapshot()); this.doc = JSON.parse(this.redoStack.pop()); this.afterHistory(); }
-  afterHistory() { if (this.sel && !this.shape(this.sel)) this.sel = null; this.scheduleSave(); this.paint(); }
+  afterHistory() { this.picks = this.picks.filter((q) => this.shape(q)); if (this.sel && !this.shape(this.sel)) this.sel = null; this.scheduleSave(); this.paint(); }
   scheduleSave() {
     clearTimeout(this.saveTimer);
     this.saveEl.textContent = "Saving…";
@@ -510,6 +511,13 @@ window.SiteEditor = class SiteEditor {
     let body = null;
     if (!this.open()) body = null;
     else if (this.tool === "across") body = this.chainPanel();
+    else if (this.picks.length > 1) {
+      const n = (kind) => this.picks.filter((q) => q.kind === kind).length;
+      const parts = [["wall", "wall"], ["room", "room"], ["stairs", "stairs"], ["yard", "yard shape"]].map(([k, w]) => (n(k) ? `${n(k)} ${w}${n(k) > 1 && k !== "stairs" ? "s" : ""}` : null)).filter(Boolean);
+      body = el("div.fc-sum", el("h3", `${this.picks.length} picked`), el("span.small", parts.join(", ")),
+        el("span.small.muted", "Drag any of them to move them together. Ctrl+click another to add it, or one of these to take it out."),
+        this.clipRow(), el("button.btn.small.danger", { type: "button", on: { click: () => this.remove() } }, "Delete them"));
+    }
     else if (!s) {
       const err = this.checkError();
       const outer = this.planOuter();
@@ -604,6 +612,8 @@ window.SiteEditor = class SiteEditor {
       body = el("div.fc-sum", el("h3", { ref: "Scale line", check: "Front-to-back check", square: "Square-up line" }[this.sel.kind]),
         el("p.small.muted", "Drag its points to adjust it."), del);
     }
+    // under one wall, room, stairs or yard shape (or nothing, with something copied): copy and paste
+    if (body && this.open() && this.tool === "select" && this.picks.length <= 1 && ((this.sel && COPYABLE.includes(this.sel.kind)) || (!this.sel && CLIP && clipCount()))) body.append(this.clipRow());
     L.set(this.inspEl, body);
     this.inspEl.style.display = body ? "" : "none";
   }
@@ -687,7 +697,20 @@ window.SiteEditor = class SiteEditor {
     else { w.a[1] = round3(w.a[1] + delta); w.b[1] = round3(w.b[1] + delta); }
   }
 
+  // What's picked: several (Ctrl+click), else the one
+  picked() { return this.picks.length > 1 ? [...this.picks] : this.sel ? [this.sel] : []; }
   remove() {
+    if (this.picks.length > 1) {
+      const b = this.snapshot(), d = this.doc;
+      for (const q of this.picks) {
+        const key = LISTS[q.kind];
+        if (key) d[key] = d[key].filter((x) => x.id !== q.id);
+        if (q.kind === "wall") d.doors = d.doors.filter((x) => x.wall !== q.id);
+      }
+      this.picks = []; this.sel = null;
+      this.commit(b);
+      return;
+    }
     if (!this.sel) return;
     const b = this.snapshot(), k = this.sel.kind, d = this.doc;
     if (k === "light") return;
@@ -749,7 +772,7 @@ window.SiteEditor = class SiteEditor {
 
   drawShapes(ctx, col) {
     const d = this.doc;
-    const isSel = (kind, id) => this.sel && this.sel.kind === kind && (id === undefined || this.sel.id === id);
+    const isSel = (kind, id) => (this.sel && this.sel.kind === kind && (id === undefined || this.sel.id === id)) || this.picks.some((q) => q.kind === kind && q.id === id);
     const house = this.ctx.house();
     // the street side
     ctx.font = `600 11px ${getComputedStyle(document.body).fontFamily}`;
@@ -823,7 +846,7 @@ window.SiteEditor = class SiteEditor {
         // stairs from another level that lead here: the same stairs, the other way
         else if (t.to === this.level) this.drawStairs(ctx, stairsSeenFrom(t), isSel("stairs", t.id), col);
       }
-      if (this.sel && this.sel.kind === "wall" && this.tool !== "across") this.drawWallDims(ctx, col);
+      if (this.sel && this.sel.kind === "wall" && this.tool !== "across" && this.picks.length <= 1) this.drawWallDims(ctx, col);
       if (this.tool === "across") this.drawChain(ctx, col);
       for (const r of d.rooms) {
         if (r.level !== this.level) continue;
@@ -1243,7 +1266,14 @@ window.SiteEditor = class SiteEditor {
       if (e.key === "Escape") { this.draft = null; this.paint(); return; }
     }
     if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); this.remove(); return; }
-    if (e.key === "Escape") { this.sel = null; this.measure = null; this.paint(); return; }
+    if (e.key === "Escape") { this.sel = null; this.picks = []; this.measure = null; this.paint(); return; }
+    if (e.ctrlKey || e.metaKey) {
+      if (k === "c") { e.preventDefault(); this.copy(); return; }
+      if (k === "x") { e.preventDefault(); if (this.copy()) this.remove(); return; }
+      if (k === "v") { e.preventDefault(); this.paste(); return; }
+      if (k === "a") { e.preventDefault(); this.selectAll(); return; }
+      if (k === "d") { e.preventDefault(); if (this.copy(true)) this.paste(); return; }
+    }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const t = this.TOOLS().find((x) => x.key && x.key.toLowerCase() === k);
     if (t) { e.preventDefault(); this.setTool(t.id); }
@@ -1345,6 +1375,23 @@ window.SiteEditor = class SiteEditor {
     if (this.tool === "yard" && (this.opts.yard === "tree" || this.opts.yard === "bush")) { this.drag = { kind: "circle", c: [x, y], start: p, before }; return; }
     if (this.tool === "select" || this.tool === "aim") {
       const hit = this.hitShape(p);
+      if (this.tool === "select" && (e.ctrlKey || e.metaKey)) {
+        // Ctrl (or ⌘) + click: add it to what's picked, or take it out
+        if (hit && COPYABLE.includes(hit.kind)) {
+          const now = this.picked().filter((q) => COPYABLE.includes(q.kind));
+          const i = now.findIndex((q) => q.kind === hit.kind && q.id === hit.id);
+          if (i >= 0) now.splice(i, 1); else now.push(hit);
+          this.picks = now.length > 1 ? now : [];
+          this.sel = now[now.length - 1] || null;
+          this.paint();
+        }
+        return;
+      }
+      if (hit && this.picks.length > 1 && this.picks.some((q) => q.kind === hit.kind && q.id === hit.id)) {
+        this.drag = { kind: "moveMany", before, start: p, h0: [x, y], items: this.picks.map((q) => ({ q, orig: JSON.parse(JSON.stringify(this.shape(q))) })) };
+        return;
+      }
+      this.picks = [];
       if (hit && (this.tool === "select" || hit.kind === "light")) {
         this.sel = hit;
         if (hit.kind === "light") this.ctx.select(hit.id);
@@ -1385,6 +1432,7 @@ window.SiteEditor = class SiteEditor {
     const [x, y] = this.s2h(p);
     if (d.kind === "handle") { this.dragHandle(d.h, p, [x, y]); this.render(); return; }
     if (d.kind === "moveShape") { this.dragShape(d, [x, y]); this.render(); return; }
+    if (d.kind === "moveMany") { this.dragMany(d, [x, y]); this.render(); return; }
     if (d.kind === "measure") { this.measure = { a: d.a, b: [x, y], len: Math.hypot(x - d.a[0], y - d.a[1]) }; this.paintOptions(); this.render(); return; }
     if (d.kind === "wallDraw") { d.b = this.wallEnd(d.a, [x, y], null, e.altKey); d.a2 = this.shifted(d.a); this.render(); return; }
     if (d.kind === "stairDraw") { d.b = [x, y]; this.render(); return; }
@@ -1443,6 +1491,16 @@ window.SiteEditor = class SiteEditor {
       if (h.i === 0) { s.a = q; s.b = o2; } else { s.b = q; s.a = o2; }
     }
   }
+  // Several picked things dragged together; the first wall among them snaps as one would alone
+  dragMany(d, [x, y]) {
+    let dx = x - d.h0[0], dy = y - d.h0[1];
+    const w = d.items.find((it) => it.q.kind === "wall");
+    if (w) {
+      const [a] = this.snapWallMove(this.shape(w.q), [w.orig.a[0] + dx, w.orig.a[1] + dy], [w.orig.b[0] + dx, w.orig.b[1] + dy], this.altHeld);
+      dx = a[0] - w.orig.a[0]; dy = a[1] - w.orig.a[1];
+    }
+    for (const it of d.items) moveItem(it.q.kind, this.shape(it.q), it.orig, dx, dy);
+  }
   dragShape(d, [x, y]) {
     const dx = x - d.h0[0], dy = y - d.h0[1], o = d.orig, s = this.shape(d.hit);
     if (!s) return;
@@ -1489,6 +1547,7 @@ window.SiteEditor = class SiteEditor {
       this.commit(d.before); return;
     }
     if (d.kind === "moveShape") { if (!tapped) this.commit(d.before); else this.paint(); return; }
+    if (d.kind === "moveMany") { if (!tapped) this.commit(d.before); else { this.picks = []; this.sel = d.items[d.items.length - 1].q; this.paint(); } return; }
     if (d.kind === "squareDraw") {
       if (tapped) return;
       const a = this.h2p(...this.s2h(d.start)), b = this.h2p(x, y);
@@ -1609,6 +1668,81 @@ window.SiteEditor = class SiteEditor {
   wallEnd(a, p, skip, free, angled = this.opts.angled) {
     if (angled) return this.snapWall(p, null, skip, free);
     return this.snapWall(squareTo(a, p), a, skip, free);
+  }
+  // ---- copy and paste: walls (with their doorways), rooms, stairs and yard shapes ------------------
+  copy(quiet = false) {
+    const d = this.doc, items = this.picked().filter((q) => COPYABLE.includes(q.kind));
+    if (!items.length) { if (!quiet) L.toast("Pick walls, rooms, stairs or yard shapes to copy (Ctrl+click picks several)"); return false; }
+    const ids = (kind) => new Set(items.filter((q) => q.kind === kind).map((q) => q.id));
+    const pick = (list, kind) => list.filter((x) => ids(kind).has(x.id)).map((x) => JSON.parse(JSON.stringify(x)));
+    const walls = pick(d.walls, "wall"), wallIds = new Set(walls.map((w) => w.id));
+    CLIP = { level: this.level, walls, doors: d.doors.filter((x) => wallIds.has(x.wall)).map((x) => ({ ...x })), rooms: pick(d.rooms, "room"), stairs: pick(d.stairs, "stairs"), yard: pick(d.yard, "yard") };
+    if (!quiet) L.toast(`Copied ${clipCount()}. Show another level and paste (Ctrl+V) to put them in the same place there.`);
+    this.paint();
+    return true;
+  }
+  // Onto the level shown, in the same place (so walls stack from one level to the next); where
+  // they'd land on themselves, a foot over
+  paste(level = this.level) {
+    if (!CLIP || !clipCount()) { L.toast("Nothing copied yet"); return; }
+    const d = this.doc, before = this.snapshot();
+    // already there (pasted twice, or onto the level they came from): a foot over
+    const same = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.01;
+    const there = CLIP.walls.some((w) => d.walls.some((o) => o.level === level && same(o.a, w.a) && same(o.b, w.b)))
+      || CLIP.rooms.some((r) => d.rooms.some((o) => o.level === level && same(o.at, r.at)))
+      || CLIP.stairs.some((t) => d.stairs.some((o) => o.level === level && same([o.x0, o.y0], [t.x0, t.y0]) && same([o.x1, o.y1], [t.x1, t.y1])));
+    const shift = level === CLIP.level || there ? 0.3048 : 0;
+    const mv = (pt) => [round3(pt[0] + shift), round3(pt[1] - shift)];
+    const picks = [], newWall = new Map();
+    for (const w of CLIP.walls) { const id = uid(); newWall.set(w.id, id); d.walls.push({ ...w, id, level, a: mv(w.a), b: mv(w.b) }); picks.push({ kind: "wall", id }); }
+    for (const dr of CLIP.doors) d.doors.push({ ...dr, id: uid(), wall: newWall.get(dr.wall) });
+    for (const r of CLIP.rooms) { const id = uid(); d.rooms.push({ ...r, id, level, at: mv(r.at) }); picks.push({ kind: "room", id }); }
+    for (const t of CLIP.stairs) {
+      const id = uid();
+      // stairs pasted onto the level they led to lead back to where they came from
+      const to = t.to === level ? CLIP.level : t.to;
+      d.stairs.push({ ...t, id, level, to, x0: round3(t.x0 + shift), x1: round3(t.x1 + shift), y0: round3(t.y0 - shift), y1: round3(t.y1 - shift) });
+      picks.push({ kind: "stairs", id });
+    }
+    for (const y of CLIP.yard) {
+      const id = uid(), yy = JSON.parse(JSON.stringify(y));
+      if (yy.pts) yy.pts = yy.pts.map(([a, b]) => [round3(a + 0.3048), round3(b - 0.3048)]);
+      if (yy.c) yy.c = [round3(yy.c[0] + 0.3048), round3(yy.c[1] - 0.3048)];
+      d.yard.push({ ...yy, id });
+      picks.push({ kind: "yard", id });
+    }
+    if (level !== this.level) this.level = level;
+    this.tool = "select";
+    this.picks = picks.length > 1 ? picks : [];
+    this.sel = picks[picks.length - 1] || null;
+    this.commit(before);
+    L.toast(`Pasted ${clipCount()} on ${this.levelName()}${shift ? ", a foot over" : ""}`);
+  }
+  // Every wall, room and stairs on the level shown
+  selectAll() {
+    const d = this.doc, here = (x) => x.level === this.level;
+    const picks = [...d.walls.filter(here).map((x) => ({ kind: "wall", id: x.id })), ...d.rooms.filter(here).map((x) => ({ kind: "room", id: x.id })), ...d.stairs.filter(here).map((x) => ({ kind: "stairs", id: x.id }))];
+    if (!picks.length) { L.toast(`Nothing drawn on the ${this.levelName()} plan yet`); return; }
+    this.tool = "select";
+    this.picks = picks.length > 1 ? picks : [];
+    this.sel = picks[picks.length - 1];
+    this.paint();
+  }
+  // The buttons for the same: on a phone or tablet there's no keyboard
+  clipRow() {
+    const { el } = L;
+    const some = this.picked().some((q) => COPYABLE.includes(q.kind));
+    const others = this.ctx.floors().filter((f) => f.id !== this.level);
+    const to = el("select.input", { style: { width: "auto" } }, others.map((f) => el("option", { value: f.id }, f.name)));
+    return el("div", { style: { display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--line)", paddingTop: "10px" } },
+      el("div.row", { style: { gap: "6px", flexWrap: "wrap" } },
+        some ? el("button.btn.small", { type: "button", title: "Ctrl+C", on: { click: () => this.copy() } }, "Copy") : null,
+        some ? el("button.btn.small", { type: "button", title: "Ctrl+X", on: { click: () => { if (this.copy()) this.remove(); } } }, "Cut") : null,
+        CLIP && clipCount() ? el("button.btn.small", { type: "button", title: "Ctrl+V", on: { click: () => this.paste() } }, `Paste ${clipCount()} here`) : null),
+      some && others.length ? el("div.row", { style: { gap: "6px", flexWrap: "wrap", alignItems: "center" } },
+        el("span.small.muted", "Copy to"), to,
+        el("button.btn.small", { type: "button", on: { click: () => { if (this.copy(true)) this.paste(to.value); } } }, "Copy")) : null,
+      el("span.small.muted", "Ctrl+click picks several. Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+A (everything on this level), Ctrl+D (duplicate), Delete, Esc."));
   }
   // A whole wall dragged to a, b: whichever of its ends comes near another wall's end, a corner of
   // the outside walls' inside face, or onto another wall (not one alongside it), takes it there,
@@ -1765,6 +1899,21 @@ function setStair(s, { width, tread, steps }, floors) {
   s.steps = n;
   const run = n * tr;
   if (s.dir[1] === "+") s[`${along}1`] = round3(s[`${along}0`] + run); else s[`${along}0`] = round3(s[`${along}1`] - run);
+}
+// What can be picked several at a time, copied and pasted, and where each kind is kept
+const COPYABLE = ["wall", "room", "stairs", "yard"];
+const LISTS = { yard: "yard", wall: "walls", door: "doors", room: "rooms", stairs: "stairs" };
+// The clipboard: shared by every Top view on the page, kept while the page is open
+let CLIP = null;
+function clipCount() { return CLIP ? CLIP.walls.length + CLIP.rooms.length + CLIP.stairs.length + CLIP.yard.length : 0; }
+// Move a plan item from its original by dx, dy
+function moveItem(kind, s, o, dx, dy) {
+  if (!s) return;
+  const mv = ([px, py]) => [round3(px + dx), round3(py + dy)];
+  if (kind === "wall") { s.a = mv(o.a); s.b = mv(o.b); }
+  else if (kind === "room") s.at = mv(o.at);
+  else if (kind === "stairs") { s.x0 = round3(o.x0 + dx); s.x1 = round3(o.x1 + dx); s.y0 = round3(o.y0 + dy); s.y1 = round3(o.y1 + dy); }
+  else if (kind === "yard") { if (o.c) s.c = mv(o.c); else s.pts = o.pts.map(mv); }
 }
 // Stairs as seen from the level they lead to: from there they go the other way
 function stairsSeenFrom(t) {

@@ -201,6 +201,14 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
     9' 6" away"), with matching numbered tags on the plan; the chosen one is blue, with a
     blueprint dimension (ticks at the two faces, the length over the middle). **Pick on the plan**
     then a tap on a wall chooses it.
+  - **Picking several, copy and paste** (Select): Ctrl+click (⌘ on a Mac) adds a wall, room,
+    stairs or yard shape to what's picked, or takes it out; drag any of them to move them
+    together; Delete removes them. Ctrl+C copies (walls with their doorways), Ctrl+X cuts,
+    Ctrl+V pastes onto the level shown in the same place, so walls stack from one level to the
+    next (where they'd land on themselves, a foot over). Ctrl+A picks everything on the level
+    shown, Ctrl+D duplicates, Esc lets go. Stairs pasted onto the level they led to lead back.
+    The panel has the same as buttons (Copy, Cut, Paste, **Copy to** a level) for phones and
+    tablets. The clipboard lasts while the page is open.
   - **Measure across** (X): tape measurements straight across a level. Tap the walls in the order
     measured: an outside wall's inside face first if you can, each wall in between, then the far
     wall (all running the same way, in order). Type each face-to-face measurement in the panel;
