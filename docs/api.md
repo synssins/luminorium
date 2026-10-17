@@ -120,6 +120,13 @@ Body `{"driver": "z2m"}` (any of the light's `driver_options`) to pin a driver, 
 `{"driver": null}` for automatic. Stored in `choices.json`. Returns the light. `400` for a
 driver the light can't use, `404` for unknown entities.
 
+## `PUT /api/lights/{entity_id}/white_only`
+
+Body `{"white_only": true}` marks a light whose bulbs only give white, whatever colour they're
+sent (the white LEDs of the WLED pathway); `false` clears it. Stored in `choices.json` (the
+`white_only` list); the light's `white_only` field shows it. Palette layers leave such lights out
+unless the play sets `include_white`. `404` for unknown lights.
+
 ## `POST /api/lights/{entity_id}/test`
 
 Starts the Test sequence. Optional body `{"transition_ms": 3000, "effect": "candle",
@@ -151,7 +158,7 @@ plus `exclude`.
 | `GET /api/palettes` | | `[{id, name, category, colors: [{hex or kelvin, weight}], brightness, transition_s, hold_s, spread, white?, source}]`; `source` is `builtin` or `user` |
 | `PUT /api/palettes/{id}` | a palette (as in [engine.md](engine.md#the-palette-cycler)) | the palette, saved to `/config/palettes/{id}.yaml`; `400` if invalid or the id isn't `a-z 0-9 _ -` |
 | `DELETE /api/palettes/{id}` | | `{"deleted": id}`; `404` if there is no user palette (built-ins can't be deleted) |
-| `POST /api/palettes/{id}/play` | `{"targets": {...}, "priority"?: 0, "on_end"?: "restore", "fade_s"?: 2, "brightness"?: 100, "duration_s"?, "seed"?}` | a running show; `404` for an unknown palette |
+| `POST /api/palettes/{id}/play` | `{"targets": {...}, "include_white"?: false, "priority"?: 0, "on_end"?: "restore", "fade_s"?: 2, "brightness"?: 100, "duration_s"?, "seed"?}` | a running show; `404` for an unknown palette |
 | `GET /api/effects` | | `[{id, name, color, software, integrations}]` |
 | `GET /api/lights/{entity_id}/effects` | | `{effect: {"method", "name"}}` for that light; `method` is `native`, `close`, `software` or `static` |
 | `GET /api/shows` | | saved shows |

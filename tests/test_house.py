@@ -111,7 +111,12 @@ def test_wled_leds_are_parts_and_segment_lights_fold_in(lum):
         mac="aabbccddeeff",
         leds=8,
         online=True,
-        segments=[{"id": 0, "start": 0, "stop": 4}, {"id": 1, "start": 4, "stop": 8}],
+        # As the front pathway is set up: white and RGB LEDs alternate, each segment skipping
+        # every other LED
+        segments=[
+            {"id": 0, "name": "RGB", "start": 1, "stop": 8, "grp": 1, "spc": 1},
+            {"id": 1, "name": "White", "start": 0, "stop": 7, "grp": 1, "spc": 1},
+        ],
     )
     inv = lum.inventory.inventory
     master = inv.lights["light.front_pathway_master"]
@@ -121,16 +126,57 @@ def test_wled_leds_are_parts_and_segment_lights_fold_in(lum):
     )
     lum.router.drivers["wled"] = wled
     parts = lum._parts_for(master)
-    assert [p.label for p in parts][:5] == [
-        "LED 1 · segment 0",
-        "LED 2 · segment 0",
-        "LED 3 · segment 0",
-        "LED 4 · segment 0",
-        "LED 5 · segment 1",
+    assert [p.label for p in parts] == [
+        f"LED {i} · {'White' if i % 2 else 'RGB'}" for i in range(1, 9)
     ]
+    # The RGB segment is LEDs 2, 4, 6, 8
+    assert wled.leds(rgb) == [1, 3, 5, 7]
+    assert [p.label for p in lum._parts_for(rgb)] == ["LED 2", "LED 4", "LED 6", "LED 8"]
     ids = {t["id"] for t in lum.house.targets()}
     assert "light.front_pathway_master" in ids
     assert "light.front_pathway_rgb" not in ids and "light.front_pathway_white" not in ids
+
+
+def test_segment_leds_follow_grouping_and_spacing():
+    from luminorium.drivers.wled import segment_leds
+
+    assert segment_leds({"start": 0, "stop": 7, "grp": 1, "spc": 1}) == [0, 2, 4, 6]
+    assert segment_leds({"start": 2, "stop": 12, "grp": 2, "spc": 3}) == [2, 3, 7, 8]
+    assert segment_leds({"start": 3, "stop": 6}) == [3, 4, 5]
+
+
+async def test_stream_to_an_interleaved_segment_leaves_the_others_dark():
+    wled = WLEDDriver()
+    device = WLEDDevice(
+        host="192.0.2.5",
+        mac="aabbccddeeff",
+        leds=8,
+        online=True,
+        segments=[{"id": 0, "start": 1, "stop": 8, "grp": 1, "spc": 1}],
+    )
+    wled.device_for = lambda light: (device, 0)
+    sent = []
+
+    class Sock:
+        def sendto(self, data, addr):
+            sent.append(data)
+
+    wled._ddp = Sock()
+    await wled.stream(object(), [(255, 0, 0), (0, 255, 0), (0, 0, 255), (9, 9, 9)])
+    (packet,) = sent
+    offset = int.from_bytes(packet[4:8], "big")
+    pixels = [tuple(packet[10 + i : 13 + i]) for i in range(0, len(packet) - 10, 3)]
+    # LEDs 2..8: the segment's LEDs get the colours, the white LEDs between them stay dark
+    assert offset == 3
+    assert pixels == [
+        (255, 0, 0),
+        (0, 0, 0),
+        (0, 255, 0),
+        (0, 0, 0),
+        (0, 0, 255),
+        (0, 0, 0),
+        (9, 9, 9),
+    ]
 
 
 async def test_flash_pixel_lights_one_led(lum):

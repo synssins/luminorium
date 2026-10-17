@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0-dev.4
+
+- **White only lights:** mark a light whose bulbs only give white (the pathway's white LEDs) on
+  its page. Palettes leave it alone unless **Include white lights** is ticked next to **Play on**.
+- **WLED segments that interleave** (white and RGB LEDs alternating, with spacing) are read
+  right: the house map labels each LED with its segment, and flashing one LED lights that LED.
+- **Halloween palette:** purple and deep orange, each light fading into the next colour over 3-9 s
+  at random.
+
 ## 0.3.0-dev.3
 
 - **Front photo:** measure the house from a photo of its front. Box the front door (36" × 80" by

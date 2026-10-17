@@ -70,7 +70,12 @@ On **Palettes & shows**, choose where to play (every light, a whole level, or a 
 Each light wanders through the palette's colours on its own, with long fades. **Stop** puts the
 lights back as they were.
 
-Starter palettes: Forest, Ocean, Fire, Aurora, Sunset, Team colours, Warm white. Your own go in
+Lights whose bulbs only give white, whatever colour they're sent (like the white LEDs on a WLED
+pathway), can be marked **White only** on their page, under **Its bulbs**. Palettes leave them
+alone unless you tick **Include white lights** next to **Play on**.
+
+Starter palettes: Forest, Ocean, Fire, Aurora, Sunset, Team colours, Warm white, Halloween (purple
+and deep orange, each light blending on its own every few seconds). Your own go in
 the add-on's config folder (`/addon_configs/<slug>/palettes/<id>.yaml`); one with the same id as
 a starter palette replaces it. Saved shows go in `shows/`, extra effect names in `effects/`.
 

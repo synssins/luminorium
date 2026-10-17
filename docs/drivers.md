@@ -108,8 +108,13 @@ All discovery is reading: nothing found is changed. In `read_only` mode drivers 
 - `tt` (this call's transition, in 100 ms) carries `transition_ms`.
 - `effect(light, name, palette=, speed=, intensity=)`: by name, looked up in the controller's
   own lists.
+- **Segments can interleave.** A segment drives the LEDs from `start` to `stop`, `grp` on then
+  `spc` skipped, over and over (`segment_leds`). The front pathway has 8 LEDs: White is LEDs 1, 3,
+  5, 7 (`start` 0, `spc` 1) and RGB is 2, 4, 6, 8 (`start` 1, `spc` 1). `leds(light)` lists a
+  light's physical LEDs: the whole strip for the master light, else its segment's.
 - **DDP** (`stream(light, pixels)`): RGB frames to UDP 4048, 480 pixels per packet, the push flag
-  on the last one, offset at the segment's first LED. WLED shows them in realtime mode and goes
+  on the last one. The pixels go to the light's own LEDs; one run is sent from its first LED to its
+  last, and the other segments' LEDs in between are sent dark. WLED shows them in realtime mode and goes
   back to its own state a few seconds after frames stop. The caller paces frames; nothing is
   rate-limited here.
 

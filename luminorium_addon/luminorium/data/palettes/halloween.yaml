@@ -1,0 +1,14 @@
+id: halloween
+name: Halloween
+category: [holiday, spooky]
+colors:
+  - { hex: "#7a1fff", weight: 3 }   # purple
+  - { hex: "#a020f0", weight: 2 }   # violet
+  - { hex: "#ff4500", weight: 3 }   # deep orange
+  - { hex: "#ff6a00", weight: 2 }   # pumpkin
+# Each light drifts on its own: a few seconds to blend into the next colour, a short hold
+brightness: [45, 90]
+transition_s: [3, 9]
+hold_s: [1, 6]
+spread: per_element
+white: { kelvin: 1900 }

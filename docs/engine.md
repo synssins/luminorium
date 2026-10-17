@@ -28,7 +28,7 @@ all, outside changes) and the rate governor are in [safety.md](safety.md).
 | `engine/planner.py` | `Planner`: per-light rate, per-network budgets, what to send and with what transition |
 | `engine/engine.py` | `Engine`: play, stop, the tick, overlap, handing lights back; `resolve_targets()` |
 | `library.py` | `Library`: palettes and shows as YAML (built-in and user) |
-| `data/palettes/*.yaml` | Starter palettes: forest, ocean, fire, aurora, sunset, team_colours, warm_white |
+| `data/palettes/*.yaml` | Starter palettes: forest, ocean, fire, aurora, sunset, team_colours, warm_white, halloween |
 | `data/effects/builtin.yaml` | Normalised effects and their names per integration |
 
 ## Colour

@@ -4,7 +4,7 @@
 (function () {
   const { el, icon, api, run, toast, onData, start, store, save } = L;
   const page = document.getElementById("page");
-  const ui = { tab: store("palettes.tab", "palettes"), where: store("palettes.where", "all") };
+  const ui = { tab: store("palettes.tab", "palettes"), where: store("palettes.where", "all"), white: store("palettes.white", false) };
   let palettes = [];
   let shows = [];
   let effects = [];
@@ -41,6 +41,8 @@
   function strip(p) {
     return el("div.pstrip", (p.colors || []).map((c) => el("span", { style: { flex: String(c.weight || 1), background: L.colorHex(c) } })));
   }
+  function whiteCount(inv) { return inv.lights.filter((l) => l.included && l.white_only).length; }
+
   function describe(p) {
     const n = (p.colors || []).length;
     const t = p.transition_s ? `${p.transition_s[0]}–${p.transition_s[1]} s fades` : "";
@@ -49,7 +51,7 @@
 
   async function playPalette(p) {
     await run(async () => {
-      await api(`api/palettes/${encodeURIComponent(p.id)}/play`, { method: "POST", body: { targets: targetOf(ui.where, last.inventory) } });
+      await api(`api/palettes/${encodeURIComponent(p.id)}/play`, { method: "POST", body: { targets: targetOf(ui.where, last.inventory), include_white: !!ui.white } });
       toast(`Playing ${p.name}`);
     });
     await loadRunning(); paint();
@@ -83,7 +85,10 @@
       el("div.section-head", el("h2", "Palettes"),
         el("label.row", el("span.muted", "Play on"),
           el("select.input", { style: { width: "auto", minWidth: "240px" }, on: { change: (e) => { ui.where = e.target.value; save("palettes.where", ui.where); } } },
-            targets(last.inventory).map(([v, t]) => el("option", { value: v, selected: v === ui.where }, t))))),
+            targets(last.inventory).map(([v, t]) => el("option", { value: v, selected: v === ui.where }, t)))),
+        whiteCount(last.inventory) ? el("label.check", { title: "Lights whose bulbs only give white, like the white LEDs on the pathway" },
+          el("input", { type: "checkbox", checked: !!ui.white, on: { change: (e) => { ui.white = e.target.checked; save("palettes.white", ui.white); } } }),
+          `Include white lights (${whiteCount(last.inventory)})`) : null),
       readOnly ? el("div.banner.warn", "Read-only mode: palettes can't be played.") : null,
       el("div.grid", { style: { "--min": "250px" } }, palettes.map((p) =>
         el("article.pcard", strip(p),

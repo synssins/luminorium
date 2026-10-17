@@ -52,6 +52,15 @@ def ddp_packets(
     return out
 
 
+def segment_leds(segment: dict) -> list[int]:
+    """The physical LEDs a WLED segment drives: from start to stop, `grp` LEDs on then `spc`
+    skipped, over and over."""
+    start, stop = int(segment.get("start", 0)), int(segment.get("stop", 0))
+    grp = max(1, int(segment.get("grp") or 1))
+    spc = max(0, int(segment.get("spc") or 0))
+    return [i for i in range(start, stop) if (i - start) % (grp + spc) < grp]
+
+
 def _mac(text: str) -> str:
     return re.sub(r"[^0-9a-f]", "", text.lower())
 
@@ -87,7 +96,8 @@ class WLEDDevice:
     leds: int = 0
     effects: list[str] = field(default_factory=list)
     palettes: list[str] = field(default_factory=list)
-    segments: list[dict] = field(default_factory=list)  # [{"id", "start", "stop"}]
+    # [{"id", "name", "start", "stop", "grp", "spc"}]: grouping and spacing as WLED has them
+    segments: list[dict] = field(default_factory=list)
     online: bool = False
 
     @property
@@ -187,7 +197,14 @@ class WLEDDriver(DirectDriver):
             effects=[str(e) for e in effects],
             palettes=[str(p) for p in palettes],
             segments=[
-                {"id": s.get("id", i), "start": s.get("start", 0), "stop": s.get("stop", 0)}
+                {
+                    "id": s.get("id", i),
+                    "name": str(s.get("n") or ""),
+                    "start": s.get("start", 0),
+                    "stop": s.get("stop", 0),
+                    "grp": s.get("grp", 1),
+                    "spc": s.get("spc", 0),
+                }
                 for i, s in enumerate(state.get("seg") or [])
             ],
             online=True,
@@ -313,15 +330,20 @@ class WLEDDriver(DirectDriver):
     def can_stream(self, light: Light) -> bool:
         return self.device_for(light) is not None
 
-    def pixel_count(self, light: Light) -> int:
+    def leds(self, light: Light) -> list[int]:
+        """The light's physical LEDs, in order: the whole strip for the master light, else its
+        segment's (two segments can interleave, every other LED each, with spacing)."""
         found = self.device_for(light)
         if not found:
-            return 0
+            return []
         device, seg = found
         segment = next((s for s in device.segments if s["id"] == seg), None)
         if segment is None:
-            return device.leds
-        return max(0, segment["stop"] - segment["start"])
+            return list(range(device.leds))
+        return segment_leds(segment)
+
+    def pixel_count(self, light: Light) -> int:
+        return len(self.leds(light))
 
     async def stream(self, light: Light, pixels: list[tuple[int, int, int]]) -> None:
         """One DDP frame for the light's LEDs (its segment's range). WLED shows it in realtime
@@ -330,10 +352,17 @@ class WLEDDriver(DirectDriver):
         found = self.device_for(light)
         if found is None or self._ddp is None:
             raise ConnectionError(f"WLED device for {light.entity_id} not reachable")
-        device, seg = found
-        start = next((s["start"] for s in device.segments if s["id"] == seg), 0)
+        device, _ = found
+        leds = self.leds(light)[: len(pixels)]
+        if not leds:
+            return
+        # One run from the first LED to the last; LEDs in between that aren't the light's are dark
+        start = min(leds)
+        frame = [(0, 0, 0)] * (max(leds) - start + 1)
+        for led, px in zip(leds, pixels, strict=False):
+            frame[led - start] = px
         self._seq = self._seq % 15 + 1
-        for data in ddp_packets(pixels, start, self._seq):
+        for data in ddp_packets(frame, start, self._seq):
             self._ddp.sendto(data, (device.ip, self.ddp_port))
 
     def status(self) -> dict[str, Any]:

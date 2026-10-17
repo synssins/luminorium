@@ -141,7 +141,16 @@ def test_palette_validation():
 def test_starter_palettes(tmp_path):
     lib = Library(tmp_path)
     palettes = lib.palettes()
-    for pid in ("forest", "ocean", "fire", "aurora", "sunset", "team_colours", "warm_white"):
+    for pid in (
+        "forest",
+        "ocean",
+        "fire",
+        "aurora",
+        "sunset",
+        "team_colours",
+        "warm_white",
+        "halloween",
+    ):
         assert pid in palettes
     assert len(palettes["team_colours"].colors) == 2
     assert all(c.kelvin for c, _ in palettes["warm_white"].colors)

@@ -337,3 +337,29 @@ async def test_api_read_only_refuses_play(fake_ha, tmp_path):
         assert r.status_code == 409
         assert (await client.get("/api/palettes")).status_code == 200
     await app.stop()
+
+
+async def test_palettes_leave_white_only_lights_alone(api, lum):
+    rgb, white = "light.front_pathway_rgb", "light.front_pathway_white"
+    r = await api.put(f"/api/lights/{white}/white_only", json={"white_only": True})
+    assert r.status_code == 200 and r.json()["white_only"] is True
+    assert lum.inventory.store.load("choices")["white_only"] == [white]
+    assert (
+        await api.put("/api/lights/light.nope/white_only", json={"white_only": True})
+    ).status_code == 404
+
+    targets = {"lights": [rgb, white]}
+    run = (await api.post("/api/palettes/fire/play", json={"targets": targets})).json()
+    assert run["lights"] == [rgb]
+    await api.post(f"/api/running/{run['id']}/stop", json={})
+    # Unless the play asks for them
+    run = (
+        await api.post("/api/palettes/fire/play", json={"targets": targets, "include_white": True})
+    ).json()
+    assert sorted(run["lights"]) == [rgb, white]
+    await api.post(f"/api/running/{run['id']}/stop", json={})
+    # Only white-only lights: nothing left to play on
+    r = await api.post("/api/palettes/fire/play", json={"targets": {"lights": [white]}})
+    assert r.status_code == 400
+    r = await api.put(f"/api/lights/{white}/white_only", json={"white_only": False})
+    assert r.json()["white_only"] is False

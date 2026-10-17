@@ -12,7 +12,7 @@ from .drivers.govee import GoveeDriver
 from .drivers.ha import HADriver
 from .drivers.router import Router
 from .drivers.wiz import WiZDriver
-from .drivers.wled import WLEDDriver
+from .drivers.wled import WLEDDriver, segment_leds
 from .drivers.z2m import Z2MDriver
 from .drivers.zwave import ZWaveDriver
 from .engine.engine import Engine
@@ -79,17 +79,17 @@ class Luminorium:
             if not found:
                 return []
             device, seg = found
-            count = wled.pixel_count(light)
-            start = next((s["start"] for s in device.segments if s["id"] == seg), 0)
+            # Which segment each LED is in, so interleaved segments (white and RGB LEDs
+            # alternating along a path) label each LED right
+            owner = {}
+            for s in device.segments:
+                for led in segment_leds(s):
+                    owner.setdefault(led, s.get("name") or f"segment {s['id']}")
             parts = []
-            for i in range(count):
-                pixel = start + i
-                in_seg = next(
-                    (s["id"] for s in device.segments if s["start"] <= pixel < s["stop"]), None
-                )
-                label = f"LED {i + 1}"
-                if seg is None and len(device.segments) > 1 and in_seg is not None:
-                    label += f" · segment {in_seg}"
+            for i, led in enumerate(wled.leds(light)):
+                label = f"LED {led + 1}"
+                if seg is None and len(device.segments) > 1 and led in owner:
+                    label += f" · {owner[led]}"
                 parts.append(Part(i, label))
             return parts
         if light.segments:

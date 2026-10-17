@@ -36,6 +36,10 @@ class DriverBody(BaseModel):
     driver: str | None
 
 
+class WhiteOnlyBody(BaseModel):
+    white_only: bool
+
+
 class TestBody(BaseModel):
     transition_ms: int = 0
     effect: str | None = None
@@ -58,6 +62,7 @@ class MembersBody(BaseModel):
 
 class PlayPaletteBody(BaseModel):
     targets: dict
+    include_white: bool = False  # also play on lights marked white only
     priority: int = 0
     on_end: str = "restore"
     fade_s: float = 2.0
@@ -240,6 +245,15 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         light = lum.inventory.inventory.get(entity_id)
         return light_dict(light) if light else {}
 
+    @app.put("/api/lights/{entity_id}/white_only")
+    async def set_white_only(entity_id: str, body: WhiteOnlyBody):
+        try:
+            lum.inventory.set_white_only(entity_id, body.white_only)
+        except KeyError as err:
+            raise HTTPException(404, f"unknown light {entity_id}") from err
+        light = lum.inventory.inventory.get(entity_id)
+        return light_dict(light) if light else {}
+
     @app.post("/api/lights/{entity_id}/test")
     async def test_light(entity_id: str, body: TestBody | None = None):
         if lum.settings.read_only:
@@ -352,6 +366,7 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
             "fade_s": body.fade_s,
             "duration_s": body.duration_s,
             "seed": body.seed,
+            "include_white": body.include_white,
             "layers": [{"type": "palette", "palette": palette_id, "brightness": body.brightness}],
         }
         return await _play(spec, "palette", palette_id, body.targets)

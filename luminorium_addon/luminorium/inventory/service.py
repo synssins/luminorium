@@ -178,6 +178,19 @@ class InventoryService:
             self.choices.drivers[entity_id] = driver
         self._save()
 
+    def set_white_only(self, entity_id: str, white_only: bool) -> None:
+        """Mark a light whose bulbs only give white, whatever colour it's sent."""
+        light = self.inventory.get(entity_id)
+        if light is None or light.kind not in (Kind.LIGHT, Kind.SEGMENT):
+            raise KeyError(entity_id)
+        marked = set(self.choices.white_only)
+        if white_only:
+            marked.add(entity_id)
+        else:
+            marked.discard(entity_id)
+        self.choices.white_only = sorted(marked)
+        self._save()
+
     # ---- fixtures -----------------------------------------------------------------------------
 
     def create_fixture(self, name: str, members: list[str]) -> str:

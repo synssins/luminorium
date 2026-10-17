@@ -84,6 +84,7 @@ class Light:
     members: list[str] = field(default_factory=list)  # for groups
     duplicates: list[str] = field(default_factory=list)  # suggested: same light, other integration
     fixture: str | None = None  # id of the fixture this light is part of
+    white_only: bool = False  # the user says its bulbs only give white
     profile: Profile | None = None
     # How direct drivers find the light: HA's ids for the entity and its device
     unique_id: str | None = None

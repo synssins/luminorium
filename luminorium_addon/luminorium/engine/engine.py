@@ -216,6 +216,16 @@ class Engine:
             layer_targets = (layer.targets if not targets else None) or show_targets
             elements.append(resolve_targets(inv, layer_targets))
 
+        # Colour palettes leave white-only lights alone (they'd just glow white) unless asked
+        if not (spec.get("include_white") or (show_targets or {}).get("include_white")):
+            for layer, els in zip(layers, elements, strict=True):
+                if layer.kind != "palette":
+                    continue
+                for el in list(els.values()):
+                    el.members = [m for m in el.members if not inv.lights[m].white_only]
+                    if not el.members:
+                        del els[el.id]
+
         # Lights another session (a test) is using are left out
         busy = {eid for eid, snap in self.safety.snapshots.items() if snap.session != SESSION}
         for els in elements:

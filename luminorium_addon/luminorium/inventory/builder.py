@@ -39,6 +39,9 @@ class UserChoices:
     dismissed: list[list[str]] = field(default_factory=list)
     # entity_id -> driver the user picked ("ha", "z2m", ...); absent means automatic
     drivers: dict[str, str] = field(default_factory=dict)
+    # Lights whose bulbs only give white, whatever colour they're sent (the white LEDs of a WLED
+    # pathway); colour palettes leave them alone unless a play asks for them
+    white_only: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict | None) -> UserChoices:
@@ -51,6 +54,7 @@ class UserChoices:
                 for f in data.get("fixtures") or []
             ],
             dismissed=[sorted(m) for m in data.get("dismissed") or []],
+            white_only=sorted({str(e) for e in data.get("white_only") or []}),
         )
 
     def to_dict(self) -> dict:
@@ -59,6 +63,7 @@ class UserChoices:
             "fixtures": self.fixtures,
             "dismissed": self.dismissed,
             "drivers": dict(sorted(self.drivers.items())),
+            "white_only": sorted(self.white_only),
         }
 
 
@@ -195,6 +200,7 @@ def build(
         node = zwave_nodes.get(light.device_id or "")
         light.profile = build_profile(light, node, relay=light.kind == Kind.SWITCH)
         light.profile.driver_override = choices.drivers.get(light.entity_id)
+        light.white_only = light.entity_id in choices.white_only
 
     _apply_fixtures(inv, choices.fixtures)
     inv.suggestions = _suggest_fixtures(inv, choices.dismissed)

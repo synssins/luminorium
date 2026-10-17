@@ -27,6 +27,25 @@
     ];
   }
 
+  // A light HA thinks is colour, but whose bulbs only give white (the white LEDs of a pathway on
+  // a WLED strip): colour palettes then leave it alone
+  function bulbsCard(light) {
+    const c = (light.profile || {}).capabilities || {};
+    if (!(c.color_modes || []).length && !light.white_only) return null;
+    return el("section.card", { "aria-labelledby": "blb" },
+      el("h2#blb", "Its bulbs"),
+      el("div.seg", { role: "radiogroup", "aria-label": "Its bulbs" }, [[false, "Colour"], [true, "White only"]].map(([v, label]) =>
+        el("button", { type: "button", role: "radio", "aria-checked": String(!!light.white_only === v),
+          on: { click: () => setWhiteOnly(light, v) } }, label))),
+      el("span.small.muted", light.white_only
+        ? "Colour palettes leave it alone, unless you tick Include white lights next to Play on. Tests and other effects still use it."
+        : "Choose White only when its bulbs give white whatever colour they're sent, like the white LEDs on a WLED pathway."));
+  }
+  async function setWhiteOnly(light, value) {
+    await run(() => api(`api/lights/${encodeURIComponent(light.entity_id)}/white_only`, { method: "PUT", body: { white_only: value } }));
+    L.refresh(true);
+  }
+
   function driverCard(light) {
     const p = light.profile || {};
     const options = light.driver_options || ["ha"];
@@ -183,6 +202,7 @@
           : el("button.btn.primary", { type: "button", disabled: !testable || readOnly, on: { click: () => runTest(light, true) } }, "Test")]),
       el("div.cols",
         el("section.card", { "aria-labelledby": "cap" }, el("h2#cap", "What it can do"), capsRows(light)),
+        light.kind === "light" || light.kind === "segment" ? bulbsCard(light) : null,
         light.kind === "light" || light.kind === "switch" ? driverCard(light) : null,
         testable && !light.fixture ? testCard(light, readOnly) : null,
         placeCard(light, inventory)),

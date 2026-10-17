@@ -45,7 +45,8 @@
     const out = [];
     if (p.relay) out.push("On/off relay");
     else {
-      if (c.color_modes && c.color_modes.length) out.push("Colour");
+      if (light.white_only) out.push("White bulbs only");
+      else if (c.color_modes && c.color_modes.length) out.push("Colour");
       if (c.white) out.push("White");
       else if (c.dimming && !(c.color_modes || []).length) out.push("Dim");
       if (c.effects && c.effects.length) out.push(`${c.effects.length} effects`);
