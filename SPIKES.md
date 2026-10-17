@@ -277,9 +277,10 @@ each Test.
 | 5. Govee `devStatus` | Not run (see Govee above). |
 
 Open:
-- **Govee LAN vs govee2mqtt:** both want UDP 4002 on the host. Either turn off govee2mqtt's LAN
-  side (it would then use the cloud only, which it already does here) or stop govee2mqtt and let
-  Luminorium own Govee on the LAN, keeping HA entities through govee2mqtt's cloud path or not at
-  all. Govee replies always go to 4002, so they can't share it.
+- **Govee LAN vs govee2mqtt: decided 21:27.** Luminorium owns Govee on the LAN. govee2mqtt has
+  `no_multicast: true` (with no `scan` or broadcast options its LAN side is off and it doesn't
+  bind 4002); it keeps the HA entities, scenes and segments through Govee's cloud, as before.
+  Luminorium's Govee LAN driver listens; 0 devices found while they're offline. Next: LAN Control
+  on in the Govee Home app per device, then step 5.
 - `unicast_only` is relearned after every restart (one miss + correction). Persisting it is a
   small follow-up if the first-show flicker matters.

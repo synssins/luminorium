@@ -33,12 +33,13 @@ the facts about this house.
 - The front porch, entryway and driveway Z-Wave switches are locked-on relays that feed Hue bulbs.
   They are excluded; the Hue bulbs are the lights.
 - The five GE 12724 dimmers use Multilevel Switch v1 (no transition).
-- govee2mqtt reaches every Govee device through the cloud today; segments are cloud-only. The
-  Govee LAN driver needs LAN Control on in the Govee app, and port 4002 free.
+- govee2mqtt reaches every Govee device through the cloud; segments are cloud-only there. The
+  Govee LAN driver needs LAN Control on in the Govee app for each device.
 - The direct drivers ([docs/drivers.md](docs/drivers.md)) were checked on real lights on
   2026-10-16 (z2m discovery, Z-Wave multicast insecure and S2, WiZ, WLED; results in SPIKES.md).
   The lower hallway GE dimmer (node 22) is out of the stick's direct range and misses multicasts.
-  Govee LAN is blocked: govee2mqtt holds UDP 4002.
+  Govee: Luminorium owns the LAN (UDP 4002); govee2mqtt runs with `no_multicast: true` and keeps
+  the HA entities through the cloud.
 - Mapping is a guided capture (centre, 45° left, 45° right); there is no real video to work from.
 
 ## Releasing
