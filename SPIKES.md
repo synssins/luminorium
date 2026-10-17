@@ -258,3 +258,28 @@ add-on. It doesn't depend on phase 1.
    controllers are unavailable. Coming back (seasonal?) or gone?
 6. **Repository and licence:** `synssins/luminorium`, public or private, which licence?
 7. **Real-light tests** above: OK to run, and when?
+
+## Driver checks on the real house (2026-10-16, 21:08–21:30, Luminorium 0.2.0-dev.2 → dev.3)
+
+Run with Chris's OK, from the installed add-on (`host_network: true`), each light restored after.
+State timings are from HA's `state_changed` events, relative to a watcher started ~2 s before
+each Test.
+
+| Check | Result |
+|---|---|
+| 0. Discovery (read-only) | Ingress works with host networking. MQTT credentials from the Supervisor (`addons` user); z2m 46 devices, 4 groups; Z-Wave JS 3.10.2 at `ws://core-zwave-js:3000`, 35 nodes; WiZ: **all 4 bulbs** (192.168.10.64, .161, .195, .230); WLED front pathway (8 LEDs, 220 effects). Badges as expected (porch Hue via z2m with the trailing-space name, ZEN77 node 26, C3B549 via WiZ, pathway via WLED segment 0). |
+| Govee LAN | **Off:** govee2mqtt already holds UDP 4002 on the host, and the Govee devices were offline. Govee stays on HA. Needs a decision (below). |
+| 1a. Z-Wave multicast, GE 12724 ×2 (insecure) | **Bug found and fixed.** Node 38 took the multicast; **node 22 (lower hallway) missed it**: multicast isn't routed and node 22 is out of the stick's direct range. The read-back corrected it by unicast, but Safety took the read-back's old level for a person, dropped the light and didn't restore it. Fixed in dev.3 (unicast after a miss; settling window). Rerun: run 1 miss → corrected, restored, nothing dropped; run 2 node 22 by unicast, both on within 0.17 s, off within 0.05 s. A plain unicast Test of node 22 alone worked cleanly. |
+| 1b. Z-Wave S2 multicast, ZEN77 + ZEN35 | **Works.** One S2 multicast each for on and off, no misses; both off at the same instant; cabinets restored to 240. HA saw the ZEN35's "on" ~3 s after the ZEN77's (a late report; the read-back found the right level). |
+| 2. 3 s fade, ZEN77 vs GE 12724 | Sequence correct for both (on, 3 s fade + 3 s hold, off, restore). HA reports only the end points, so the ramp itself wasn't measurable from here; to be confirmed by eye. |
+| 3. WiZ C3B549 | **Works** via WiZ: HA saw the change ~0.2 s after the command; restored to on/full. |
+| 4. WLED pathway, Breathe 5 s | **Works** via WLED: Breathe for 5 s, off, restored to Chris's Rainbow. (The controller's reboot at 21:09 was Chris, not the driver.) |
+| 5. Govee `devStatus` | Not run (see Govee above). |
+
+Open:
+- **Govee LAN vs govee2mqtt:** both want UDP 4002 on the host. Either turn off govee2mqtt's LAN
+  side (it would then use the cloud only, which it already does here) or stop govee2mqtt and let
+  Luminorium own Govee on the LAN, keeping HA entities through govee2mqtt's cloud path or not at
+  all. Govee replies always go to 4002, so they can't share it.
+- `unicast_only` is relearned after every restart (one miss + correction). Persisting it is a
+  small follow-up if the first-show flicker matters.

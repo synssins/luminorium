@@ -1,6 +1,7 @@
 # Direct-driver checks on real lights
 
-Short tests of the phase 2 drivers on the house's real lights. **None of these has been run.**
+Short tests of the phase 2 drivers on the house's real lights. **Steps 0–4 were run on
+2026-10-16; results are in [SPIKES.md](../SPIKES.md#driver-checks-on-the-real-house-2026-10-16-2108-2130-luminorium-020-dev2--dev3).** Step 5 (Govee) is still open.
 Each needs Chris's OK before it is run, ideally in daylight, with someone near the lights. Every
 step is small and is put back afterwards.
 
