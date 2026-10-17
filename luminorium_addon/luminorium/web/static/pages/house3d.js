@@ -267,10 +267,10 @@ window.House3D = class House3D {
     for (const y of t.yard) {
       const c = COLORS[y.kind] || "#b0b8c4";
       if (y.c) continue;
-      if (y.kind === "path") {
-        const q = y.pts.map(([x, yy]) => P(x, yy, 0.01));
-        if (q.every(Boolean)) for (let i = 0; i + 1 < q.length; i++) this.line(q[i], q[i + 1], hexA(c, 0.8), Math.max(2, (y.width ?? 1.2) * q[i].scale * 0.9));
-      } else ground(y.pts, c, y.kind === "pool" ? 0.45 : 0.3);
+      // curves are followed in the ground's own metres, so they lie flat from any angle
+      const line = y.smooth ? curvePoints(y.pts, y.kind !== "path") : y.pts;
+      if (y.kind === "path") ground(stripAround(line, (y.width ?? 1.2) / 2), c, 0.55);
+      else ground(line, c, y.kind === "pool" ? 0.45 : 0.3);
     }
     for (const y of t.yard) {
       if (!y.c) continue;
@@ -560,6 +560,35 @@ window.House3D = class House3D {
     }
   }
 };
+
+// Points along a smooth curve through pts (Catmull-Rom), in the ground's metres
+function curvePoints(pts, closed, steps = 8) {
+  const n = pts.length;
+  if (n < 3) return pts;
+  const P = (i) => pts[closed ? (i + n) % n : Math.max(0, Math.min(n - 1, i))];
+  const out = [];
+  for (let i = 0; i < (closed ? n : n - 1); i++) {
+    const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
+    for (let k = 0; k < steps; k++) {
+      const t = k / steps, t2 = t * t, t3 = t2 * t;
+      out.push([0, 1].map((j) => 0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3)));
+    }
+  }
+  if (!closed) out.push(pts[n - 1]);
+  return out;
+}
+// A strip `half` either side of a line on the ground: its outline, as one polygon
+function stripAround(line, half) {
+  const left = [], right = [];
+  for (let i = 0; i < line.length; i++) {
+    const a = line[Math.max(0, i - 1)], b = line[Math.min(line.length - 1, i + 1)];
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len * half, ny = dx / len * half;
+    left.push([line[i][0] + nx, line[i][1] + ny]);
+    right.push([line[i][0] - nx, line[i][1] - ny]);
+  }
+  return [...left, ...right.reverse()];
+}
 
 // Where a ray first meets an axis-aligned box (min, max as [x, y, z]), or null
 function rayBox(o, d, lo, hi) {

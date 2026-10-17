@@ -157,7 +157,11 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
   - **Check front to back** (optional): a second line and its known length. Over 3% apart is a
     check (below).
   Changing the placement keeps what's traced where it is on the photo.
-- **Roof outline:** its corners, in house metres. The **outside walls** are the outline pulled in
+- **Roof outline:** its corners, in house metres. While tracing, a corner within 10° of straight
+  across or straight back from the last one snaps to it (Alt to stop it). Finishing (or **Square
+  it up**, or loading one drawn before) squares it to the house: the edges' average lean is taken
+  out by turning the photo that much (`trim`), and each edge is made exactly straight. Only for
+  outlines whose edges are all within 12° of square. The **outside walls** are the outline pulled in
   by the eaves (`inset`), as thick as their build (2x4, 2x6 or 2x8: studs, drywall, sheathing and
   siding). The deepest point sets the house's depth, and blocks without their own depth go back
   as far as the plan does over their width.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.17
+
+- **Square walls from above:** the roof outline (and so the outside walls) is squared to the
+  house, turning the photo the fraction of a degree it was off so they still line up. Corners snap
+  square while tracing; **Square it up** does it again after hand changes.
+- **3D: paths, driveways and curved shapes lie flat** on the ground from any angle (paths were a
+  thick line on the screen that turned with the view).
+
 ## 0.3.0-dev.16
 
 - **Several fixtures on one switch:** tick **Multiple fixtures on this switch** on a light (cans

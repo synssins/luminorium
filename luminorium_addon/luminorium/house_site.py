@@ -91,6 +91,8 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
         }
     turns = int(_num(body.get("turns", 0), 0, 3))
     out["turns"] = turns
+    # a small extra turn (radians) that squares the roof outline to the house
+    out["trim"] = _num(body.get("trim", 0), -0.5, 0.5)
     for key in ("ref", "check"):
         r = body.get(key)
         if r:

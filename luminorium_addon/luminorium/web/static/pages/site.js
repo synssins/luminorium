@@ -40,7 +40,7 @@ window.SiteEditor = class SiteEditor {
     const s = site || {};
     this.photo = s.photo || null;
     this.doc = {
-      xf: s.xf || null, square: s.square || null, turns: s.turns || 0, ref: s.ref || null, check: s.check || null,
+      xf: s.xf || null, square: s.square || null, turns: s.turns || 0, trim: s.trim || 0, ref: s.ref || null, check: s.check || null,
       outline: s.outline ? s.outline.map((p) => [...p]) : null, ext_wall: s.ext_wall || "2x6",
       yard: (s.yard || []).map((y) => JSON.parse(JSON.stringify(y))),
       walls: (s.walls || []).map((w) => JSON.parse(JSON.stringify(w))),
@@ -48,6 +48,10 @@ window.SiteEditor = class SiteEditor {
     };
     if (!this.level) this.level = this.defaultLevel();
     this.draft = null;
+    if (this.doc.outline && this.doc.xf && this.squareOutline()) {
+      this.scheduleSave();
+      L.toast("Squared up the roof outline (and the photo with it)");
+    }
     if (this.photo && (!this.img || this.img._for !== JSON.stringify(this.photo))) this.loadImage();
     if (!this.photo) this.img = null;
     if (!this.doc.square) this.tool = "square";
@@ -143,7 +147,44 @@ window.SiteEditor = class SiteEditor {
       const phi = Math.atan2(-(sq.b[1] - sq.a[1]), sq.b[0] - sq.a[0]);
       t = (sq.runs === "depth" ? Math.PI / 2 : 0) - phi;
     }
-    return t + (this.doc.turns || 0) * Math.PI / 2;
+    return t + (this.doc.turns || 0) * Math.PI / 2 + (this.doc.trim || 0);
+  }
+
+  // Square the roof outline to the house. Its edges' average lean from straight across or
+  // straight back is taken out by turning the photo that little bit (so the tracing still sits on
+  // the roof), then each edge is made exactly straight. Only for outlines that are nearly square
+  // already (every edge within 12° of across or back); returns whether it changed anything.
+  squareOutline() {
+    const o = this.doc.outline;
+    if (!o || o.length < 4) return false;
+    const n = o.length;
+    let sum = 0, weight = 0;
+    for (let i = 0; i < n; i++) {
+      const [x0, y0] = o[i], [x1, y1] = o[(i + 1) % n];
+      const len = Math.hypot(x1 - x0, y1 - y0);
+      let a = Math.atan2(y1 - y0, x1 - x0);
+      // the lean from the nearest of across or back, -45° to 45°
+      a = ((a % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2);
+      if (a > Math.PI / 4) a -= Math.PI / 2;
+      if (Math.abs(a) > 12 * Math.PI / 180) return false;
+      sum += a * len; weight += len;
+    }
+    const lean = weight ? sum / weight : 0;
+    const before = JSON.stringify(o);
+    if (Math.abs(lean) > 0.0005 && this.doc.xf) {
+      this.doc.trim = (this.doc.trim || 0) - lean;
+      this.place(); // turns the photo and the outline with it
+    }
+    // then each edge straight: across edges share one y, back edges one x
+    const q = this.doc.outline.map((p) => [...p]);
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const across = Math.abs(q[j][0] - q[i][0]) >= Math.abs(q[j][1] - q[i][1]);
+      if (across) { const y = (q[i][1] + q[j][1]) / 2; q[i][1] = y; q[j][1] = y; }
+      else { const x = (q[i][0] + q[j][0]) / 2; q[i][0] = x; q[j][0] = x; }
+    }
+    this.doc.outline = q.map(([x, y]) => [round3(x), round3(y)]);
+    return JSON.stringify(this.doc.outline) !== before;
   }
   p2h(u, v, xf = this.xf()) { const [a, b] = rot([u, -v], xf.theta); return [a * xf.s + xf.tx, b * xf.s + xf.ty]; }
   h2p(x, y, xf = this.xf()) { const [a, b] = rot([(x - xf.tx) / xf.s, (y - xf.ty) / xf.s], -xf.theta); return [a, -b]; }
@@ -505,6 +546,7 @@ window.SiteEditor = class SiteEditor {
       body = this.aimPanel(s);
     } else if (this.sel.kind === "outline") {
       body = el("div.fc-sum", el("h3", "Roof outline"), el("dl.fc-kv", el("dt", "Corners"), el("dd", String(s.length))),
+        el("button.btn.small", { type: "button", on: { click: () => edit(() => { if (!this.squareOutline()) L.toast("It's already square, or has corners that aren't meant to be"); }) } }, "Square it up"),
         el("p.small.muted", "Drag a corner to move it; double-click an edge to add one; Alt-click a corner to take it out."), del);
     } else if (["ref", "check", "square"].includes(this.sel.kind)) {
       body = el("div.fc-sum", el("h3", { ref: "Scale line", check: "Front-to-back check", square: "Square-up line" }[this.sel.kind]),
@@ -1057,7 +1099,15 @@ window.SiteEditor = class SiteEditor {
       const closes = kind !== "ref" && kind !== "check" && kind !== "path";
       const near = (q) => { const s = this.h2s(...asH(q)); return Math.hypot(s.x - p.x, s.y - p.y) <= 12; };
       if (pts.length >= (closes ? 3 : 2) && near(closes ? pts[0] : pts[pts.length - 1])) { this.finishDraft(); return; }
-      pts.push(photoPts ? this.h2p(x, y).map(round1) : [round3(x), round3(y)]);
+      let at = [x, y];
+      if (kind === "outline" && pts.length && !e.altKey) {
+        // within 10° of straight across or straight back: make it exactly so
+        const [px, py] = pts[pts.length - 1];
+        const ang = Math.abs(Math.atan2(y - py, x - px)) * 180 / Math.PI;
+        if (ang < 10 || ang > 170) at = [x, py];
+        else if (Math.abs(ang - 90) < 10) at = [px, y];
+      }
+      pts.push(photoPts ? this.h2p(...at).map(round1) : [round3(at[0]), round3(at[1])]);
       this.paint(); return;
     }
     if (this.tool === "door") {
@@ -1090,7 +1140,7 @@ window.SiteEditor = class SiteEditor {
     const d = this.doc;
     if (dr.kind === "ref") { if (dr.pts.length < 2) return; d.ref = { ...(d.ref || {}), pts: dr.pts }; }
     else if (dr.kind === "check") { if (dr.pts.length < 2) return; d.check = { ...(d.check || {}), pts: dr.pts }; if (!d.check.length) L.toast("Now type its front-to-back length"); }
-    else if (dr.kind === "outline") { if (dr.pts.length < 3) return; d.outline = dr.pts; this.sel = { kind: "outline" }; }
+    else if (dr.kind === "outline") { if (dr.pts.length < 3) return; d.outline = dr.pts; this.squareOutline(); this.sel = { kind: "outline" }; }
     else {
       const least = dr.kind === "path" ? 2 : 3;
       if (dr.pts.length < least) return;
