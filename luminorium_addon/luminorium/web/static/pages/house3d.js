@@ -14,11 +14,13 @@ window.House3D = class House3D {
     this.pitch = 0.62;    // above the horizon
     this.zoom = 1;
     this.mode = "move";   // "move" | "raise"
+    this.pan = { x: 0, y: 0, z: 0 }; // how far the view's middle is slid from the house's
     this.pointers = new Map();
     this.drag = null;
     const ro = new ResizeObserver(() => this.render());
     ro.observe(canvas);
     canvas.style.touchAction = "none";
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault()); // the right button pans
     canvas.addEventListener("pointerdown", (e) => this.down(e));
     canvas.addEventListener("pointermove", (e) => this.move(e));
     canvas.addEventListener("pointerup", (e) => this.up(e));
@@ -40,6 +42,7 @@ window.House3D = class House3D {
     else if (name === "front") { this.yaw = 0; this.pitch = 0.08; }
     else { this.yaw = -0.55; this.pitch = 0.62; }
     this.zoom = 1;
+    this.pan = { x: 0, y: 0, z: 0 };
     this.render();
   }
 
@@ -47,7 +50,7 @@ window.House3D = class House3D {
 
   camera() {
     const s = this.scene;
-    const target = { x: s.W / 2, y: s.D / 2 - 2, z: (s.zMin + s.zMax) / 2 };
+    const target = { x: s.W / 2 + this.pan.x, y: s.D / 2 - 2 + this.pan.y, z: (s.zMin + s.zMax) / 2 + this.pan.z };
     const span = Math.max(s.W + 12, s.D + 15, (s.zMax - s.zMin) * 2);
     const dist = (span * 1.15) / this.zoom;
     const cp = Math.cos(this.pitch);
@@ -185,7 +188,7 @@ window.House3D = class House3D {
     items.sort((a, b) => b.depth - a.depth);
     for (const it of items) it.draw();
     // a hint (the page shows it under the view on narrow screens)
-    if (W >= 520) this.text(this.aimMode ? "Aim: click what the light should point at (a wall, the ground, a tree)" : this.mode === "raise" ? "Raise: drag the picked light up or down" : "Drag to turn · scroll or pinch to zoom · drag the picked light to move it",
+    if (W >= 520) this.text(this.aimMode ? "Aim: click what the light should point at (a wall, the ground, a tree)" : this.mode === "raise" ? "Raise: drag the picked light up or down" : "Drag to turn · right-drag or wheel-drag to slide · scroll or pinch to zoom · drag the picked light to move it",
       12, H - 12, col.muted, 12, "left");
   }
 
@@ -420,7 +423,14 @@ window.House3D = class House3D {
     this.pointers.set(e.pointerId, pt);
     if (this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()];
-      this.drag = { kind: "pinch", dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: this.zoom };
+      // two fingers: pinch to zoom, move together to slide the view
+      this.drag = { kind: "pinch", dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: this.zoom, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, pan: { ...this.pan } };
+      return;
+    }
+    // the wheel (middle button), the right button, or Shift with the left: slide the view
+    if (e.button === 1 || e.button === 2 || e.shiftKey) {
+      e.preventDefault();
+      this.drag = { kind: "pan", start: pt, pan: { ...this.pan }, moved: false };
       return;
     }
     const hit = this.hit(pt);
@@ -441,6 +451,13 @@ window.House3D = class House3D {
     if (d.kind === "pinch" && this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()];
       this.zoom = Math.min(4, Math.max(0.35, d.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / d.dist)));
+      this.slide(d.pan, (a.x + b.x) / 2 - d.mid.x, (a.y + b.y) / 2 - d.mid.y);
+      this.render();
+      return;
+    }
+    if (d.kind === "pan") {
+      if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 2) d.moved = true;
+      this.slide(d.pan, pt.x - d.start.x, pt.y - d.start.y);
       this.render();
       return;
     }
@@ -464,6 +481,20 @@ window.House3D = class House3D {
       d.h = Math.max(0, d.h0 - (pt.y - d.start.y) / ppm);
       this.h.onRaise(d.light.id, d.h, false);
     }
+  }
+
+  // Slide the view so what was under the pointer follows it: dx, dy in screen px from pan0
+  slide(pan0, dx, dy) {
+    const cam = this.cam || this.camera();
+    // metres per pixel at the view's middle
+    const target = { x: this.scene.W / 2 + pan0.x, y: this.scene.D / 2 - 2 + pan0.y, z: (this.scene.zMin + this.scene.zMax) / 2 + pan0.z };
+    const dist = len(sub(target, cam.pos));
+    const k = dist / cam.focal;
+    this.pan = {
+      x: pan0.x - cam.r.x * dx * k + cam.u.x * dy * k,
+      y: pan0.y - cam.r.y * dx * k + cam.u.y * dy * k,
+      z: pan0.z - cam.r.z * dx * k + cam.u.z * dy * k,
+    };
   }
 
   up(e, cancel = false) {

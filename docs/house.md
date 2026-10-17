@@ -257,8 +257,9 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
   down to its floor (lit ones glow); a strip's parts are small dots. Lights on other floors are
   dimmed. The view is drawn by `pages/house3d.js`, a small perspective renderer on a 2D canvas
   (no 3D library to download, so it works offline).
-  - Drag empty space to turn the view; scroll or pinch to zoom. **3D**, **Top** and **Front**
-    reset the angle.
+  - Drag empty space to turn the view; drag with the right button or the wheel (or Shift and the
+    left button, or two fingers) to slide it; scroll or pinch to zoom. **3D**, **Top** and
+    **Front** reset the angle and the slide.
   - Tap a light to pick it. A light (or part) not placed yet goes where you then tap the floor,
     on the floor chosen above the view. Tapping off a placed light lets go of it: it only moves
     when dragged.

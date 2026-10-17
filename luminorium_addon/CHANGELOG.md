@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.15
+
+- **3D: slide the view.** Drag with the right mouse button or the wheel (or Shift and the left
+  button, or two fingers) to move the view, so it doesn't always turn round the middle of the
+  house. **3D**, **Top** and **Front** put it back.
+
 ## 0.3.0-dev.14
 
 - **3D: tap off a light to let go of it.** Tapping anywhere else no longer moves a light that's
