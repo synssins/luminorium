@@ -24,13 +24,16 @@ OUTSIDE = "_outside"
 # A standard front door: 36" x 80"
 DOOR_W_M = 0.9144
 DOOR_H_M = 2.032
-ROOFS = (
-    "flat",
-    "gable",
-    "ridge",
-)  # gable: the triangle faces the street; ridge: runs along the front
+# How a roof, drawn as its outline seen from the street, goes back from the front:
+# extrude: the same shape all the way back (a gable facing the street, a flat roof)
+# ridge: the outline is the front slope, up to a ridge `ridge_y` back, then down the back
+#        (drawn as a trapezoid it's a hip; as a rectangle with the gable ends at the sides)
+# shed: one slope, from the front up to the back
+ROOF_BACKS = ("extrude", "ridge", "shed")
 OPENINGS = ("window", "door", "garage")
 PHOTO_MAX_BYTES = 15 * 1024 * 1024
+# Joists and subfloor between a ceiling and the floor above it: about 12"
+FLOOR_DEPTH_M = 0.3048
 STOREY_M = 2.7
 CEILING_M = 2.4
 # The deepest a floor goes by default: one storey below the ground
@@ -134,6 +137,7 @@ class HouseService:
         self.data.setdefault("floors", {})
         self.data.setdefault("items", {})
         self.data.setdefault("facade", None)
+        _migrate_roofs(self.data.get("facade"))
 
     # ---- floors ---------------------------------------------------------------------------
 
@@ -424,6 +428,10 @@ class HouseService:
             out["door"] = None
         ground = body.get("ground")
         out["ground"] = None if ground is None else {"z": _num(ground.get("z", 0))}
+        floor_depth = _num(body.get("floor_depth", FLOOR_DEPTH_M))
+        if not 0 <= floor_depth <= 1:
+            raise HouseError("a floor is 0-3 ft thick")
+        out["floor_depth"] = floor_depth
 
         def rect(r: dict) -> dict:
             x0, x1 = sorted((_num(r.get("x0")), _num(r.get("x1"))))
@@ -436,22 +444,16 @@ class HouseService:
             return str(v or "")[:n]
 
         blocks = []
+        floors = self.floors()
+        _migrate_roofs(body)  # a page from before roofs were their own shapes
         for b in _list(body.get("blocks"), 50):
-            roof = b.get("roof") or "flat"
-            if roof not in ROOFS:
-                raise HouseError(f"unknown roof {roof}")
-            blk = {
-                "id": ident(b.get("id")),
-                "name": ident(b.get("name"), 60),
-                **rect(b),
-                "roof": roof,
-            }
-            if roof != "flat":
-                blk["peak_z"] = max(blk["z1"], _num(b.get("peak_z", blk["z1"] + 1.5)))
-                blk["peak_x"] = min(
-                    blk["x1"], max(blk["x0"], _num(b.get("peak_x", (blk["x0"] + blk["x1"]) / 2)))
-                )
-            for key, lo, hi in (("depth", 0.5, 200), ("y0", -50, 50)):
+            blk = {"id": ident(b.get("id")), "name": ident(b.get("name"), 60), **rect(b)}
+            if b.get("floor"):
+                # the HA floor whose floor is this block's bottom (a basement in the ground)
+                if b["floor"] not in floors:
+                    raise HouseError(f"unknown floor {b['floor']}")
+                blk["floor"] = str(b["floor"])
+            for key, lo, hi in (("depth", 0.5, 200), ("y0", -50, 50), ("below", 0, 10)):
                 if b.get(key) not in (None, ""):
                     v = _num(b[key])
                     if not lo <= v <= hi:
@@ -466,13 +468,41 @@ class HouseService:
                 raise HouseError(f"unknown opening {kind}")
             openings.append({"id": ident(o.get("id")), "kind": kind, **rect(o)})
         out["openings"] = openings
+        roofs = []
+        for r in _list(body.get("roofs"), 30):
+            back = r.get("back") or "ridge"
+            if back not in ROOF_BACKS:
+                raise HouseError(f"unknown roof shape {back}")
+            pts = r.get("pts") or []
+            if not isinstance(pts, list) or not 3 <= len(pts) <= 40:
+                raise HouseError("a roof outline needs 3 to 40 points")
+            roof = {
+                "id": ident(r.get("id")),
+                "name": ident(r.get("name"), 60),
+                "pts": [[_num(p[0]), _num(p[1])] for p in pts],
+                "back": back,
+            }
+            zs = [p[1] for p in roof["pts"]]
+            xs = [p[0] for p in roof["pts"]]
+            if max(xs) - min(xs) < 0.1 or max(zs) - min(zs) < 0.05:
+                raise HouseError("a roof outline is too small")
+            for key, lo, hi in (("depth", 0.3, 200), ("y0", -50, 50), ("ridge_y", 0, 200)):
+                if r.get(key) not in (None, ""):
+                    v = _num(r[key])
+                    if not lo <= v <= hi:
+                        raise HouseError(f"roof {key} out of range")
+                    roof[key] = v
+            roofs.append(roof)
+        out["roofs"] = roofs
         lines = []
-        floors = self.floors()
         for ln in _list(body.get("lines"), 30):
             fid = str(ln.get("floor") or "")
             if fid and fid not in floors:
                 raise HouseError(f"unknown floor {fid}")
             x0, x1 = sorted((_num(ln.get("x0")), _num(ln.get("x1"))))
+            at = ln.get("at") or "floor"
+            if at not in ("floor", "below"):
+                raise HouseError("a floor line marks the floor, or the ceiling below it")
             lines.append(
                 {
                     "id": ident(ln.get("id")),
@@ -480,6 +510,7 @@ class HouseService:
                     "x0": x0,
                     "x1": x1,
                     "z": _num(ln.get("z")),
+                    "at": at,
                 }
             )
         out["lines"] = lines
@@ -506,19 +537,55 @@ class HouseService:
             width = round(max(b["x1"] for b in blocks) - ox, 3)
             self.data["size"]["width"] = min(200.0, max(1.0, width))
         width = self.data["size"]["width"]
+        depth = f.get("floor_depth", FLOOR_DEPTH_M)
+        placed = []  # (elevation, x0, x1, floor id)
         for ln in f.get("lines") or []:
             if not ln["floor"]:
                 continue
             x0, x1 = max(0.0, ln["x0"] - ox), min(width, ln["x1"] - ox)
             whole = x1 - x0 >= 0.95 * width
+            # A line on the ceiling below: the floor itself is the joists' depth higher
+            elevation = ln["z"] - gz + (depth if ln.get("at") == "below" else 0.0)
             saved = self.data["floors"].setdefault(ln["floor"], {})
             saved.update(
                 {
-                    "elevation": round(ln["z"] - gz, 3),
+                    "elevation": round(elevation, 3),
                     "x0": None if whole else round(x0, 3),
                     "x1": None if whole else round(x1, 3),
                 }
             )
+            placed.append((elevation, x0, x1, ln["floor"]))
+        # A block whose bottom is a floor (a basement): that floor sits there, unless a line
+        # says otherwise
+        lined = {fid for _, _, _, fid in placed}
+        for b in blocks:
+            fid = b.get("floor")
+            if not fid or fid in lined:
+                continue
+            x0, x1 = max(0.0, b["x0"] - ox), min(width, b["x1"] - ox)
+            whole = x1 - x0 >= 0.95 * width
+            elevation = b["z0"] - gz - b.get("below", 0.0)
+            self.data["floors"].setdefault(fid, {}).update(
+                {
+                    "elevation": round(elevation, 3),
+                    "x0": None if whole else round(x0, 3),
+                    "x1": None if whole else round(x1, 3),
+                }
+            )
+            placed.append((elevation, x0, x1, fid))
+            lined.add(fid)
+        # A floor's ceiling is the underside of the next floor drawn above it, over the same part
+        # of the house
+        for elevation, x0, x1, fid in placed:
+            above = [
+                e
+                for e, a0, a1, _ in placed
+                if e > elevation + 1.5 and min(x1, a1) - max(x0, a0) > 0.5
+            ]
+            if above:
+                ceiling = round(min(above) - depth - elevation, 3)
+                if 1.5 <= ceiling <= 12:
+                    self.data["floors"][fid]["ceiling"] = ceiling
 
     def massing(self) -> dict | None:
         """The drawn house in house coordinates, for the 3D view."""
@@ -541,16 +608,30 @@ class HouseService:
             w = {
                 "name": b.get("name", ""),
                 **world(b),
-                "roof": b["roof"],
                 "y0": b.get("y0", 0.0),
                 "depth": b.get("depth", depth),
             }
-            if b["roof"] != "flat":
-                w["peak_x"] = round(b["peak_x"] - ox, 3)
-                w["peak_z"] = round(b["peak_z"] - gz, 3)
+            if b.get("below"):
+                # It goes on into the ground (a basement): its bottom is that far under its
+                # drawn bottom
+                w["z0"] = round(w["z0"] - b["below"], 3)
+                w["below"] = b["below"]
             blocks.append(w)
+        roofs = []
+        for r in f.get("roofs") or []:
+            d = r.get("depth", depth)
+            roofs.append(
+                {
+                    "name": r.get("name", ""),
+                    "pts": [[round(x - ox, 3), round(z - gz, 3)] for x, z in r["pts"]],
+                    "back": r["back"],
+                    "y0": r.get("y0", 0.0),
+                    "depth": d,
+                    "ridge_y": min(d, r.get("ridge_y", d / 2)),
+                }
+            )
         openings = [{"kind": o["kind"], **world(o)} for o in f.get("openings") or []]
-        return {"blocks": blocks, "openings": openings}
+        return {"blocks": blocks, "openings": openings, "roofs": roofs}
 
     def master_of(self, entity_id: str) -> str | None:
         """The house-map target a light is placed as: itself, or a WLED segment light's main
@@ -597,6 +678,30 @@ class HouseService:
 
     def _save(self) -> None:
         self.store.save("house", self.data)
+
+
+def _migrate_roofs(facade: dict | None) -> None:
+    """Blocks used to carry one roof each (a gable facing the street, or a ridge along the
+    front); those become roof outlines of their own."""
+    if not facade:
+        return
+    roofs = facade.setdefault("roofs", [])
+    for b in facade.get("blocks") or []:
+        kind = b.pop("roof", None)
+        peak_x, peak_z = b.pop("peak_x", None), b.pop("peak_z", None)
+        if kind not in ("gable", "ridge") or peak_z is None:
+            continue
+        x0, x1, z1 = b["x0"], b["x1"], b["z1"]
+        roof = {"id": f"{b.get('id', '')}r", "name": f"{b.get('name') or 'Block'} roof"}
+        if kind == "gable":
+            px = peak_x if peak_x is not None else (x0 + x1) / 2
+            roof.update(pts=[[x0, z1], [px, peak_z], [x1, z1]], back="extrude")
+        else:
+            roof.update(pts=[[x0, z1], [x1, z1], [x1, peak_z], [x0, peak_z]], back="ridge")
+        for key in ("depth", "y0"):
+            if key in b:
+                roof[key] = b[key]
+        roofs.append(roof)
 
 
 def photo_type(data: bytes) -> str | None:

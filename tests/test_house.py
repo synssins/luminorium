@@ -46,6 +46,64 @@ def test_default_floors_plain_house():
     )
 
 
+async def test_floor_thickness_basements_and_roofs(client, lum):
+    await client.put("/api/house/photo?w=800&h=600", content=JPEG)
+    door = {"pts": [[400, 300], [436, 300], [436, 380], [400, 380]], "w": 0.9144, "h": 2.032}
+    body = {
+        "door": door,
+        "ground": {"z": 0},
+        "floor_depth": 0.3,
+        "blocks": [
+            # the lower level, its ceiling at 2.4 m; the basement under the main side, 2.1 m in
+            {"id": "g", "name": "Ground", "x0": 0, "x1": 6, "z0": 0, "z1": 2.4},
+            {
+                "id": "b",
+                "name": "Basement",
+                "x0": 6,
+                "x1": 12,
+                "z0": 0,
+                "z1": 1.0,
+                "below": 2.1,
+                "floor": "basement",
+            },
+        ],
+        "roofs": [
+            {
+                "id": "r",
+                "name": "Main",
+                "pts": [[6, 3.5], [12, 3.5], [12, 5], [6, 5]],
+                "back": "ridge",
+                "ridge_y": 3,
+            },
+            {
+                "id": "p",
+                "name": "Porch",
+                "pts": [[5, 2.4], [7, 2.4], [6, 3]],
+                "back": "extrude",
+                "depth": 1.5,
+                "y0": -1.5,
+            },
+        ],
+        "lines": [
+            # drawn where the siding changes: the ceiling of the level below
+            {"id": "u", "floor": "bedroom_level", "x0": 0, "x1": 6, "z": 2.4, "at": "below"},
+            {"id": "g", "floor": "ground_level", "x0": 0, "x1": 6, "z": 0},
+        ],
+    }
+    view = (await client.put("/api/house/facade", json=body)).json()
+    floors = {f["id"]: f for f in view["floors"]}
+    assert floors["bedroom_level"]["elevation"] == pytest.approx(2.7)  # 2.4 + the floor's 0.3
+    assert floors["ground_level"]["ceiling"] == pytest.approx(2.4)  # up to the floor's underside
+    assert floors["basement"]["elevation"] == pytest.approx(-2.1)  # the block's bottom
+    m = view["massing"]
+    assert m["blocks"][1]["z0"] == pytest.approx(-2.1) and m["blocks"][1]["below"] == 2.1
+    main, porch = m["roofs"]
+    assert main["ridge_y"] == 3 and main["depth"] == view["size"]["depth"]
+    assert porch["y0"] == -1.5 and porch["depth"] == 1.5
+    bad = {**body, "blocks": [{**body["blocks"][1], "floor": "attic"}]}
+    assert (await client.put("/api/house/facade", json=bad)).status_code == 400
+
+
 def test_unset_floors_fit_the_set_ones(lum):
     # Chris's house as drawn on the photo: Main +1.12 m, Bedroom +2.82 m (half a storey apart)
     lum.house.settings(
@@ -364,8 +422,14 @@ async def test_front_photo_sets_width_floors_and_massing(client, lum):
     m = view["massing"]
     a, b = m["blocks"]
     assert (a["x0"], a["x1"], a["z0"], a["z1"]) == (0, 7, 0, 5.6)
-    assert (a["peak_x"], a["peak_z"]) == (3.5, 8.1)
+    # A page from before roofs were their own shapes: each block's roof becomes an outline
+    gable, ridge = m["roofs"]
+    assert gable["pts"] == [[0, 5.6], [3.5, 8.1], [7, 5.6]] and gable["back"] == "extrude"
+    assert ridge["back"] == "ridge" and ridge["depth"] == 8 and ridge["ridge_y"] == 4
+    assert "roof" not in lum.house.store.load("house")["facade"]["blocks"][0]
     assert b["depth"] == 8 and a["depth"] == view["size"]["depth"]
+    # Main's ceiling is the underside of the Bedroom floor drawn above it: 12" of floor less
+    assert floors["main_level"]["ceiling"] == pytest.approx(3.0 - 0.3048 - 0.6, abs=0.001)
     assert m["openings"][0] == {"kind": "window", "x0": 9, "x1": 10.2, "z0": 1.0, "z1": 2.2}
     # Kept in house.json
     assert lum.house.store.load("house")["facade"]["blocks"][0]["name"] == "Two storey"
@@ -373,7 +437,9 @@ async def test_front_photo_sets_width_floors_and_massing(client, lum):
     # Bad drawings are refused
     for broken in (
         {**body, "door": {**door, "pts": door["pts"][:3]}},
-        {**body, "blocks": [{**body["blocks"][0], "roof": "dome"}]},
+        {**body, "roofs": [{"pts": [[0, 5], [1, 6], [2, 5]], "back": "dome"}]},
+        {**body, "roofs": [{"pts": [[0, 5], [1, 6]], "back": "ridge"}]},
+        {**body, "lines": [{"floor": "main_level", "x0": 0, "x1": 1, "z": 1, "at": "wall"}]},
         {**body, "lines": [{"floor": "attic", "x0": 0, "x1": 1, "z": 1}]},
         {**body, "openings": [{"kind": "window", "x0": 1, "x1": 1, "z0": 0, "z1": 1}]},
     ):

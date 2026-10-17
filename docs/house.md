@@ -98,10 +98,10 @@ A photo of the front of the house, measured from its front door. Code: `pages/fa
   | Pan | H | Moves the photo (also: Space, the middle button, or two fingers; scroll or pinch zooms) |
   | Front door | D | Drag a box round the door, then fit its four corners. Door size in the bar above |
   | Ground line | G | Tap where the wall meets the ground |
-  | House block | B | Drag a box from the ground to the eaves, wall edge to wall edge. Split levels and the garage are their own blocks |
-  | Roof | R | Tap the top of a roof: **point faces the street** (a gable; its peak can sit off-centre) or **ridge along the front** |
+  | House block | B | Drag a box from the ground to the eaves, wall edge to wall edge. Split levels and the garage are their own blocks. A block can **go into the ground** by a length (a basement), and **its bottom can be a floor** (that floor's height comes from it, unless a floor line sets it) |
+  | Roof outline | R | Tap each corner of a roof as seen from the street, all the way round; tap the first corner (or Enter) to finish, Backspace takes the last one back, Esc stops. Any number of roofs, any shape (a porch overhang and a dormer are roofs of their own). Each says how it **goes back**: **slopes to a ridge** (the outline is the front slope; a trapezoid makes a hip roof), **same shape all the way back** (a gable facing the street, or a flat roof), or **one slope to the back** (a shed roof); plus its depth, how far back the ridge is, and how far it's set back (less than 0 sticks out toward the street). Drag a corner to move it, double-click an edge to add one, Alt-click a corner to take it out |
   | Window or door | N | Drag a box over a window, door or garage door |
-  | Floor line | F | Pick an HA floor, then drag along where that floor is (a tap runs it across the block it's on) |
+  | Floor line | F | Pick an HA floor, then drag along where that floor is (a tap runs it across the block it's on). The line marks **the floor**, or **the ceiling under it** (where the siding changes between storeys): then the floor is a floor's thickness higher. **Floors are … thick** (12" unless changed) |
   | Place a light | L | Tap where the light picked in the list is: **inside, by the window** (30 cm in, on the floor under that point) or **outside, on the wall** |
   | Measure | M | Drag between two points for the distance |
 
@@ -112,9 +112,14 @@ A photo of the front of the house, measured from its front door. Code: `pages/fa
   roofs, floors, lights. A tap on a step picks its tool.
 - **What it changes, on every save:** the blocks set the house width; each floor line sets its
   floor's height above the ground and the part of the house it covers (the whole width when it
-  runs at least 95% across). Floors without a line keep their values.
-- **In 3D** the blocks are drawn as see-through walls with their roofs, and the windows and doors
-  on the front, around the floors and lights.
+  runs at least 95% across), and a block whose bottom is a floor sets that floor. A floor's
+  ceiling is the underside of the next floor drawn above it over the same part of the house (that
+  floor's height less the floor thickness). Floors without a line follow the ones with one.
+- Drawings from before roofs were their own shapes (a block's gable or ridge) are turned into
+  roof outlines when loaded.
+- **In 3D** the blocks are drawn as see-through walls, each roof is built from its outline as it
+  says, and the windows and doors are on the front. A block that goes into the ground leaves a
+  hole in the ground grid where it goes in.
 - The photo is shrunk in the page to 2400 px and saved as a JPEG, as `house_front.img` in the
   config folder. A new photo keeps the drawing but needs the door marked again.
 
@@ -132,11 +137,12 @@ A photo of the front of the house, measured from its front door. Code: `pages/fa
 | `POST /api/house/identify` | `{target, part?}` | `{flashing, part?}`; `409` when read-only or the light is busy |
 | `PUT /api/house/photo?w=&h=` | the image bytes (JPEG, PNG or WebP, under 15 MB) | the facade; the door must be marked again |
 | `GET /api/house/photo` | | the image |
-| `PUT /api/house/facade` | `{door: {pts: [[u, v] ×4: top left, top right, bottom right, bottom left], w, h}, ground: {z}, blocks: [{id, name, x0, x1, z0, z1, roof: flat\|gable\|ridge, peak_x?, peak_z?, depth?, y0?}], openings: [{id, kind: window\|door\|garage, x0, x1, z0, z1}], lines: [{id, floor, x0, x1, z}]}` (facade metres) | the view, with the house width and floors applied; `400` without a photo or for a bad shape |
+| `PUT /api/house/facade` | `{door: {pts: [[u, v] ×4: top left, top right, bottom right, bottom left], w, h}, ground: {z}, floor_depth?: 0.3048, blocks: [{id, name, x0, x1, z0, z1, depth?, y0?, below?, floor?}], roofs: [{id, name, pts: [[X, Z], …3–40], back: ridge\|extrude\|shed, depth?, y0?, ridge_y?}], openings: [{id, kind: window\|door\|garage, x0, x1, z0, z1}], lines: [{id, floor, x0, x1, z, at: floor\|below}]}` (facade metres) | the view, with the house width and floors applied; `400` without a photo or for a bad shape |
 | `DELETE /api/house/facade` | | the view; removes the photo and the drawing |
 
 `GET /api/house` also returns `facade` (the drawing as saved) and `massing` (`null` until a door
-and a block are drawn, else `{blocks, openings}` in house metres, for the 3D view).
+and a block are drawn, else `{blocks, openings, roofs}` in house metres, for the 3D view; a
+block's `z0` includes how far it goes into the ground).
 
 ## Units
 
@@ -165,7 +171,9 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
   floor's span is highlighted, and lights on other floors are dimmed. Tap empty ground to place
   the selected light or part; drag it to move it (5 cm steps).
 - **From the street:** each floor as a band at its height. Drag the selected light up or down.
-- **The list:** every light by HA floor; Outside holds the areas with no floor.
+- **The list:** every light by HA floor; Outside holds the areas with no floor. Each level folds
+  away (remembered) and shows how many of its lights are placed; a search shows every match.
+  Picking a light keeps the list and the page scrolled where they were.
 - **The panel:** floor, type, position, height, **Flash it**, **Remove**, and the parts with their
   own Flash and **Lay out along a line**.
 - **Floors & size:** the house size, and each floor's height, ceiling and span.

@@ -19,6 +19,7 @@
     drag: null,
     view: L.store("house.view", "3d"), // "3d" | "flat" | "photo"
     mode3d: "move",                     // "move" | "raise" in the 3D view
+    folded: new Set(L.store("house.folded", [])), // levels folded away in the list
   };
   let house = null;
   let inventory = null;
@@ -203,7 +204,7 @@
       };
     });
     const m = house.massing;
-    const peaks = m ? m.blocks.map((b) => b.peak_z ?? b.z1) : [];
+    const peaks = m ? [...m.blocks.map((b) => b.z1), ...(m.roofs || []).flatMap((r) => r.pts.map((q) => q[1]))] : [];
     return {
       W: house.size.width, D: Math.max(house.size.depth, ...(m ? m.blocks.map((b) => (b.y0 || 0) + b.depth) : [])),
       zMin: Math.min(0, ...bottoms, ...(m ? m.blocks.map((b) => b.z0) : [])), zMax: Math.max(2.5, ...tops, ...peaks),
@@ -403,9 +404,21 @@
     return el("aside.card.hm-list", { "aria-label": "Lights to place", style: { padding: "14px", gap: "8px" } },
       el("label.search", { style: { flex: "none" } }, icon("search", 16), el("span.sr", "Find a light"),
         el("input", { type: "search", placeholder: "Find a light", value: ui.search, on: { input: (e) => { ui.search = e.target.value.toLowerCase(); paintList(); } } })),
-      order.map((k) => el("div", { style: { display: "flex", flexDirection: "column", gap: "2px" } },
-        el("span.small", { style: { padding: "8px 4px 2px", fontWeight: "600", letterSpacing: ".6px", textTransform: "uppercase", color: "var(--muted)" } }, floorName(k)),
-        groups.get(k).map((t) => {
+      order.map((k) => {
+        // A search shows every match, folded or not
+        const folded = ui.folded.has(k) && !ui.search;
+        const placedN = groups.get(k).filter((t) => t.placed).length;
+        return el("div", { style: { display: "flex", flexDirection: "column", gap: "2px" } },
+        el("button", { type: "button", "aria-expanded": String(!folded), on: { click: () => {
+          if (ui.folded.has(k)) ui.folded.delete(k); else ui.folded.add(k);
+          L.save("house.folded", [...ui.folded]); paintList();
+        } },
+          style: { display: "flex", alignItems: "center", gap: "6px", width: "100%", minHeight: "36px", padding: "8px 4px 2px", border: "0", background: "none", cursor: "pointer",
+            fontWeight: "600", letterSpacing: ".6px", textTransform: "uppercase", fontSize: "12px", color: "var(--muted)", textAlign: "left" } },
+          el("span", { style: { display: "inline-flex", transition: "transform .15s", transform: folded ? "none" : "rotate(90deg)" } }, icon("chev", 14)),
+          el("span", { style: { flex: "1" } }, floorName(k)),
+          el("span", { style: { fontWeight: "500", letterSpacing: "0", textTransform: "none" } }, `${placedN}/${groups.get(k).length}`)),
+        folded ? null : groups.get(k).map((t) => {
           const sel = t.id === ui.sel;
           return el("button", { type: "button", "aria-pressed": String(sel), on: { click: () => { ui.sel = t.id; ui.part = null; ui.floor = floorOfTarget(t); paint(); } },
             style: { display: "flex", alignItems: "center", gap: "10px", minHeight: "44px", padding: "4px 10px", borderRadius: "10px", textAlign: "left",
@@ -413,7 +426,8 @@
             el("span", { style: { width: "10px", height: "10px", borderRadius: "50%", flex: "none", ...(t.placed ? { background: "var(--ok)" } : { border: "2px solid var(--faint)" }) } }),
             el("span", { style: { flex: "1", minWidth: "0", display: "flex", flexDirection: "column" } },
               el("span", t.name), el("span.small.muted", [areas.get(t.area_id), t.kind === "fixture" ? "fixture" : null, t.parts.length ? `${t.parts.length} parts` : null].filter(Boolean).join(" · "))));
-        }))));
+        }));
+      }));
   }
 
   function inspector() {
@@ -492,7 +506,12 @@
     views.plan.replaceChildren(planView());
     views.side.replaceChildren(sideView());
   }
-  function paintList() { if (listBox) listBox.replaceWith(listBox = listPanel()); }
+  function paintList() {
+    if (!listBox) return;
+    const top = listBox.scrollTop;
+    listBox.replaceWith(listBox = listPanel());
+    listBox.scrollTop = top;
+  }
   let inspBox = null;
   function paintSide() {
     paintList();
@@ -501,6 +520,14 @@
 
   function paint() {
     if (!house || !inventory) return;
+    // Picking a light repaints the page: keep it, and the list, scrolled where they were
+    const pageTop = window.scrollY;
+    const listTop = listBox ? listBox.scrollTop : 0;
+    paintPage();
+    if (listBox) listBox.scrollTop = listTop;
+    window.scrollTo(window.scrollX, pageTop);
+  }
+  function paintPage() {
     const placed = house.targets.filter((t) => t.placed).length;
     const extra = L.topExtra();
     extra.replaceChildren(el("span.small.muted", `${placed} of ${house.targets.length} placed`),

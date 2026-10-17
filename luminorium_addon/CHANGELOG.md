@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0-dev.7
+
+- **Roofs are their own shapes.** Draw any number, each as its outline seen from the street (any
+  shape: off-centre peaks, porch overhangs, dormers), and say how it goes back: slopes to a ridge
+  (or a hip), the same shape all the way back, or one slope. Each has its depth, ridge distance
+  and set-back (or how far it sticks out). Roofs drawn on blocks before are carried over.
+- **Floor thickness:** a floor line marks the floor, or the ceiling under it (then the floor is
+  12" higher, or whatever **Floors are … thick** says). Ceilings come from the floor drawn above.
+- **Basements:** a house block can go into the ground by a set depth, and its bottom can be a
+  floor. The 3D view shows it going down through a hole in the ground.
+- **House map list:** levels fold away (remembered) and show how many lights are placed; picking
+  a light no longer scrolls the list or the page back to the top.
+
 ## 0.3.0-dev.6
 
 - **Floors you haven't set follow the ones you have.** Drawing floor lines for some levels on the

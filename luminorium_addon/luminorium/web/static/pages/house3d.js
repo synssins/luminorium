@@ -191,6 +191,13 @@ window.House3D = class House3D {
       const q = pts.map(([x, y, z]) => P(x, y, z));
       items.push({ depth: avgDepth(q), draw: () => this.poly(q, color, alpha, color, strokeAlpha) });
     };
+    // A block that goes into the ground (a basement) leaves a hole in the grid where it goes in
+    for (const b of this.scene.massing.blocks) {
+      if (b.z0 > -0.01) continue;
+      const y0 = b.y0 || 0, y1 = y0 + b.depth;
+      const hole = [P(b.x0, y0, 0), P(b.x1, y0, 0), P(b.x1, y1, 0), P(b.x0, y1, 0)];
+      this.poly(hole, col.bg, 0.92, col.line2, 1);
+    }
     for (const b of this.scene.massing.blocks) {
       const { x0, x1, z0, z1 } = b;
       const y0 = b.y0 || 0, y1 = y0 + b.depth;
@@ -198,21 +205,26 @@ window.House3D = class House3D {
       face([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], WALL, 0.06, 0.45);
       face([[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], WALL, 0.06, 0.55);
       face([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], WALL, 0.06, 0.55);
-      if (b.roof === "gable") {
-        const px = b.peak_x, pz = b.peak_z;
-        face([[x0, y0, z1], [px, y0, pz], [x1, y0, z1]], ROOF, 0.1);
-        face([[x0, y1, z1], [px, y1, pz], [x1, y1, z1]], ROOF, 0.08, 0.45);
-        face([[x0, y0, z1], [px, y0, pz], [px, y1, pz], [x0, y1, z1]], ROOF, 0.12);
-        face([[x1, y0, z1], [px, y0, pz], [px, y1, pz], [x1, y1, z1]], ROOF, 0.12);
-      } else if (b.roof === "ridge") {
-        const ym = (y0 + y1) / 2, pz = b.peak_z;
-        face([[x0, y0, z1], [x1, y0, z1], [x1, ym, pz], [x0, ym, pz]], ROOF, 0.12);
-        face([[x0, y1, z1], [x1, y1, z1], [x1, ym, pz], [x0, ym, pz]], ROOF, 0.12);
-        face([[x0, y0, z1], [x0, ym, pz], [x0, y1, z1]], ROOF, 0.1);
-        face([[x1, y0, z1], [x1, ym, pz], [x1, y1, z1]], ROOF, 0.1);
-      }
       const lab = P(x0 + 0.2, y0, z1 + 0.15);
       if (lab && b.name) items.push({ depth: lab.depth - 0.01, draw: () => this.text(b.name, lab.x, lab.y, col.muted, 11, "left") });
+    }
+    // Roofs: the outline seen from the street, taken back as each one says
+    for (const r of this.scene.massing.roofs || []) {
+      const zs = r.pts.map((q) => q[1]);
+      const ze = Math.min(...zs), h = Math.max(...zs) - ze || 1;
+      const y0 = r.y0 || 0, d = r.depth;
+      const ry = r.back === "shed" ? d : r.ridge_y;
+      const front = r.pts.map(([x, z]) => [x, r.back === "extrude" ? y0 : y0 + ((z - ze) / h) * ry, z]);
+      const back = r.pts.map(([x, z]) => [x, r.back === "ridge" ? y0 + d - ((z - ze) / h) * (d - ry) : y0 + d, z]);
+      face(front, ROOF, 0.12);
+      face(back, ROOF, 0.08, 0.45);
+      for (let i = 0; i < front.length; i++) {
+        const j = (i + 1) % front.length;
+        face([front[i], front[j], back[j], back[i]], ROOF, 0.07, 0.4);
+      }
+      const top = front.reduce((a, b) => (b[2] > a[2] ? b : a));
+      const lab = P(top[0], top[1], top[2] + 0.2);
+      if (lab && r.name) items.push({ depth: lab.depth - 0.01, draw: () => this.text(r.name, lab.x, lab.y, col.muted, 11, "center") });
     }
     // windows and doors sit on the front wall of the block they're in
     for (const o of this.scene.massing.openings) {
