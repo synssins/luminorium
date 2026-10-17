@@ -156,7 +156,10 @@ class HouseService:
                 merged[fid].update(
                     {k: v for k, v in saved.items() if k in ("elevation", "ceiling", "x0", "x1")}
                 )
-        _fit_unset(merged, {fid for fid, s in self.data["floors"].items() if "elevation" in s})
+        known = {fid for fid, s in self.data["floors"].items() if "elevation" in s}
+        _fit_unset(merged, known)
+        for fid, f in merged.items():
+            f["set"] = fid in known  # False: guessed from the others
         return merged
 
     def floor_z(self, floor_id: str) -> float:

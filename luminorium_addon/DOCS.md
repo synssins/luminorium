@@ -129,7 +129,7 @@ roofs. With **Place a light**, tap where a light is on the photo.
    which stretch, left to right.
 2. Pick a light on the list, or tap it in the **3D** view. Tap the floor where it is, then drag
    it to fine-tune (**Move**). Drag empty space to turn the view, and scroll or pinch to zoom.
-   **Plan & side** has a flat view from above and from the street, for exact positions.
+   The **Front photo** and **Top view** place lights exactly where you tap.
 3. Choose its **Type** (ceiling, pendant, wall, floor lamp, tabletop, under cabinet, strip, path or
    post, in the ground). That sets a height, which you can change with the slider, or with **Raise** in the 3D view
    (drag it up or down).

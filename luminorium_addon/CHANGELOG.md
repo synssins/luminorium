@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0-dev.12
+
+- **The House map fits the window** on a big screen: no page scrollbar, no zooming out. The
+  light list and the panel scroll inside themselves; the view takes the rest. On the Front photo
+  and Top view the editor's own panel replaces the page's, so the photo gets the room.
+  **Things to check** folds to one line (the first item shown) until opened.
+- **Plan & side removed:** the Top view and 3D cover it.
+- **Guessed floors** are drawn dashed in 3D and labelled "(guessed)" until a floor line or a
+  block sets them.
+
 ## 0.3.0-dev.11
 
 - **Roof edge lines fixed:** they were measured on the wall while being drawn, then shown at the

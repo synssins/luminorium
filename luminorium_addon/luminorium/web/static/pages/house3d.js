@@ -135,12 +135,16 @@ window.House3D = class House3D {
       const x0 = f.x0 ?? 0, x1 = f.x1 ?? s.W;
       const quad = (z) => [P(x0, 0, z), P(x1, 0, z), P(x1, s.D, z), P(x0, s.D, z)];
       const floorQ = quad(f.elevation), ceilQ = quad(f.elevation + f.ceiling);
+      // a floor whose height is guessed from the others is only outlined, dashed
+      const guessed = f.set === false;
       items.push({ depth: avgDepth(floorQ) + 0.01, draw: () => {
-        this.poly(floorQ, f.active ? col.accent : col.card2, f.active ? 0.18 : 0.55, f.active ? col.accent : col.line2);
+        if (guessed) this.ctx.setLineDash([5, 4]);
+        this.poly(floorQ, f.active ? col.accent : col.card2, guessed ? 0 : f.active ? 0.18 : 0.55, f.active ? col.accent : col.line2);
+        this.ctx.setLineDash([]);
         const lab = P(x0 + 0.3, 0.2, f.elevation);
-        if (lab) this.text(`${f.name}  ${f.label}`, lab.x, lab.y - 4, f.active ? col.accent : col.muted, 11, "left");
+        if (lab) this.text(`${f.name}  ${f.label}${guessed ? " (guessed)" : ""}`, lab.x, lab.y - 4, f.active ? col.accent : col.muted, 11, "left");
       } });
-      items.push({ depth: avgDepth(ceilQ), draw: () => this.poly(ceilQ, col.card2, 0, f.active ? col.accent : col.line, 0.5) });
+      if (!guessed) items.push({ depth: avgDepth(ceilQ), draw: () => this.poly(ceilQ, col.card2, 0, f.active ? col.accent : col.line, 0.5) });
     }
     // The structure first (back to front), then the lights on top of it, so slabs never hide them
     items.sort((a, b) => b.depth - a.depth);

@@ -246,13 +246,14 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
     chosen above the view.
   - **Move:** drag the picked light, or one of its parts, across its floor.
   - **Raise:** drag it up or down; it stops at the ceiling.
+  (The flat "Plan & side" tab was removed in 0.3.0-dev.12: the Top view and 3D cover it.)
 - **Front photo** (the second tab): the drawing tools above.
 - **Top view** (the third tab): the photo from above, the yard, floor plans, and aiming.
-- **Plan & side** (the fourth tab), for exact positions:
-- **From above:** the plan, with a 1 m grid (5 m lines heavier) and the house outline. The chosen
-  floor's span is highlighted, and lights on other floors are dimmed. Tap empty ground to place
-  the selected light or part; drag it to move it (5 cm steps).
-- **From the street:** each floor as a band at its height. Drag the selected light up or down.
+- **Fits the window** on a big screen (1181 px wide and 600 px tall or more): nothing scrolls the
+  page; the list and the panel scroll inside themselves and the view takes the rest. On the
+  photo tabs the editor's own panel replaces the page's, to give the photo the room.
+- **Guessed floors** (`set: false` in `floors`, heights followed from the set ones) are drawn
+  dashed in 3D and labelled "(guessed)".
 - **The list:** every light by HA floor; Outside holds the areas with no floor. Each level folds
   away (remembered) and shows how many of its lights are placed; a search shows every match.
   Picking a light keeps the list and the page scrolled where they were.

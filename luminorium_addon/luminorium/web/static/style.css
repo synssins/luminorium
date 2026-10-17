@@ -274,9 +274,33 @@ a.tile:hover { border-color: var(--line2); text-decoration: none; }
 .hm-list { grid-area: list; max-height: calc(100vh - 140px); overflow: auto; }
 .hm-views { grid-area: views; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .hm-insp { grid-area: insp; }
+.hm-canvas { aspect-ratio: 4 / 3; max-height: 72vh; }
+.hm.hm-editor { grid-template-columns: minmax(230px, 280px) minmax(0, 1fr); grid-template-areas: "list views"; }
+/* On a big screen the house map fills the window: the list, the panel and the editors scroll or
+   size themselves inside it, never the page */
+@media (min-width: 1181px) and (min-height: 600px) {
+  .app.fit { height: 100vh; overflow: hidden; flex-wrap: nowrap; }
+  .app.fit .nav { overflow-y: auto; }
+  .app.fit .body { height: 100vh; overflow: hidden; }
+  .app.fit .page { flex: 1; min-height: 0; overflow: auto; padding: 16px 22px 18px; gap: 14px; }
+  .app.fit .hm { flex: 1 0 auto; height: 0; min-height: 520px; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+  .app.fit .hm-list { max-height: none; min-height: 0; overflow: auto; }
+  .app.fit .hm-insp { min-height: 0; overflow: auto; }
+  .app.fit .hm-views { min-height: 0; gap: 10px; }
+  .app.fit .hm-views > .card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .app.fit .hm-canvas { flex: 1 1 0; min-height: 0; aspect-ratio: auto; max-height: none; }
+  .app.fit .fc { flex: 1; min-height: 0; }
+  .app.fit .fc-body { flex: 1; min-height: 0; }
+  .app.fit .fc-tools { max-height: 100%; overflow-y: auto; }
+  .app.fit .fc-insp { min-height: 0; overflow-y: auto; }
+  .app.fit .fc-stage { height: auto; min-height: 0; }
+}
 @media (max-width: 1180px) {
   .hm { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "views views" "insp list"; }
   .hm-list { max-height: 560px; }
+}
+@media (max-width: 1180px) {
+  .hm.hm-editor { grid-template-columns: minmax(0, 1fr); grid-template-areas: "views" "list"; }
 }
 @media (max-width: 760px) {
   .hm { grid-template-columns: minmax(0, 1fr); grid-template-areas: "views" "insp" "list"; }

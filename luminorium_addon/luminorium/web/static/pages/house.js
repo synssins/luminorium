@@ -1,23 +1,22 @@
-// House map: place every light in 3D by hand. Plan from above (across, back) and a side view from
-// the street (height). Floors come from HA; the house is a box of your size; no floorplan needed.
+// House map: place every light in 3D by hand, in the 3D view, on the front photo, or from above
+// (the top view). Floors come from HA; the house is measured from the photos, or a box of your size.
 "use strict";
 
 (function () {
   const { el, icon, api, run, toast, onData, start } = L;
   const page = document.getElementById("page");
-  const SVG = "http://www.w3.org/2000/svg";
   const params = new URLSearchParams(location.search);
 
   const ui = {
     sel: params.get("select") || null, // target id
     part: null,                         // selected part index of the selected target
-    floor: null,                        // floor shown in the plan
+    floor: null,                        // floor shown in 3D
     mode: null,                         // null | "line-start" | "line-end"
     lineStart: null,
     search: "",
     settings: false,
     drag: null,
-    view: L.store("house.view", "3d"), // "3d" | "flat" | "photo"
+    view: ["3d", "photo", "top"].includes(L.store("house.view", "3d")) ? L.store("house.view", "3d") : "3d", // "3d" | "photo" | "top"
     mode3d: "move",                     // "move" | "raise" in the 3D view
     folded: new Set(L.store("house.folded", [])), // levels folded away in the list
   };
@@ -51,127 +50,7 @@
   function floorZ(id) { return id === house.outside ? 0 : floorsById().get(id)?.elevation ?? 0; }
   function ceilingOf(id) { return id === house.outside ? 6 : floorsById().get(id)?.ceiling ?? 2.4; }
 
-  // ---- geometry ----------------------------------------------------------------------------
-
-  function bounds() {
-    const W = house.size.width, D = house.size.depth;
-    return { x0: -6, x1: W + 6, y0: -12, y1: D + 3 };
-  }
-  function zBounds() {
-    const tops = house.floors.map((f) => f.elevation + f.ceiling);
-    const bottoms = house.floors.map((f) => f.elevation);
-    return { z0: Math.min(-1, ...bottoms) - 0.6, z1: Math.max(4, ...tops) + 0.8 };
-  }
-  function svgPoint(svg, evt) {
-    const p = svg.createSVGPoint();
-    p.x = evt.clientX; p.y = evt.clientY;
-    return p.matrixTransform(svg.getScreenCTM().inverse());
-  }
-  function s(tag, attrs, ...kids) {
-    const n = document.createElementNS(SVG, tag);
-    for (const [k, v] of Object.entries(attrs || {})) if (v !== null && v !== undefined) n.setAttribute(k, v);
-    for (const k of kids.flat()) if (k) n.append(k instanceof Node ? k : document.createTextNode(String(k)));
-    return n;
-  }
   const r2 = (v) => L.snapLen(v); // a whole inch, or 5 cm
-
-  // ---- plan view (from above) -----------------------------------------------------------------
-
-  function planView() {
-    const b = bounds(), W = house.size.width, D = house.size.depth;
-    const vb = `${b.x0} ${-b.y1} ${b.x1 - b.x0} ${b.y1 - b.y0}`; // y flipped: svg y = -y
-    const svg = s("svg", { viewBox: vb, role: "img", "aria-label": `Plan from above, ${floorName(ui.floor)}`,
-      style: "width:100%;height:auto;display:block;touch-action:none;background:var(--field);border-radius:10px;cursor:crosshair" });
-    const grid = s("g", { stroke: "var(--line)", "stroke-width": 0.03 });
-    // Grid lines every foot (heavier every 5 ft), or every metre (heavier every 5 m)
-    const step = L.units() === "imperial" ? L.FT : 1;
-    for (let i = Math.ceil(b.x0 / step); i * step <= b.x1; i++) grid.append(s("line", { x1: i * step, y1: -b.y1, x2: i * step, y2: -b.y0, "stroke-width": i % 5 ? 0.02 : 0.05 }));
-    for (let i = Math.ceil(b.y0 / step); i * step <= b.y1; i++) grid.append(s("line", { x1: b.x0, y1: -i * step, x2: b.x1, y2: -i * step, "stroke-width": i % 5 ? 0.02 : 0.05 }));
-    svg.append(grid);
-    // the house, and which part of it this floor covers
-    svg.append(s("rect", { x: 0, y: -D, width: W, height: D, fill: "var(--card2)", stroke: "var(--faint)", "stroke-width": 0.08, rx: 0.1 }));
-    const f = floorsById().get(ui.floor);
-    if (f) {
-      const x0 = f.x0 ?? 0, x1 = f.x1 ?? W;
-      svg.append(s("rect", { x: x0, y: -D, width: Math.max(0, x1 - x0), height: D, fill: "var(--accent)", "fill-opacity": 0.08,
-        stroke: "var(--accent)", "stroke-opacity": 0.5, "stroke-width": 0.05, "stroke-dasharray": "0.3 0.2" }));
-    }
-    svg.append(s("text", { x: 0.2, y: -D + 0.7, "font-size": 0.55, fill: "var(--muted)" }, `${floorName(ui.floor)} · ${L.fmtLen(W)} × ${L.fmtLen(D)}`));
-    svg.append(s("text", { x: b.x1 - 0.3, y: -b.y0 - 0.4, "font-size": 0.55, fill: "var(--faint)", "text-anchor": "end" }, "Street ↓"));
-    svg.append(s("text", { x: b.x0 + 0.3, y: -b.y0 - 0.4, "font-size": 0.55, fill: "var(--faint)" }, "Yard"));
-
-    // pins
-    for (const t of house.targets) {
-      if (!t.item) continue;
-      const here = t.item.floor === ui.floor || t.item.floor === house.outside;
-      const sel = t.id === ui.sel;
-      const g = s("g", { opacity: here || sel ? 1 : 0.3, style: "cursor:pointer" });
-      for (const p of t.parts) {
-        if (!p.world) continue;
-        const psel = sel && ui.part === p.index;
-        g.append(s("circle", { cx: p.world.x, cy: -p.world.y, r: psel ? 0.28 : 0.16, fill: psel ? "var(--accent)" : "var(--info)", stroke: "var(--bg)", "stroke-width": 0.05,
-          "data-part": p.index, "data-target": t.id }));
-      }
-      g.append(s("circle", { cx: t.item.x, cy: -t.item.y, r: sel ? 0.42 : 0.3, fill: sel ? "var(--accent)" : t.state === "on" ? "#c99a3a" : "var(--faint)",
-        stroke: sel ? "var(--on-accent)" : "var(--bg)", "stroke-width": 0.07, "data-target": t.id }));
-      if (sel) g.append(s("circle", { cx: t.item.x, cy: -t.item.y, r: 0.75, fill: "none", stroke: "var(--accent)", "stroke-opacity": 0.5, "stroke-width": 0.08 }));
-      if (here || sel) g.append(s("text", { x: t.item.x, y: -t.item.y - 0.6, "font-size": 0.45, "text-anchor": "middle", fill: "var(--text)",
-        "paint-order": "stroke", stroke: "var(--field)", "stroke-width": 0.15 }, t.name));
-      svg.append(g);
-    }
-    if (ui.mode === "line-end" && ui.lineStart) {
-      svg.append(s("circle", { cx: ui.lineStart.x, cy: -ui.lineStart.y, r: 0.25, fill: "var(--info)" }));
-    }
-
-    svg.addEventListener("pointerdown", (e) => planDown(svg, e));
-    svg.addEventListener("pointermove", (e) => planMove(svg, e));
-    svg.addEventListener("pointerup", (e) => planUp(svg, e));
-    return svg;
-  }
-
-  function planDown(svg, e) {
-    const p = svgPoint(svg, e);
-    const tid = e.target.getAttribute && e.target.getAttribute("data-target");
-    const part = e.target.getAttribute && e.target.getAttribute("data-part");
-    if (ui.mode) return; // line clicks are handled on pointerup
-    if (tid) {
-      if (tid !== ui.sel || (part !== null && Number(part) !== ui.part)) {
-        ui.sel = tid; ui.part = part !== null ? Number(part) : null;
-        paint();
-        return;
-      }
-      ui.drag = { kind: part !== null ? "part" : "item", start: p, moved: false };
-      svg.setPointerCapture(e.pointerId);
-    }
-  }
-  function planMove(svg, e) {
-    if (!ui.drag) return;
-    const p = svgPoint(svg, e);
-    ui.drag.moved = true;
-    ui.drag.at = { x: r2(p.x), y: r2(-p.y) };
-    const t = target(ui.sel);
-    if (ui.drag.kind === "item" && t.item) { t.item.x = ui.drag.at.x; t.item.y = ui.drag.at.y; }
-    if (ui.drag.kind === "part") { const pp = t.parts.find((x) => x.index === ui.part); if (pp && pp.world) { pp.world.x = ui.drag.at.x; pp.world.y = ui.drag.at.y; } }
-    repaintViews();
-  }
-  async function planUp(svg, e) {
-    const p = svgPoint(svg, e);
-    const at = { x: r2(p.x), y: r2(-p.y) };
-    if (ui.drag) {
-      const d = ui.drag;
-      ui.drag = null;
-      if (!d.moved) return;
-      if (d.kind === "item") await placeItem({ x: d.at.x, y: d.at.y });
-      else await placePart(ui.part, d.at);
-      return;
-    }
-    if (ui.mode) { await lineClick(at); return; }
-    const tid = e.target.getAttribute && e.target.getAttribute("data-target");
-    if (tid || !ui.sel) return;
-    // A click on empty ground: place the selected light (or part) here
-    if (ui.part !== null && target(ui.sel)?.item) await placePart(ui.part, at);
-    else await placeItem(at);
-  }
 
   async function lineClick(at) {
     if (ui.mode === "line-start") { ui.lineStart = at; ui.mode = "line-end"; paint(); toast("Now tap where the last one is"); return; }
@@ -218,7 +97,7 @@
   function ensure3d() {
     if (view3d) return;
     canvas3d = el("canvas", { "aria-label": "The house in 3D: floors and lights", role: "img",
-      style: { width: "100%", aspectRatio: "4 / 3", maxHeight: "72vh", display: "block", borderRadius: "10px", cursor: "grab" } });
+      class: "hm-canvas", style: { width: "100%", display: "block", borderRadius: "10px", cursor: "grab" } });
     view3d = new window.House3D(canvas3d, {
       onPick: (id, part) => { const t = target(id); ui.sel = id; ui.part = part; if (t && part === null) ui.floor = floorOfTarget(t); paint(); },
       onPlace: async (x, y) => {
@@ -245,58 +124,6 @@
         if (done) await placeItem({ h: hh });
       },
     });
-  }
-
-  // ---- side view (from the street) ------------------------------------------------------------
-
-  function sideView() {
-    const b = bounds(), z = zBounds(), W = house.size.width;
-    const svg = s("svg", { viewBox: `${b.x0} ${-z.z1} ${b.x1 - b.x0} ${z.z1 - z.z0}`, role: "img", "aria-label": "Side view from the street: floors and heights",
-      style: "width:100%;height:auto;display:block;touch-action:none;background:var(--field);border-radius:10px" });
-    svg.append(s("rect", { x: b.x0, y: 0, width: b.x1 - b.x0, height: -z.z0, fill: "var(--ok-soft)" }));
-    svg.append(s("line", { x1: b.x0, y1: 0, x2: b.x1, y2: 0, stroke: "var(--ok)", "stroke-width": 0.05 }));
-    svg.append(s("text", { x: b.x1 - 0.3, y: 0.55, "font-size": 0.4, fill: "var(--ok-text)", "text-anchor": "end" }, "Ground"));
-    for (const f of house.floors) {
-      const x0 = f.x0 ?? 0, x1 = f.x1 ?? W, active = f.id === ui.floor;
-      svg.append(s("rect", { x: x0, y: -(f.elevation + f.ceiling), width: Math.max(0, x1 - x0), height: f.ceiling,
-        fill: active ? "var(--accent)" : "var(--card2)", "fill-opacity": active ? 0.1 : 0.7,
-        stroke: active ? "var(--accent)" : "var(--line2)", "stroke-width": 0.04 }));
-      svg.append(s("text", { x: x0 + 0.2, y: -(f.elevation + f.ceiling) + 0.45, "font-size": 0.35, fill: active ? "var(--accent)" : "var(--muted)" },
-        `${f.name}  ${L.fmtLen(f.elevation, { signed: true })}`));
-    }
-    for (const t of house.targets) {
-      if (!t.world) continue;
-      const sel = t.id === ui.sel;
-      const here = t.item.floor === ui.floor || t.item.floor === house.outside;
-      for (const p of t.parts) if (p.world) svg.append(s("circle", { cx: p.world.x, cy: -p.world.z, r: 0.1, fill: "var(--info)", opacity: here || sel ? 1 : 0.3 }));
-      svg.append(s("circle", { cx: t.world.x, cy: -t.world.z, r: sel ? 0.28 : 0.18, fill: sel ? "var(--accent)" : "var(--faint)",
-        opacity: here || sel ? 1 : 0.3, "data-target": t.id, style: "cursor:ns-resize" }));
-      if (sel) {
-        const fz = floorZ(t.item.floor);
-        svg.append(s("line", { x1: t.world.x, y1: -fz, x2: t.world.x, y2: -t.world.z, stroke: "var(--accent)", "stroke-width": 0.05, "stroke-dasharray": "0.15 0.1" }));
-        svg.append(s("text", { x: t.world.x + 0.3, y: -(fz + t.item.h / 2), "font-size": 0.35, fill: "var(--accent)" }, `${L.fmtLen(t.item.h)} above the floor`));
-      }
-    }
-    let dragging = false;
-    svg.addEventListener("pointerdown", (e) => {
-      const tid = e.target.getAttribute && e.target.getAttribute("data-target");
-      if (tid && tid !== ui.sel) { ui.sel = tid; ui.part = null; paint(); return; }
-      if (tid === ui.sel) { dragging = true; svg.setPointerCapture(e.pointerId); }
-    });
-    svg.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
-      const t = target(ui.sel);
-      const zz = -svgPoint(svg, e).y;
-      t.item.h = Math.max(0, Math.min(ceilingOf(t.item.floor), r2(zz - floorZ(t.item.floor))));
-      t.world.z = floorZ(t.item.floor) + t.item.h;
-      repaintViews();
-    });
-    svg.addEventListener("pointerup", async () => {
-      if (!dragging) return;
-      dragging = false;
-      await placeItem({ h: target(ui.sel).item.h });
-    });
-    return svg;
   }
 
   // ---- actions --------------------------------------------------------------------------------
@@ -435,12 +262,13 @@
 
   // ---- things to check --------------------------------------------------------------------------
 
-  ui.checksOpen = L.store("house.checksOpen", true);
+  ui.checksOpen = L.store("house.checksOpen", false);
   function checksCard() {
     const list = [...(house.checks || []), ...(facade ? facade.checks() : [])];
     if (!list.length) return null;
     const warns = list.filter((c) => c.level === "warn").length;
     const TAB = { photo: ["photo", "Front photo"], top: ["top", "Top view"], floors: [null, "Floors & size"] };
+    const first = list.find((c) => c.level === "warn") || list[0];
     const go = (tab) => {
       if (tab === "floors") { ui.settings = true; paint(); return; }
       ui.view = TAB[tab][0]; L.save("house.view", ui.view); paint();
@@ -449,8 +277,9 @@
       el("button", { type: "button", "aria-expanded": String(ui.checksOpen), on: { click: () => { ui.checksOpen = !ui.checksOpen; L.save("house.checksOpen", ui.checksOpen); paint(); } },
         style: { display: "flex", alignItems: "center", gap: "8px", border: "0", background: "none", color: "var(--text)", padding: "0", cursor: "pointer", font: "inherit", textAlign: "left" } },
         el("span", { style: { display: "inline-flex", transform: ui.checksOpen ? "rotate(90deg)" : "none", transition: "transform .15s" } }, icon("chev", 14)),
-        el("b", warns ? `${warns} thing${warns === 1 ? "" : "s"} to check` : "Notes"),
-        el("span.small.muted", list.length > warns ? `· ${list.length - warns} note${list.length - warns === 1 ? "" : "s"}` : "")),
+        el("b", { style: { flex: "none" } }, warns ? `${warns} thing${warns === 1 ? "" : "s"} to check` : "Notes"),
+        ui.checksOpen ? el("span.small.muted", list.length > warns ? `· ${list.length - warns} note${list.length - warns === 1 ? "" : "s"}` : "")
+          : el("span.small.muted", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: "0" } }, `· ${first.text}`)),
       ui.checksOpen ? list.map((c) => el("div.row", { style: { gap: "10px", alignItems: "flex-start" } },
         el("span", { "aria-hidden": "true", style: { width: "10px", height: "10px", borderRadius: "50%", marginTop: "6px", flex: "none", background: c.level === "warn" ? "var(--warn, #e0a030)" : "var(--info, #5aa9e6)" } }),
         el("span", { style: { flex: "1" } }, c.text),
@@ -501,7 +330,7 @@
   function inspector() {
     const t = ui.sel && target(ui.sel);
     if (!t) return el("aside.card.hm-insp",
-      el("h2", "Pick a light"), el("p.muted", { style: { margin: 0 } }, "Choose one on the left, then tap where it is in the plan. Drag it to fine-tune, and drag it up or down in the view from the street."));
+      el("h2", "Pick a light"), el("p.muted", { style: { margin: 0 } }, "Choose one on the left, then tap where it is: on the floor in 3D, on the Front photo, or from above in the Top view. In 3D, drag it to fine-tune, and use Raise to set its height."));
     const item = t.item;
     const floor = item ? item.floor : floorOfTarget(t);
     const ceil = ceilingOf(floor);
@@ -516,9 +345,9 @@
     const parts = t.parts.length ? el("section", { style: { display: "flex", flexDirection: "column", gap: "6px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
       el("div.card-head", el("h3", `Parts (${t.parts.length})`),
         el("button.btn.small", { type: "button", disabled: !item && false, "aria-pressed": String(!!ui.mode),
-          on: { click: () => { ui.mode = ui.mode ? null : "line-start"; ui.lineStart = null; paint(); if (ui.mode) toast("Tap where the first one is in the plan"); } } },
+          on: { click: () => { ui.mode = ui.mode ? null : "line-start"; ui.lineStart = null; paint(); if (ui.mode) toast("In 3D, tap where the first one is"); } } },
           ui.mode ? "Cancel line" : "Lay out along a line")),
-      el("span.small.muted", "Select a part, then tap the plan to put it there. Flash shows which one it is."),
+      el("span.small.muted", "Select a part, then tap where it goes in 3D or the Top view. Flash shows which one it is."),
       t.parts.map((p) => el("div.row", { style: { gap: "8px", padding: "6px 8px", borderRadius: "10px", flexWrap: "nowrap",
         background: ui.part === p.index ? "var(--accent-soft)" : "var(--card2)" } },
         el("button", { type: "button", "aria-pressed": String(ui.part === p.index), on: { click: () => { ui.part = ui.part === p.index ? null : p.index; paint(); } },
@@ -539,7 +368,7 @@
       el("label.field", el("span", "Height above the floor", el("span.mono", item ? L.fmtLen(item.h) : "–")),
         el("input", { type: "range", min: 0, max: ceil, step: 0.05, value: item?.h ?? 0, disabled: !item,
           on: { change: (e) => placeItem({ h: Number(e.target.value) }) } })),
-      item ? null : el("div.banner", { style: { fontSize: "14px" } }, "Tap the plan where this light is to place it."),
+      item ? null : el("div.banner", { style: { fontSize: "14px" } }, "Tap where this light is in 3D, on the Front photo, or in the Top view to place it."),
       el("div.row", { style: { gap: "8px" } },
         el("button.btn.primary", { type: "button", disabled: status?.read_only, style: { flex: "1" }, on: { click: () => identify(undefined) } }, "Flash it"),
         item ? el("button.btn", { type: "button", on: { click: removeItem } }, "Remove") : null),
@@ -570,9 +399,6 @@
   function repaintViews() {
     if (!views) return;
     if (ui.view === "3d") { view3d.mode = ui.mode3d; view3d.setScene(scene3d()); return; }
-    if (ui.view === "photo" || ui.view === "top") return;
-    views.plan.replaceChildren(planView());
-    views.side.replaceChildren(sideView());
   }
   function paintList() {
     if (!listBox) return;
@@ -603,11 +429,11 @@
     const floorTabs = el("div.chips", { role: "group", "aria-label": "Floor shown" },
       [...house.floors.map((f) => [f.id, f.name]), [house.outside, "Outside"]].map(([id, name]) =>
         el("button.chip", { type: "button", "aria-pressed": String(ui.floor === id), on: { click: () => { ui.floor = id; paint(); } } }, name)));
-    views = { plan: el("div"), side: el("div") };
+    views = {};
     listBox = listPanel();
     const lineBanner = ui.mode ? el("div.banner", { style: { fontSize: "14px" } }, ui.mode === "line-start" ? "Tap where the first part is." : "Now tap where the last part is.") : null;
     const viewTabs = el("div.tabs", { role: "tablist", "aria-label": "View" },
-      [["3d", "3D"], ["photo", "Front photo"], ["top", "Top view"], ["flat", "Plan & side"]].map(([k, label]) => el("button", { type: "button", role: "tab", "aria-selected": String(ui.view === k),
+      [["3d", "3D"], ["photo", "Front photo"], ["top", "Top view"]].map(([k, label]) => el("button", { type: "button", role: "tab", "aria-selected": String(ui.view === k),
         on: { click: () => { ui.view = k; L.save("house.view", k); paint(); } } }, label)));
     let main;
     if (ui.view === "3d") {
@@ -628,25 +454,19 @@
     } else if (ui.view === "top") {
       ensureSite();
       main = el("section.card", { "aria-label": "The house from above", style: { padding: "14px 16px" } }, site.root);
-    } else if (ui.view === "photo") {
+    } else {
       ensureFacade();
       main = el("section.card", { "aria-label": "The front photo", style: { padding: "14px 16px" } }, facade.root);
-    } else {
-      main = [
-        el("section.card", { "aria-label": "From above", style: { padding: "14px 16px" } },
-          el("div.card-head", el("h2", "From above"), floorTabs), lineBanner, views.plan),
-        el("section.card", { "aria-label": "From the street", style: { padding: "14px 16px" } },
-          el("div.card-head", el("h2", "From the street"), el("span.small.muted", "Drag the selected light up or down")),
-          views.side)];
     }
     inspBox = inspector();
     L.set(page,
       checksCard(),
       settingsPanel(),
-      el("div.hm",
+      // the photo editors have their own panel: give the photo the room
+      el("div", { class: ui.view === "3d" ? "hm" : "hm hm-editor" },
         listBox,
         el("div.hm-views", viewTabs, main),
-        inspBox));
+        ui.view === "3d" ? inspBox : null));
     repaintViews();
     if (ui.view === "photo") facade.paint();
     if (ui.view === "top") site.paint();

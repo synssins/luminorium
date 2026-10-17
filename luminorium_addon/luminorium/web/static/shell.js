@@ -222,7 +222,8 @@
     if (body.dataset.legacy) main.className = "";
     main.append(...kids);
 
-    body.replaceChildren(el("div.app", nav, el("div.body", top, main)), el("div#toast", { role: "status", hidden: true }));
+    // A wide page (the house map) fills the window on a big screen: nothing scrolls but its parts
+    body.replaceChildren(el("div.app", { class: body.dataset.wide ? "app fit" : "app" }, nav, el("div.body", top, main)), el("div#toast", { role: "status", hidden: true }));
 
     if (!body.dataset.ownStop) {
       stop.addEventListener("click", () => run(async () => {
