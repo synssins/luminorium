@@ -522,6 +522,7 @@ window.House3D = class House3D {
       const q = t.plan.map(([x, y]) => P(x, y, 0.02));
       if (q.every(Boolean)) items.push({ depth: avgDepth(q) + 0.05, draw: () => this.poly(q, col.card2, 0, "#dce2ea", 0.7) });
     }
+    const levels = new Map(this.scene.floors.map((f) => [f.id, f]));
     // stairs: a flight of steps from one level's floor to the other's
     for (const st of t.stairs || []) {
       const f0 = levels.get(st.level), f1 = levels.get(st.to);
@@ -541,7 +542,6 @@ window.House3D = class House3D {
       }
     }
     // interior walls: a see-through panel from each level's floor to its ceiling
-    const levels = new Map(this.scene.floors.map((f) => [f.id, f]));
     for (const w of t.walls) {
       const f = levels.get(w.level);
       if (!f) continue;

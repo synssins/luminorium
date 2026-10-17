@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0-dev.24
+
+- Fixed: the 3D view stopped drawing (no house, no lights, no view cube) once a level had stairs
+  drawn in the Top view.
+
 ## 0.3.0-dev.23
 
 - **House map, CAD-style layout:** the tools for the view shown sit in a tool bar across the top
