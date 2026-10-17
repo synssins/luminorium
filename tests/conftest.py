@@ -72,3 +72,16 @@ def house(raw):
     return build(
         raw["floors"], raw["areas"], raw["devices"], raw["entities"], raw["states"], raw["zwave"]
     )
+
+
+def pytest_addoption(parser):
+    parser.addoption("--slow", action="store_true", help="also run the slow mapping scenarios")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--slow"):
+        return
+    skip = pytest.mark.skip(reason="slow: run with --slow")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip)

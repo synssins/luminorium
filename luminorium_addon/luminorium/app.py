@@ -23,14 +23,23 @@ from .ha.client import HAClient
 from .inventory.model import Inventory, Light
 from .inventory.service import InventoryService
 from .library import Library
+from .mapping.clock import Clock
+from .mapping.service import MappingService
 from .settings import DRIVER_NAMES, Settings
+from .spatial.service import SpatialService
 from .store import JsonStore
 
 log = logging.getLogger(__name__)
 
 
 class Luminorium:
-    def __init__(self, settings: Settings, *, test_hold_s: float | None = None):
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        test_hold_s: float | None = None,
+        mapping_clock: Clock | None = None,
+    ):
         self.settings = settings
         self.store = JsonStore(settings.data_dir)
         self.ha = HAClient(settings.ha_url, settings.ha_token, read_only=settings.read_only)
@@ -43,6 +52,15 @@ class Luminorium:
         self.library = Library(settings.config_dir)
         self.effects = self.library.effects()
         self.engine = Engine(self.inventory, self.safety, self.effects, self.library.palettes)
+        self.spatial = SpatialService(settings.config_dir, lambda: self.inventory.inventory)
+        self.mapping = MappingService(
+            settings.config_dir,
+            self.inventory,
+            self.safety,
+            self.spatial,
+            read_only=settings.read_only,
+            clock=mapping_clock,
+        )
         self._startup: asyncio.Task | None = None
         self.router.attach(lambda: self.inventory.inventory)
         self.inventory.on_rebuild(self._rebuilt)

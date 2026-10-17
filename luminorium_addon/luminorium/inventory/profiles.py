@@ -162,6 +162,9 @@ def apply_driver(profile: Profile, driver: str, integration: str) -> None:
         network = DRIVER_NETWORK[driver]
         defaults = NETWORKS[network]
         latency, rate = defaults.latency_ms, defaults.max_rate_hz
+    # A latency measured by camera mapping through this driver beats the default
+    if profile.details.get("latency_measured_driver") == driver:
+        latency = int(profile.details["latency_measured_ms"])
     profile.driver = driver
     profile.network = network
     profile.latency_ms = latency

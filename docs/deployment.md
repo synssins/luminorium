@@ -19,6 +19,13 @@ Luminorium is installed as a Home Assistant add-on from this repository
 ## Choices and why
 
 - **Debian base, not Alpine:** `opencv-python-headless` (phase 5 mapping) has no musllinux wheels.
+- **Image size with OpenCV (0.1.0-dev.4):** the new wheels for Python 3.13 on amd64 are 78 MB to
+  download and **217 MB installed** (opencv-python-headless 5.0.0.93: 160 MB, numpy 2.5.4: 56 MB,
+  websockets 17.2: 1 MB), measured from the manylinux wheels on 2026-10-16. Docker isn't on the
+  development PC, so the built image itself is measured on the HA host after the first install
+  of this version (`docker image ls` there, or the Supervisor's add-on info). Expected about
+  300 MB in all.
+- **websockets** is required: without it uvicorn answers the phone's capture websocket with 404.
 - **amd64 only:** the HA host is generic x86-64. Add aarch64 when there's a reason.
 - **Host networking** (since 0.2.0): the WiZ, WLED and Govee drivers use UDP on the LAN, and
   Govee devices answer to port 4002 of the sender. The web server listens on the host's 8199 but

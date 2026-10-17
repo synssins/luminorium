@@ -1,8 +1,8 @@
 # Architecture (as built)
 
-This describes the code as it is today (phases 1–3: inventory and safety, direct drivers, the
-show engine core). [DESIGN.md](../DESIGN.md) is the full target design; [BRIEF.md](../BRIEF.md)
-has the phases.
+This describes the code as it is today (phases 1–3 and 5: inventory and safety, direct drivers,
+the show engine core, views and camera mapping). [DESIGN.md](../DESIGN.md) is the full target
+design; [BRIEF.md](../BRIEF.md) has the phases.
 
 ## Process
 
@@ -37,6 +37,10 @@ One Python process (asyncio) in one add-on container:
                  │ discovery.py         Supervisor services/mqtt, Z-Wave JS server URL       │
                  │                                                                           │
                  │ engine/testlight.py  LightTester: the Test button                         │
+                 │ spatial/service.py   SpatialService: views, planes, elements (/config)    │
+                 │ mapping/service.py   MappingService: captures; session.py runs a station  │
+                 │      ├─ mapping/live.py      live step detection (adaptive advance)      │
+                 │      └─ mapping/analysis.py  offline analysis (OpenCV, worker thread)    │
                  │ web/server.py        FastAPI app (Ingress UI + JSON API)                  │
                  └───────────────────────────────────────────────────────────────────────────┘
 ```
@@ -72,8 +76,19 @@ settings and runs the FastAPI app under uvicorn; the app's lifespan starts and s
 | `engine/engine.py` | `Engine`: play/stop, targets → elements (fixtures as one), the 20 Hz tick, overlap by priority, `on_end` hand-back. One Safety session, `engine`. |
 | `library.py` | `Library`: built-in palettes (`data/palettes`) and the user's palettes and shows (`/config/palettes`, `/config/shows`). |
 | `engine/testlight.py` | `LightTester`: on (full) → hold → off → hold → restore, as a session named `test:<entity_id>`; `start_fixture()` does the same for all of a fixture's lights at once (`test:<fixture id>`). |
-| `web/server.py` | `create_app()`: pages, static files, JSON API ([api.md](api.md)), client allow-list. |
-| `web/static/` | `index.html` + `app.js` + `style.css` (lights page), `shows.js` (the Palettes panel), `camera.html` (phone camera check). No build step. |
+| `spatial/model.py` | `View`, `Plane`, `Element`, `Part`, `World`, `Station`: normalised picture coordinates. See [mapping.md](mapping.md). |
+| `spatial/geometry.py` | Plane homographies, polygons, mask outlines, photo registration (ORB + RANSAC), camera pose from a plane. |
+| `spatial/service.py` | `SpatialService`: views on disk; photo, planes, elements; merge, split, reorder, segment lines; `apply_capture()`. |
+| `mapping/session.py` | `CaptureSession`: the phone's websocket, the clock handshake, each station's pass as a Safety session, recording, analysis in a worker thread. |
+| `mapping/live.py` | `LiveDetector`: is this step's change visible and settled yet (adaptive step advance). |
+| `mapping/analysis.py` | The offline analysis, ported from `proto/mapping/analyze.py` (alignment, exposure, clock, differences, grouping, 3D). |
+| `mapping/lm.py` | A small Levenberg–Marquardt solver (no SciPy). |
+| `mapping/results.py` | Analysis results → per-light findings, suggested elements, stations, latencies. |
+| `mapping/recording.py` | Raw captures on disk; decoding uploaded videos. |
+| `mapping/service.py` | `MappingService`: create, list, delete, re-analyse, apply; latency write-back. |
+| `mapping/clock.py` | The capture's clock (simulated in tests). |
+| `web/server.py` | `create_app()`: pages, static files, JSON API ([api.md](api.md)), client allow-list. Includes `web/spatial_api.py` and `web/mapping_api.py`. |
+| `web/static/` | `index.html` + `app.js` + `style.css` (lights page), `shows.js` (the Palettes panel), `views.html` + `views.js` (views and review), `capture.html` + `capture.js` (camera mapping), `spatial.css`, `camera.html` (phone camera check). No build step. |
 
 ## Data in `/data`
 
@@ -82,10 +97,12 @@ settings and runs the FastAPI app under uvicorn; the app's lifespan starts and s
 | `options.json` | Written by the Supervisor from the add-on options. |
 | `choices.json` | The user's decisions: `include` (`{entity_id: true/false}`), `fixtures` (`[{id, name, members}]`), `dismissed` fixture suggestions (`[[entity_id, …]]`) and `drivers` (`{entity_id: "ha" or a direct driver}`, pinned drivers). |
 | `snapshots.json` | Lights currently touched and their state before: `{entity_id: {state, session, taken_at}}`. Absent when nothing is touched. Used to restore after a crash. |
+| `latency.json` | Latencies measured by camera mapping: `{entity_id: {ms, at, session}}`; they replace the profile defaults. |
 
 `/config` (the add-on's `addon_config` folder) holds user content: `palettes/*.yaml`,
-`shows/*.yaml` and `effects/*.yaml` ([engine.md](engine.md#storage)); plugins later. Both are
-included in HA backups.
+`shows/*.yaml` and `effects/*.yaml` ([engine.md](engine.md#storage)), `views/` (views and their
+photos) and `mapping/sessions/` (raw captures; [mapping.md](mapping.md#storage)); plugins later.
+Both are included in HA backups.
 
 ## Startup and shutdown
 
@@ -102,6 +119,6 @@ included in HA backups.
 
 ## What's not here yet
 
-Colour fields and the designer, triggers, views and mapping, plugins, MQTT entities, a
-Hue/Bifrost driver: phases 4–8 in [BRIEF.md](../BRIEF.md). The mapping analysis is prototyped in
-`proto/mapping/`.
+Colour fields and the designer, triggers, plugins, MQTT entities, a Hue/Bifrost driver: phases
+4 and 6–8 in [BRIEF.md](../BRIEF.md). The mapping analysis was prototyped in `proto/mapping/`; the
+add-on's version is in `mapping/`.

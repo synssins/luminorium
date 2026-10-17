@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 import uuid
 from collections.abc import Callable
 
@@ -32,6 +33,8 @@ class InventoryService:
         self.store = store
         self.inventory = Inventory()
         self.choices = UserChoices.from_dict(store.load("choices"))
+        # Latencies measured by camera mapping: {entity_id: {"ms", "at", "session"}}
+        self.measured: dict[str, dict] = store.load("latency", {}) or {}
         self.loaded = asyncio.Event()
         self._zwave_cache: dict[str, dict] = {}
         self._reload_task: asyncio.Task | None = None
@@ -92,11 +95,43 @@ class InventoryService:
             self._zwave_cache,
             self.choices,
         )
+        # Measured latencies first: the router (a rebuild listener) keeps them for their driver
+        self._apply_measured()
         for listener in self._rebuild_listeners:
             try:
                 listener(self.inventory)
             except Exception:
                 log.exception("rebuild listener failed")
+
+    def _apply_measured(self) -> None:
+        """Latencies measured by camera mapping replace the defaults, for the driver they were
+        measured through (another driver has another latency)."""
+        for eid, m in self.measured.items():
+            light = self.inventory.get(eid)
+            if light is None or light.profile is None:
+                continue
+            details = light.profile.details
+            details["latency_measured"] = True
+            details["latency_measured_at"] = m.get("at")
+            details["latency_measured_ms"] = int(m["ms"])
+            details["latency_measured_driver"] = m.get("driver", "ha")
+            if light.profile.driver == details["latency_measured_driver"]:
+                light.profile.latency_ms = int(m["ms"])
+
+    def set_measured_latency(self, latencies: dict[str, float], session: str | None = None) -> None:
+        """Store latencies (ms) measured by a capture; they replace the profile defaults."""
+        now = time.time()
+        for eid, ms in latencies.items():
+            light = self.inventory.get(eid)
+            driver = light.profile.driver if light is not None and light.profile else "ha"
+            self.measured[eid] = {
+                "ms": round(float(ms)),
+                "at": now,
+                "session": session,
+                "driver": driver,
+            }
+        self.store.save("latency", self.measured)
+        self._apply_measured()
 
     async def _load_zwave(self, devices: list[dict], entities: list[dict]) -> None:
         """Node status and command classes for Z-Wave devices that have a light or switch."""

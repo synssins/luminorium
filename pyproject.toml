@@ -9,6 +9,9 @@ testpaths = ["tests"]
 pythonpath = ["luminorium_addon", "."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = ["slow: long mapping scenarios (run with --slow)"]
+# The mapping end-to-end runs record hundreds of MB of frames: keep them only when a test fails
+tmp_path_retention_policy = "failed"
 
 [tool.ruff]
 line-length = 100

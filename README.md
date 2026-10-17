@@ -5,12 +5,14 @@ Zigbee (Zigbee2MQTT), Z-Wave dimmers and relays, WiZ, WLED, Govee, ESPHome and M
 Assistant stays the source of truth for lights, areas and floors; Luminorium adds effects,
 palettes, spatial shows mapped with a phone camera, and automations on top.
 
-**Status:** phases 1–3 are in: the light inventory, the safety net (Test, Stop all, crash
+**Status:** phases 1–3 and 5 are in: the light inventory, the safety net (Test, Stop all, crash
 recovery), direct drivers (Zigbee2MQTT over MQTT, Z-Wave JS with multicast, WiZ, WLED and Govee
-over the LAN, HA as the fallback, under per-network rate budgets) and the show engine core
+over the LAN, HA as the fallback, under per-network rate budgets), the show engine core
 (palettes, native and software effects, dip and flash, shows as YAML;
-[docs/engine.md](docs/engine.md)). None of the direct drivers has been tried on the real lights
-yet ([docs/driver-tests.md](docs/driver-tests.md)).
+[docs/engine.md](docs/engine.md)), and views with manual placement and guided phone-camera
+mapping ([docs/mapping.md](docs/mapping.md)). Phase 1 is deployed. The direct drivers, the engine
+and camera mapping haven't been tried on the real lights yet
+([docs/driver-tests.md](docs/driver-tests.md)).
 
 ## Documentation
 
@@ -25,6 +27,7 @@ yet ([docs/driver-tests.md](docs/driver-tests.md)).
 | [docs/driver-tests.md](docs/driver-tests.md) | Short real-light checks of the direct drivers, waiting for approval (none run) |
 | [docs/engine.md](docs/engine.md) | The show engine: colour, layers, palettes, effect resolution, the planner, shows, storage |
 | [docs/safety.md](docs/safety.md) | Rate governor, batches, snapshots, Stop all, crash restore, outside changes, read-only |
+| [docs/mapping.md](docs/mapping.md) | Views, planes, elements; manual placement; the guided camera capture, live step detection, analysis, results, raw sessions |
 | [docs/api.md](docs/api.md) | The HTTP API |
 | [docs/development.md](docs/development.md) | Setup, tests, the fake HA, running on a PC, fixtures |
 | [docs/deployment.md](docs/deployment.md) | Add-on packaging, versioning rules, installing on HA |
@@ -40,13 +43,13 @@ yet ([docs/driver-tests.md](docs/driver-tests.md)).
 | `tests/` | pytest suite; `tests/fixtures/ha/` is scrubbed data captured from the real HA |
 | `tools/` | `fake_ha.py` (fake HA server), fake devices (`fake_mqtt.py`, `fake_zwave.py`, `fake_lan.py`, `fake_supervisor.py`), `dev.py` (run on a PC), `capture_ha.mjs` + `make_fixtures.py` (refresh fixtures) |
 | `docs/` | Documentation |
-| `proto/mapping/` | Offline prototype of the phone-mapping analysis on synthetic data (added separately) |
+| `proto/mapping/` | Offline prototype of the phone-mapping analysis on synthetic data; its renderer drives the add-on's end-to-end mapping tests |
 
 ## Quick start (development)
 
 ```bash
 py -3.13 -m venv .venv
-.venv/Scripts/python -m pip install aiohttp fastapi uvicorn pyyaml pytest pytest-asyncio httpx ruff
+.venv/Scripts/python -m pip install aiohttp fastapi uvicorn pyyaml websockets numpy opencv-python-headless pytest pytest-asyncio httpx ruff
 .venv/Scripts/python -m pytest
 .venv/Scripts/python tools/dev.py
 ```

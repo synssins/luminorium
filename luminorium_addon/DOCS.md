@@ -5,7 +5,8 @@ Light effects, shows and sequences across every light Home Assistant knows about
 Luminorium reads your floors, areas and lights from Home Assistant and shows each light with what
 it can do, and drives each light the fastest way it can reach it. A **Test** button turns one
 light on, then off, then puts it back exactly as it was. **Palettes** play slowly changing colours
-in a room, and the API plays effects and shows (early days: the designer comes later).
+in a room, and the API plays effects and shows (early days: the designer comes later). **Views**
+place your lights on a photo of the house, by hand or with the phone camera.
 
 ## Lights
 
@@ -67,6 +68,41 @@ Effects use a light's own built-in effect where it has one (a Hue "fireplace", a
 "Fireplace", a WLED "Fire 2012"), and otherwise run in software within what the light and its
 network can take. Z-Wave dimmers get slow fades, never a flood of commands.
 
+## Views
+
+A view is a photo of the house from one spot ("Front of house") with lights placed on it. Open
+**Views** (link at the bottom of the lights page).
+
+- **New view**, then **Photo…**. Tap a light in the list, then tap where it is on the photo.
+  Drag a placed light to move it.
+- **Mark a plane**: tap the four corners of the lawn or the house front (top-left, top-right,
+  bottom-right, bottom-left) and give its real size if you know it. Lights on a plane get
+  positions in metres.
+- Select a placed light to rename it, put it on a plane, **Merge** it with others (several lights
+  behind one window as one; or as **segments** of a long window), **Split**, reorder, or **Draw a
+  segment line** (a strip's segments, or several lights in a row, spread along the line).
+
+## Map with the camera
+
+Lets the phone find where each light is, and how quickly each one reacts. It flashes the lights
+you pick, one at a time, so do it when that's fine for the house (night works best).
+
+1. Open Home Assistant on the phone through its **https://** address (Nabu Casa or your own
+   certificate); the camera needs it. Open **Map with the camera**.
+2. Pick the view and tick the lights you can see from the street (through windows too).
+   Optionally give the distance between two of them (for real metres).
+3. Pick an anchor in the middle of the house front (the front door) and keep it in the circle.
+   **Start the centre station** and hold still while the lights flash (about 20–30 seconds).
+   Every light goes back as it was at the end.
+4. Walk about 45° to the left around the anchor (the page counts the degrees), start the left
+   station; then the right one.
+5. **Put them on the view and review**: check the outlines, merge or split where needed.
+
+**Stop this pass** or **Stop all** puts every light back at once. If the camera doesn't work in
+the app, use **Record a video instead**: run each station's pass, film it with the camera app,
+and upload the video. Each capture is kept (the newest 10) in the add-on's config folder, so it
+can be analysed again later.
+
 ## Safety
 
 - **Stop all** is always at the bottom of the page. It ends every running test or show and
@@ -87,6 +123,7 @@ network can take. Z-Wave dimmers get slow fades, never a flood of commands.
   model has been tested.
 - `z2m_base_topic` (optional, default `zigbee2mqtt`), `zwave_url` (optional, found
   automatically).
+  Camera mapping is off in this mode.
 - `log_level`: `info` by default.
 
 Luminorium uses host networking (to reach WiZ, WLED and Govee devices) and asks the Supervisor
