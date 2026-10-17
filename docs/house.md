@@ -195,7 +195,9 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
     Its build: 2x4, 2x6 or 2x8 with drywall
     (½") or plaster (¾") on each face. **How far from** an outside wall or a parallel wall,
     **wall face to wall face**, as measured with a tape: typing it moves the wall. The walls it
-    can be measured from are listed nearest first by where they are ("2 · A wall to the left,
+    can be measured from (the outside walls, and walls running alongside it for part of its
+    length: a tape can't go round a corner) are listed nearest first by where they are; the
+    nearest is chosen unless you pick another for that wall ("2 · A wall to the left,
     9' 6" away"), with matching numbered tags on the plan; the chosen one is blue, with a
     blueprint dimension (ticks at the two faces, the length over the middle). **Pick on the plan**
     then a tap on a wall chooses it.

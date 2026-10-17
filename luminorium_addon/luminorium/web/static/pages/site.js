@@ -540,7 +540,7 @@ window.SiteEditor = class SiteEditor {
     } else if (this.sel.kind === "wall") {
       const len = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]);
       const refs = this.wallRefs(s);
-      const ref = refs.find((r) => r.id === this.wallRef) || refs[0];
+      const ref = this.chosenRef(s, refs);
       const dist = ref ? this.faceDistance(s, ref) : null;
       body = el("div.fc-sum", el("h3", "Wall"),
         this.buildSelect(s, (k, v) => edit(() => { s[k] = v; })),
@@ -549,7 +549,7 @@ window.SiteEditor = class SiteEditor {
         el("label.check.small", el("input", { type: "checkbox", checked: !!s.angled, on: { change: (e) => edit(() => { if (e.target.checked) s.angled = true; else { delete s.angled; s.b = squareTo(s.a, s.b); } }) } }), "Angled"),
         this.lenRow("Length", len, (v) => edit(() => { const k = v / (len || 1); s.b = [round3(s.a[0] + (s.b[0] - s.a[0]) * k), round3(s.a[1] + (s.b[1] - s.a[1]) * k)]; })),
         ref ? el("div.field", el("span", "How far from"),
-          el("select.input", { on: { change: (e) => { this.wallRef = e.target.value; this.paint(); } } }, refs.map((r) => el("option", { value: r.id, selected: r.id === ref.id ? "" : null }, r.label))),
+          el("select.input", { on: { change: (e) => { this.wallRef = { wall: s.id, ref: e.target.value }; this.paint(); } } }, refs.map((r) => el("option", { value: r.id, selected: r.id === ref.id ? "" : null }, r.label))),
           el("button.btn.small", { type: "button", "aria-pressed": String(!!this.pickRef), on: { click: () => { this.pickRef = !this.pickRef; this.paint(); } } },
             this.pickRef ? "Tap the wall on the plan…" : "Pick on the plan"),
           this.lenRow("Wall face to wall face", dist, (v) => edit(() => this.setFaceDistance(s, ref, v))),
@@ -643,7 +643,7 @@ window.SiteEditor = class SiteEditor {
   vertical(w) { return Math.abs(w.b[0] - w.a[0]) < Math.abs(w.b[1] - w.a[1]); }
   // What a wall can be measured from: the outside walls' inside faces, and parallel walls
   // The walls a wall can be measured from: the outside walls' inside faces and the walls on its
-  // level that run the same way. Each says where it is and how far, nearest first; `n` is the
+  // level that run the same way alongside it. Each says where it is and how far, nearest first; `n` is the
   // number on its tag on the plan.
   wallRefs(w) {
     const refs = [];
@@ -654,17 +654,25 @@ window.SiteEditor = class SiteEditor {
       if (vert) refs.push({ id: "L", name: "The left outside wall", pos: bb.x0, face: 0, span: [bb.y0, bb.y1] }, { id: "R", name: "The right outside wall", pos: bb.x1, face: 0, span: [bb.y0, bb.y1] });
       else refs.push({ id: "F", name: "The front outside wall", pos: bb.y0, face: 0, span: [bb.x0, bb.x1] }, { id: "B", name: "The back outside wall", pos: bb.y1, face: 0, span: [bb.x0, bb.x1] });
     }
+    const mine = vert ? [Math.min(w.a[1], w.b[1]), Math.max(w.a[1], w.b[1])] : [Math.min(w.a[0], w.b[0]), Math.max(w.a[0], w.b[0])];
     for (const o of this.doc.walls) {
       if (o === w || o.level !== w.level || this.vertical(o) !== vert) continue;
       const pos = this.wallPos(o);
       const way = vert ? (pos < here ? "to the left" : "to the right") : (pos < here ? "toward the front" : "toward the back");
       const span = vert ? [Math.min(o.a[1], o.b[1]), Math.max(o.a[1], o.b[1])] : [Math.min(o.a[0], o.b[0]), Math.max(o.a[0], o.b[0])];
+      // only walls that face it, alongside it for some of its length: a tape can't go round corners
+      if (Math.min(mine[1], span[1]) - Math.max(mine[0], span[0]) < 0.05) continue;
       refs.push({ id: o.id, name: `A wall ${way}`, pos, face: this.wallThick(o) / 2, span, wall: o });
     }
     for (const r of refs) r.dist = this.faceDistance(w, r);
     refs.sort((a, b) => a.dist - b.dist);
     refs.forEach((r, i) => { r.n = i + 1; r.label = `${r.n} · ${r.name}, ${L.fmtLen(r.dist)} away`; });
     return refs;
+  }
+  // The wall this one is measured from: the one chosen for it, else the nearest
+  chosenRef(w, refs) {
+    const c = this.wallRef && this.wallRef.wall === w.id ? refs.find((r) => r.id === this.wallRef.ref) : null;
+    return c || refs[0];
   }
   wallPos(w) { return this.vertical(w) ? (w.a[0] + w.b[0]) / 2 : (w.a[1] + w.b[1]) / 2; }
   faceDistance(w, ref) {
@@ -1070,7 +1078,7 @@ window.SiteEditor = class SiteEditor {
     if (!w || w.level !== this.level) return;
     const refs = this.wallRefs(w);
     if (!refs.length) return;
-    const ref = refs.find((r) => r.id === this.wallRef) || refs[0];
+    const ref = this.chosenRef(w, refs);
     const vert = this.vertical(w);
     const BLUE = "#5aa9e6";
     const P = (pos, along) => (vert ? this.h2s(pos, along) : this.h2s(along, pos));
@@ -1308,7 +1316,7 @@ window.SiteEditor = class SiteEditor {
       const hit = w && this.wallRefs(w).find((r) => r.wall ? segDist([x, y], r.wall.a, r.wall.b) <= this.wallThick(r.wall) / 2 + tol
         : Math.abs((this.vertical(w) ? x : y) - r.pos) <= tol);
       this.pickRef = false;
-      if (hit) this.wallRef = hit.id; else L.toast("That isn't a wall this one can be measured from: pick one that runs the same way");
+      if (hit) this.wallRef = { wall: w.id, ref: hit.id }; else L.toast("That wall doesn't face this one: pick one that runs the same way, alongside it");
       this.paint();
       return;
     }

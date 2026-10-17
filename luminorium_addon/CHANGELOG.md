@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.32
+
+- **How far from, fixed:** the list only has walls that face the picked wall (alongside it for
+  part of its length), and picking a wall starts on the nearest one. Before, a wall chosen for
+  the last wall you picked stayed chosen.
+
 ## 0.3.0-dev.31
 
 - **Fractions of an inch:** type lengths as `9'5 1/4"`, `9'5.25"`, `9' 5-1/4"` or `5 1/4"`.
