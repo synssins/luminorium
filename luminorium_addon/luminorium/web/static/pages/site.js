@@ -549,16 +549,27 @@ window.SiteEditor = class SiteEditor {
         del);
     } else if (this.sel.kind === "stairs") {
       const floors = this.ctx.floors();
-      const from = floors.find((f) => f.id === s.level), to = floors.find((f) => f.id === s.to);
-      const rise = from && to ? Math.abs(to.elevation - from.elevation) : 0;
-      const run = s.dir[0] === "x" ? s.x1 - s.x0 : s.y1 - s.y0;
+      const from = floors.find((f) => f.id === s.level);
+      const st = stairInfo(s, floors);
+      const fmt = L.fmtLen;
       body = el("div.fc-sum", el("h3", "Stairs"),
         el("label.field", el("span", "From"), el("span", from ? from.name : "?")),
         el("label.field", el("span", "Up or down to"), el("select", { on: { change: (e) => edit(() => { s.to = e.target.value; }) } },
           floors.filter((f) => f.id !== s.level).map((f) => el("option", { value: f.id, selected: s.to === f.id ? "" : null }, f.name)))),
         el("button.btn.small", { type: "button", on: { click: () => edit(() => { s.dir = { "x+": "x-", "x-": "x+", "y+": "y-", "y-": "y+" }[s.dir]; }) } }, "Turn round"),
-        el("dl.fc-kv", el("dt", "Width"), el("dd", L.fmtLen(s.dir[0] === "x" ? s.y1 - s.y0 : s.x1 - s.x0)), el("dt", "Length"), el("dd", L.fmtLen(run)),
-          rise ? [el("dt", "Rise"), el("dd", L.fmtLen(rise)), el("dt", "Steps"), el("dd", `about ${Math.max(1, Math.round(rise / 0.19))}`)] : null),
+        this.lenRow("Width", st.width, (v) => edit(() => setStair(s, { width: v }, floors))),
+        this.lenRow("Tread depth", st.tread, (v) => edit(() => setStair(s, { tread: v }, floors))),
+        this.lenRow("Step height", st.riser, (v) => edit(() => { if (v >= 0.05 && v <= 0.4) s.riser = round3(v); })),
+        el("label.field", el("span", "Steps"),
+          el("input.input", { type: "number", min: 1, max: 60, step: 1, value: st.steps, style: { width: "90px" },
+            on: { change: (e) => { const n = Math.round(Number(e.target.value)); if (!(n >= 1 && n <= 60)) { L.toast("1 to 60 steps"); e.target.value = st.steps; return; } edit(() => setStair(s, { steps: n }, floors)); } } }),
+          el("span.small.muted", "Not counting a landing or the floor at the top.")),
+        el("dl.fc-kv", el("dt", "Length"), el("dd", fmt(st.run)), el("dt", "They climb"), el("dd", fmt(st.climb)),
+          st.rise ? [el("dt", "Between the levels"), el("dd", fmt(st.rise))] : null),
+        st.rise && Math.abs(st.climb - st.rise) > 0.0254
+          ? el("div.banner", { style: { fontSize: "13px" } }, `These stairs climb ${fmt(st.climb)}, but ${from ? from.name : "the levels"} and where they lead are ${fmt(st.rise)} apart. `,
+            el("button.btn.small", { type: "button", on: { click: () => edit(() => { delete s.riser; }) } }, "Fit the step height"))
+          : el("span.small.muted", "Drag the white handles on the picked stairs to size them; the ends move a whole step at a time."),
         del);
     } else if (this.sel.kind === "door") {
       const w = d.walls.find((x) => x.id === s.wall);
@@ -862,7 +873,9 @@ window.SiteEditor = class SiteEditor {
     const along = t.dir[0], sign = t.dir[1] === "+" ? 1 : -1;
     const lo = along === "x" ? t.x0 : t.y0, hi = along === "x" ? t.x1 : t.y1;
     ctx.lineWidth = 1;
-    for (let v = lo + 0.28; v < hi - 0.05; v += 0.28) {
+    const info = stairInfo(t, this.ctx.floors());
+    for (let k = 1; k < info.steps; k++) {
+      const v = lo + k * info.tread;
       const a = along === "x" ? this.h2s(v, t.y0) : this.h2s(t.x0, v), b = along === "x" ? this.h2s(v, t.y1) : this.h2s(t.x1, v);
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
@@ -874,6 +887,7 @@ window.SiteEditor = class SiteEditor {
     ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - 10 * Math.cos(ang - 0.5), b.y - 10 * Math.sin(ang - 0.5)); ctx.lineTo(b.x - 10 * Math.cos(ang + 0.5), b.y - 10 * Math.sin(ang + 0.5)); ctx.closePath(); ctx.fillStyle = color; ctx.fill();
     const floors = this.ctx.floors(), f0 = floors.find((f) => f.id === t.level), f1 = floors.find((f) => f.id === t.to);
     if (f1) label(ctx, `${f0 && f1.elevation < f0.elevation ? "DOWN" : "UP"} to ${f1.name}`, a.x, a.y - 8, color, col, "center");
+    if (sel && t.id) this.handles(ctx, stairEdges(t).map((e) => e.at), color);
   }
   // A stair rectangle from a drag: the way they go is along the drag's longer side
   stairFrom(a, b) {
@@ -992,6 +1006,11 @@ window.SiteEditor = class SiteEditor {
       if (s.pts) { const i = s.pts.findIndex(([x, y]) => near(x, y)); if (i >= 0) return { kind: "yard", id: s.id, i }; }
     }
     if (s && sel.kind === "wall") { if (near(...s.a)) return { kind: "wall", id: s.id, i: 0 }; if (near(...s.b)) return { kind: "wall", id: s.id, i: 1 }; }
+    if (s && sel.kind === "stairs") {
+      const e = stairEdges(s).find((q) => near(...q.at));
+      // the ends move a whole step at a time: the tread stays as it is
+      if (e) return { kind: "stairEdge", id: s.id, edge: e.edge, tread: stairInfo(s, this.ctx.floors()).tread };
+    }
     return null;
   }
   hitShape(p) {
@@ -1126,6 +1145,22 @@ window.SiteEditor = class SiteEditor {
     if (h.kind === "ref") { d.ref.pts[h.i] = photo(); return; }
     if (h.kind === "check") { d.check.pts[h.i] = photo(); return; }
     if (h.kind === "outline") { d.outline[h.i] = [round3(x), round3(y)]; return; }
+    if (h.kind === "stairEdge") {
+      const s = this.shape({ kind: "stairs", id: h.id });
+      if (!s) return;
+      const along = s.dir[0], v = h.edge[0] === "x" ? x : y;
+      if (h.edge[0] === along) {
+        // an end: a whole number of treads from the other end
+        const other = h.edge[1] === "0" ? s[`${along}1`] : s[`${along}0`];
+        const n = Math.max(1, Math.min(60, Math.round(Math.abs(v - other) / h.tread)));
+        s[h.edge] = round3(h.edge[1] === "0" ? other - n * h.tread : other + n * h.tread);
+        s.steps = n;
+      } else {
+        const other = h.edge[1] === "0" ? s[`${h.edge[0]}1`] : s[`${h.edge[0]}0`];
+        s[h.edge] = round3(h.edge[1] === "0" ? Math.min(v, other - 0.3) : Math.max(v, other + 0.3));
+      }
+      return;
+    }
     const s = this.shape({ kind: h.kind === "yardR" ? "yard" : h.kind, id: h.id });
     if (h.kind === "yardR") { s.r = round3(Math.max(0.1, Math.hypot(x - s.c[0], y - s.c[1]))); return; }
     if (h.kind === "yard") { s.pts[h.i] = [round3(x), round3(y)]; return; }
@@ -1402,6 +1437,35 @@ function crossAt(a, b, axis, v) {
   const t = (v - a[i]) / (b[i] - a[i]);
   const q = [0, 0]; q[i] = v; q[j] = a[j] + t * (b[j] - a[j]);
   return q;
+}
+// Stairs: width across, length along the way they go, steps (treads, not the floor at the top),
+// each tread's depth, each step's height, and how far they climb. Steps not typed follow from
+// the levels' heights (about 7.5" a step); a step height not typed fits the levels.
+function stairInfo(t, floors) {
+  const along = t.dir[0];
+  const run = along === "x" ? t.x1 - t.x0 : t.y1 - t.y0;
+  const width = along === "x" ? t.y1 - t.y0 : t.x1 - t.x0;
+  const f0 = floors.find((f) => f.id === t.level), f1 = floors.find((f) => f.id === t.to);
+  const rise = f0 && f1 ? Math.abs(f1.elevation - f0.elevation) : 0;
+  const steps = t.steps || (rise ? Math.max(1, Math.round(rise / 0.19) - 1) : Math.max(1, Math.round(run / 0.28)));
+  const riser = t.riser || (rise ? rise / (steps + 1) : 0.19);
+  return { run, width, rise, steps, tread: run / steps, riser, climb: riser * (steps + 1) };
+}
+// Change stairs by a typed width, tread depth or number of steps. The bottom stays where it is.
+function setStair(s, { width, tread, steps }, floors) {
+  const info = stairInfo(s, floors);
+  const along = s.dir[0], across = along === "x" ? "y" : "x";
+  if (width !== undefined) { if (width < 0.3) return; s[`${across}1`] = round3(s[`${across}0`] + width); return; }
+  const n = steps ?? info.steps, tr = tread ?? info.tread;
+  if (!(n >= 1) || !(tr >= 0.1)) return;
+  s.steps = n;
+  const run = n * tr;
+  if (s.dir[1] === "+") s[`${along}1`] = round3(s[`${along}0`] + run); else s[`${along}0`] = round3(s[`${along}1`] - run);
+}
+// The middle of each side of a stair rectangle: drag handles
+function stairEdges(t) {
+  const xm = (t.x0 + t.x1) / 2, ym = (t.y0 + t.y1) / 2;
+  return [{ edge: "x0", at: [t.x0, ym] }, { edge: "x1", at: [t.x1, ym] }, { edge: "y0", at: [xm, t.y0] }, { edge: "y1", at: [xm, t.y1] }];
 }
 function squareTo(a, b) { return Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]) ? [b[0], a[1]] : [a[0], b[1]]; }
 // A polygon pulled in by d (each edge moved in, corners where they meet)

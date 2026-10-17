@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.26
+
+- **Stairs you can size:** type the width, tread depth, step height and number of steps (not
+  counting a landing or the floor at the top), or drag the handles on picked stairs (the ends
+  move a step at a time). The Top view and 3D draw that many steps at that height. If the steps
+  don't add up to the gap between the levels, the panel says so and offers **Fit the step
+  height**.
+
 ## 0.3.0-dev.25
 
 - **Walls snap at any zoom:** zoomed in, an end dropped anywhere on another wall's body snaps to

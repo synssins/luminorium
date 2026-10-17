@@ -529,12 +529,14 @@ window.House3D = class House3D {
       if (!f0 || !f1) continue;
       const along = st.dir[0], sign = st.dir[1] === "+" ? 1 : -1;
       const lo = along === "x" ? st.x0 : st.y0, hi = along === "x" ? st.x1 : st.y1;
-      const z0 = f0.elevation, z1 = f1.elevation;
-      const n = Math.max(2, Math.round(Math.abs(z1 - z0) / 0.19));
+      // as the Top view's panel has them: typed steps and step height, else from the levels
+      const z0 = f0.elevation, z1 = f1.elevation, rise = Math.abs(z1 - z0);
+      const n = st.steps || (rise ? Math.max(1, Math.round(rise / 0.19) - 1) : 1);
+      const riser = (st.riser || rise / (n + 1)) * Math.sign(z1 - z0 || 1);
       const run = (hi - lo) / n;
       for (let k = 0; k < n; k++) {
         const s0 = sign > 0 ? lo + k * run : hi - (k + 1) * run, s1 = s0 + run;
-        const z = z0 + (z1 - z0) * (k + 1) / n;
+        const z = z0 + riser * (k + 1);
         const q = along === "x"
           ? [P(s0, st.y0, z), P(s1, st.y0, z), P(s1, st.y1, z), P(s0, st.y1, z)]
           : [P(st.x0, s0, z), P(st.x1, s0, z), P(st.x1, s1, z), P(st.x0, s1, z)];

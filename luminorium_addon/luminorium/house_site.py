@@ -198,18 +198,23 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
         y0, y1 = sorted((_num(t.get("y0")), _num(t.get("y1"))))
         if x1 - x0 < 0.3 or y1 - y0 < 0.3:
             raise SiteError("stairs are at least 1 ft each way")
-        stairs.append(
-            {
-                "id": _id(t.get("id")),
-                "level": level,
-                "to": to or None,
-                "dir": direction,
-                "x0": x0,
-                "x1": x1,
-                "y0": y0,
-                "y1": y1,
-            }
-        )
+        st = {
+            "id": _id(t.get("id")),
+            "level": level,
+            "to": to or None,
+            "dir": direction,
+            "x0": x0,
+            "x1": x1,
+            "y0": y0,
+            "y1": y1,
+        }
+        # How many steps (treads, not the floor at the top) and how high each is, when typed;
+        # otherwise they follow from the levels' heights
+        if t.get("steps") is not None:
+            st["steps"] = int(_num(t.get("steps"), 1, 60))
+        if t.get("riser") is not None:
+            st["riser"] = _num(t.get("riser"), 0.05, 0.4)
+        stairs.append(st)
     out["stairs"] = stairs
     return out
 

@@ -758,7 +758,14 @@ async def test_stairs_and_angled_walls_on_the_plan(client, lum):
     view = (await client.put("/api/house/site", json=site)).json()
     assert view["site"]["walls"][1]["angled"] is True and "angled" not in view["site"]["walls"][0]
     assert view["top"]["stairs"][0]["to"] == "bedroom_level"
+    assert "steps" not in view["site"]["stairs"][0]  # not typed: they follow the levels
+    # typed steps and step height are kept
+    typed = {**site, "stairs": [{**site["stairs"][0], "steps": 12, "riser": 0.19}]}
+    st = (await client.put("/api/house/site", json=typed)).json()["site"]["stairs"][0]
+    assert (st["steps"], st["riser"]) == (12, 0.19)
     for bad in (
+        {**site, "stairs": [{**site["stairs"][0], "steps": 0}]},
+        {**site, "stairs": [{**site["stairs"][0], "riser": 0.9}]},
         {**site, "stairs": [{**site["stairs"][0], "to": "attic"}]},
         {**site, "stairs": [{**site["stairs"][0], "dir": "z+"}]},
         {**site, "stairs": [{**site["stairs"][0], "x1": 6.1}]},

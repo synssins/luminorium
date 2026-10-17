@@ -181,7 +181,14 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
     to** another level carries them there (a wall's own level is in its panel too).
   - **Stairs:** drag over them from the bottom step to the top (or top to bottom for stairs down);
     they lead to the next level up (or down), changeable, with **Turn round**. Drawn with their
-    treads and an UP or DOWN arrow, and in 3D as steps between the two levels' floors. Its build: 2x4, 2x6 or 2x8 with drywall
+    treads and an UP or DOWN arrow, and in 3D as steps between the two levels' floors. The panel takes
+    typed **Width**, **Tread depth**, **Step height** and **Steps** (treads, not counting a landing
+    or the floor at the top; `steps`, `riser` in `site.stairs`). Not typed, the steps follow from
+    the levels' heights (about 7½" each) and the step height fits them. A typed step height that
+    doesn't add up to the gap between the levels gets a note and **Fit the step height**. Picked
+    stairs have white handles on their four sides: the sides set the width, the ends move a whole
+    tread at a time (the tread depth stays). Typing keeps the bottom where it is.
+    Its build: 2x4, 2x6 or 2x8 with drywall
     (½") or plaster (¾") on each face. **How far from** an outside wall or a parallel wall,
     **wall face to wall face**, as measured with a tape: typing it moves the wall.
   - **Doorways:** on a wall, a width and how far from the wall's end.
