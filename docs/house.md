@@ -295,8 +295,10 @@ block's `z0` includes how far it goes into the ground).
 
 Everything is stored in metres. The page shows and accepts the user's units: feet and inches when
 Home Assistant's unit system is imperial (`get_config` → `unit_system.length` is `mi`), else
-metres. **Settings › Units** overrides it per browser. Fields accept `8' 6"`, `8 ft 6 in`,
-`102 in`, `8.5'`, `2.6 m` or `260 cm`, or a bare number in the current unit. In imperial the
+metres. **Settings › Units** overrides it per browser. Fields accept `8' 6"`, `9' 5 1/4"`,
+`9'5.25"`, `9' 5-1/4"`, `5 1/4"`, `8 ft 6 in`, `102 in`, `8.5'`, `2.6 m` or `260 cm`, or a bare
+number in the current unit. Imperial lengths show to the nearest 1/16", as a tape reads
+(`9' 5 1/4"`). In imperial the
 grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm in metric).
 
 ## The page

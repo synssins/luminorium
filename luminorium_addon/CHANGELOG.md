@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0-dev.31
+
+- **Fractions of an inch:** type lengths as `9'5 1/4"`, `9'5.25"`, `9' 5-1/4"` or `5 1/4"`.
+  Lengths show to the nearest 1/16" (`9' 5 1/4"`) instead of the nearest inch.
+
 ## 0.3.0-dev.30
 
 - **Measure across** (Top view): tap the walls in the order you measured them across a level,

@@ -278,11 +278,21 @@
     const v = Number(m);
     const sign = v < 0 ? "−" : signed && v > 0 ? "+" : "";
     if (units() === "metric") return `${sign}${Math.abs(v).toFixed(2)} m`;
-    const total = Math.round(Math.abs(v) / IN);
-    const ft = Math.floor(total / 12), inch = total % 12;
-    return `${sign}${ft}' ${inch}"`;
+    // to the nearest 1/16", as a tape reads: 9' 5 1/4"
+    const total = Math.round((Math.abs(v) / IN) * 16);
+    const ft = Math.floor(total / 192), inch = Math.floor((total % 192) / 16);
+    let n = total % 16, d = 16;
+    while (n && n % 2 === 0) { n /= 2; d /= 2; }
+    return `${sign}${ft}' ${inch}${n ? ` ${n}/${d}` : ""}"`;
   }
-  // "8' 6\"", "8 ft 6 in", "102 in", "8.5'", "2.6 m", "260 cm", or a bare number in the user's
+  // Inches as typed: "5", "5.25", "5 1/4", "5-1/4" or "1/4"
+  const INCHES = String.raw`\d+(?:\.\d+)?(?:[\s-]+\d+\s*/\s*\d+)?|\d+\s*/\s*\d+`;
+  function inchesOf(t) {
+    const m = /^(?:(\d+(?:\.\d+)?)[\s-]+)?(\d+)\s*\/\s*(\d+)$/.exec(t.trim());
+    if (m) return (m[1] ? Number(m[1]) : 0) + Number(m[2]) / Number(m[3]);
+    return Number(t);
+  }
+  // "8' 6\"", "9' 5 1/4\"", "9'5.25\"", "8 ft 6 in", "102 in", "5 1/4\"", "8.5'", "2.6 m", "260 cm", or a bare number in the user's
   // units (feet or metres) -> metres; NaN when it can't be read
   function parseLen(text) {
     const t = String(text ?? "").trim().toLowerCase().replace(/[′’]/g, "'").replace(/[″”“]/g, '"').replace(/−/g, "-").replace(",", ".");
@@ -290,9 +300,9 @@
     let m;
     if ((m = /^(-?\d+(?:\.\d+)?)\s*(m|meters?|metres?)$/.exec(t))) return Number(m[1]);
     if ((m = /^(-?\d+(?:\.\d+)?)\s*cm$/.exec(t))) return Number(m[1]) / 100;
-    if ((m = /^(-?\d+(?:\.\d+)?)\s*("|in|inch|inches)$/.exec(t))) return Number(m[1]) * IN;
-    if ((m = /^(-?)\s*(\d+(?:\.\d+)?)\s*('|ft|foot|feet)\s*(?:(\d+(?:\.\d+)?)\s*("|in|inch|inches)?)?$/.exec(t))) {
-      const v = Number(m[2]) * FT + (m[4] ? Number(m[4]) * IN : 0);
+    if ((m = new RegExp(String.raw`^(-?)\s*(${INCHES})\s*("|in|inch|inches)$`).exec(t))) { const v = inchesOf(m[2]) * IN; return m[1] === "-" ? -v : v; }
+    if ((m = new RegExp(String.raw`^(-?)\s*(\d+(?:\.\d+)?)\s*('|ft|foot|feet)\s*(?:(${INCHES})\s*("|in|inch|inches)?)?$`).exec(t))) {
+      const v = Number(m[2]) * FT + (m[4] ? inchesOf(m[4]) * IN : 0);
       return m[1] === "-" ? -v : v;
     }
     if ((m = /^(-?\d+(?:\.\d+)?)$/.exec(t))) return Number(m[1]) * (units() === "imperial" ? FT : 1);
