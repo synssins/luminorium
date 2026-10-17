@@ -9,7 +9,8 @@ Code: `luminorium/house.py` (`HouseService`), the API in `web/server.py`, the pa
 ## The model
 
 - **The house is a box** of the user's size (`size.width` across the front × `size.depth` back),
-  14 × 10 m until changed. Rooms aren't drawn: lights already know their HA room and floor.
+  14 × 10 m until changed, or the **blocks drawn on the front photo** (below). Rooms aren't drawn:
+  lights already know their HA room and floor.
 - **Coordinates, in metres:** `x` across the front from its left corner, `y` back from the front
   wall (negative is the yard, towards the street), `z` above the ground outside.
 - **Floors come from HA.** Each has:
@@ -74,6 +75,46 @@ you stand. Every flash is restored afterwards, and nothing is sent in read-only 
 - **A WLED LED:** about 2 s of DDP realtime frames with only that LED lit. WLED returns to its
   own state by itself a few seconds after the frames stop.
 
+## The front photo
+
+A photo of the front of the house, measured from its front door. Code: `pages/facade.js`
+(`FacadeEditor`), `HouseService.set_photo`, `set_facade`, `massing` in `house.py`.
+
+- **Scale and perspective from the door.** The user boxes the front door and drags its four
+  corners onto the frame's corners. The door is 36" × 80" (0.9144 × 2.032 m) unless changed. A
+  homography from those four points (direct linear transform, solved in the page) turns any point
+  on the photo into metres on the plane of the front wall, and back. Things set back from the door
+  come out a little small; a straight-on photo from across the street keeps that small.
+- **Facade metres:** shapes are stored from the door's bottom left corner, `X` across and `Z` up.
+  The **ground line** turns `Z` into height above the ground (the door sill is often a step or two
+  up), and the leftmost block's left edge is the house's `x = 0`.
+- **Drawing tools** (a toolbar beside the photo, each with a key):
+  | Tool | Key | What it draws |
+  |---|---|---|
+  | Select | V | Picks a shape; drag it or its handles, Delete removes it |
+  | Pan | H | Moves the photo (also: Space, the middle button, or two fingers; scroll or pinch zooms) |
+  | Front door | D | Drag a box round the door, then fit its four corners. Door size in the bar above |
+  | Ground line | G | Tap where the wall meets the ground |
+  | House block | B | Drag a box from the ground to the eaves, wall edge to wall edge. Split levels and the garage are their own blocks |
+  | Roof | R | Tap the top of a roof: **point faces the street** (a gable; its peak can sit off-centre) or **ridge along the front** |
+  | Window or door | N | Drag a box over a window, door or garage door |
+  | Floor line | F | Pick an HA floor, then drag along where that floor is (a tap runs it across the block it's on) |
+  | Place a light | L | Tap where the light picked in the list is: **inside, by the window** (30 cm in, on the floor under that point) or **outside, on the wall** |
+  | Measure | M | Drag between two points for the distance |
+
+  Undo and redo (Ctrl+Z, Ctrl+Shift+Z) cover every change. Edges snap to the ones already drawn
+  (hold Alt to stop it). While a corner or a box is being dragged, a magnifier shows the photo under
+  the pointer. A scale bar shows a round length at the bottom left.
+- **Steps** along the top tick off as they're done: photo, front door, ground, house blocks,
+  roofs, floors, lights. A tap on a step picks its tool.
+- **What it changes, on every save:** the blocks set the house width; each floor line sets its
+  floor's height above the ground and the part of the house it covers (the whole width when it
+  runs at least 95% across). Floors without a line keep their values.
+- **In 3D** the blocks are drawn as see-through walls with their roofs, and the windows and doors
+  on the front, around the floors and lights.
+- The photo is shrunk in the page to 2400 px and saved as a JPEG, as `house_front.img` in the
+  config folder. A new photo keeps the drawing but needs the door marked again.
+
 ## API
 
 | Request | Body | Result |
@@ -86,6 +127,13 @@ you stand. Every flash is restored afterwards, and nothing is sent in read-only 
 | `DELETE /api/house/items/{target}/parts/{index}` | | `{removed}` |
 | `POST /api/house/items/{target}/line` | `{start: {x, y, h}, end: {x, y, h}, parts?: [index, …]}` | `{placed: n}`: the parts spread evenly from start to end |
 | `POST /api/house/identify` | `{target, part?}` | `{flashing, part?}`; `409` when read-only or the light is busy |
+| `PUT /api/house/photo?w=&h=` | the image bytes (JPEG, PNG or WebP, under 15 MB) | the facade; the door must be marked again |
+| `GET /api/house/photo` | | the image |
+| `PUT /api/house/facade` | `{door: {pts: [[u, v] ×4: top left, top right, bottom right, bottom left], w, h}, ground: {z}, blocks: [{id, name, x0, x1, z0, z1, roof: flat\|gable\|ridge, peak_x?, peak_z?, depth?, y0?}], openings: [{id, kind: window\|door\|garage, x0, x1, z0, z1}], lines: [{id, floor, x0, x1, z}]}` (facade metres) | the view, with the house width and floors applied; `400` without a photo or for a bad shape |
+| `DELETE /api/house/facade` | | the view; removes the photo and the drawing |
+
+`GET /api/house` also returns `facade` (the drawing as saved) and `massing` (`null` until a door
+and a block are drawn, else `{blocks, openings}` in house metres, for the 3D view).
 
 ## Units
 
@@ -108,7 +156,8 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
     chosen above the view.
   - **Move:** drag the picked light, or one of its parts, across its floor.
   - **Raise:** drag it up or down; it stops at the ceiling.
-- **Plan & side** (the second tab), for exact positions:
+- **Front photo** (the second tab): the drawing tools above.
+- **Plan & side** (the third tab), for exact positions:
 - **From above:** the plan, with a 1 m grid (5 m lines heavier) and the house outline. The chosen
   floor's span is highlighted, and lights on other floors are dimmed. Tap empty ground to place
   the selected light or part; drag it to move it (5 cm steps).

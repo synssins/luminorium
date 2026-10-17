@@ -17,7 +17,7 @@
     search: "",
     settings: false,
     drag: null,
-    view: L.store("house.view", "3d"), // "3d" | "flat"
+    view: L.store("house.view", "3d"), // "3d" | "flat" | "photo"
     mode3d: "move",                     // "move" | "raise" in the 3D view
   };
   let house = null;
@@ -202,9 +202,12 @@
         parts: t.parts.filter((p) => p.world).map((p) => ({ index: p.index, x: p.world.x, y: p.world.y, z: p.world.z, sel: sel && ui.part === p.index })),
       };
     });
+    const m = house.massing;
+    const peaks = m ? m.blocks.map((b) => b.peak_z ?? b.z1) : [];
     return {
-      W: house.size.width, D: house.size.depth,
-      zMin: Math.min(0, ...bottoms), zMax: Math.max(2.5, ...tops),
+      W: house.size.width, D: Math.max(house.size.depth, ...(m ? m.blocks.map((b) => (b.y0 || 0) + b.depth) : [])),
+      zMin: Math.min(0, ...bottoms, ...(m ? m.blocks.map((b) => b.z0) : [])), zMax: Math.max(2.5, ...tops, ...peaks),
+      massing: m,
       floors: house.floors.map((f) => ({ ...f, active: f.id === ui.floor, label: L.fmtLen(f.elevation, { signed: true }) })),
       lights, grid: L.units() === "imperial" ? L.FT : 1,
       placeZ: floorZ(ui.floor), selPart: ui.part, labels: false,
@@ -345,6 +348,46 @@
   }
   async function reload() { house = await api("api/house"); paint(); }
 
+  // ---- the front photo ------------------------------------------------------------------------
+
+  let facade = null;
+  function ensureFacade() {
+    if (facade) return;
+    facade = new window.FacadeEditor({
+      house: () => house,
+      floors: () => house.floors,
+      selection: () => ({ target: ui.sel ? target(ui.sel) : null, part: ui.part }),
+      place: (x, z, outside) => placeFromPhoto(x, z, outside),
+      // the drawing was saved: the house width and floor heights may have changed
+      saved: (view) => { house = view; paintSide(); },
+      changed: () => reload(),
+    });
+    facade.load(house.facade);
+  }
+  // A tap on the photo: across (x) and height above the ground (z), in house metres
+  async function placeFromPhoto(x, z, outside) {
+    const t = target(ui.sel);
+    if (!t) return;
+    const at = { x: r2(x), y: outside ? -0.15 : 0.3 };
+    if (ui.part !== null && t.item) {
+      const h = Math.max(0, r2(z - floorZ(t.item.floor)));
+      await run(() => api(`api/house/items/${encodeURIComponent(t.id)}/parts/${ui.part}`, { method: "PUT", body: { ...at, h } }));
+      await reload();
+      return;
+    }
+    let floor = house.outside;
+    if (!outside) {
+      // the highest floor under the point, where that floor covers it
+      const under = house.floors.filter((f) => (f.x0 == null || x >= f.x0 - 0.05) && (f.x1 == null || x <= f.x1 + 0.05) && f.elevation <= z + 0.05)
+        .sort((a, b) => b.elevation - a.elevation)[0];
+      floor = under ? under.id : floorOfTarget(t);
+    }
+    const h = Math.max(0, Math.min(outside ? 30 : ceilingOf(floor), r2(z - floorZ(floor))));
+    ui.floor = floor;
+    await placeItem({ ...at, floor, h, mount: t.item?.mount || "wall" });
+    toast(`${t.name}: ${floorName(floor)}, ${L.fmtLen(h)} up`);
+  }
+
   // ---- panels ---------------------------------------------------------------------------------
 
   function listPanel() {
@@ -445,10 +488,16 @@
   function repaintViews() {
     if (!views) return;
     if (ui.view === "3d") { view3d.mode = ui.mode3d; view3d.setScene(scene3d()); return; }
+    if (ui.view === "photo") return;
     views.plan.replaceChildren(planView());
     views.side.replaceChildren(sideView());
   }
   function paintList() { if (listBox) listBox.replaceWith(listBox = listPanel()); }
+  let inspBox = null;
+  function paintSide() {
+    paintList();
+    if (inspBox) inspBox.replaceWith(inspBox = inspector());
+  }
 
   function paint() {
     if (!house || !inventory) return;
@@ -463,7 +512,7 @@
     listBox = listPanel();
     const lineBanner = ui.mode ? el("div.banner", { style: { fontSize: "14px" } }, ui.mode === "line-start" ? "Tap where the first part is." : "Now tap where the last part is.") : null;
     const viewTabs = el("div.tabs", { role: "tablist", "aria-label": "View" },
-      [["3d", "3D"], ["flat", "Plan & side"]].map(([k, label]) => el("button", { type: "button", role: "tab", "aria-selected": String(ui.view === k),
+      [["3d", "3D"], ["photo", "Front photo"], ["flat", "Plan & side"]].map(([k, label]) => el("button", { type: "button", role: "tab", "aria-selected": String(ui.view === k),
         on: { click: () => { ui.view = k; L.save("house.view", k); paint(); } } }, label)));
     let main;
     if (ui.view === "3d") {
@@ -481,6 +530,9 @@
           el("div.row", { style: { gap: "6px" } }, [["3d", "3D"], ["top", "Top"], ["front", "Front"]].map(([k, label]) =>
             el("button.btn.small", { type: "button", on: { click: () => view3d.preset(k) } }, label)))),
         floorTabs, lineBanner, canvas3d, el("span.small.muted", hint));
+    } else if (ui.view === "photo") {
+      ensureFacade();
+      main = el("section.card", { "aria-label": "The front photo", style: { padding: "14px 16px" } }, facade.root);
     } else {
       main = [
         el("section.card", { "aria-label": "From above", style: { padding: "14px 16px" } },
@@ -489,13 +541,15 @@
           el("div.card-head", el("h2", "From the street"), el("span.small.muted", "Drag the selected light up or down")),
           views.side)];
     }
+    inspBox = inspector();
     L.set(page,
       settingsPanel(),
       el("div.hm",
         listBox,
         el("div.hm-views", viewTabs, main),
-        inspector()));
+        inspBox));
     repaintViews();
+    if (ui.view === "photo") facade.paint();
   }
 
   // Redraw once the status says which units HA uses (and whenever that changes)

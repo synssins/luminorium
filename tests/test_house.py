@@ -236,3 +236,88 @@ async def test_identify_refused_when_read_only(fake_ha, tmp_path):
         assert (await c.post("/api/house/identify", json={"target": PORCH})).status_code == 409
     assert not fake_ha.calls
     await app.stop()
+
+
+JPEG = b"\xff\xd8\xff\xe0" + b"\0" * 64
+
+
+async def test_front_photo_sets_width_floors_and_massing(client, lum):
+    # A drawing needs a photo first
+    assert (await client.put("/api/house/facade", json={})).status_code == 400
+    bad = await client.put("/api/house/photo?w=800&h=600", content=b"not an image")
+    assert bad.status_code == 400
+    r = await client.put("/api/house/photo?w=800&h=600", content=JPEG)
+    assert r.status_code == 200 and r.json()["photo"] == {"w": 800, "h": 600}
+    photo = await client.get("/api/house/photo")
+    assert photo.headers["content-type"] == "image/jpeg" and photo.content == JPEG
+
+    # Facade metres from the door's bottom left corner. The sill is 0.6 m above the ground; the
+    # house runs from 4 m left of the door to 10 m right of it, in two blocks
+    door = {"pts": [[400, 300], [436, 300], [436, 380], [400, 380]], "w": 0.9144, "h": 2.032}
+    body = {
+        "door": door,
+        "ground": {"z": -0.6},
+        "blocks": [
+            {
+                "id": "a",
+                "name": "Two storey",
+                "x0": -4,
+                "x1": 3,
+                "z0": -0.6,
+                "z1": 5,
+                "roof": "gable",
+                "peak_z": 7.5,
+                "peak_x": -0.5,
+            },
+            {
+                "id": "b",
+                "name": "Side",
+                "x0": 3,
+                "x1": 10,
+                "z0": -0.6,
+                "z1": 2.8,
+                "roof": "ridge",
+                "peak_z": 4.6,
+                "depth": 8,
+            },
+        ],
+        "openings": [{"id": "w", "kind": "window", "x0": 5, "x1": 6.2, "z0": 0.4, "z1": 1.6}],
+        "lines": [
+            {"id": "m", "floor": "main_level", "x0": 3, "x1": 10, "z": 0},
+            {"id": "u", "floor": "bedroom_level", "x0": -4, "x1": 10, "z": 2.4},
+        ],
+    }
+    view = (await client.put("/api/house/facade", json=body)).json()
+    assert view["size"]["width"] == 14
+    floors = {f["id"]: f for f in view["floors"]}
+    # Main: 0.6 m above the ground, over the right half only (x 7..14 in house metres)
+    assert floors["main_level"]["elevation"] == pytest.approx(0.6)
+    assert (floors["main_level"]["x0"], floors["main_level"]["x1"]) == (7, 14)
+    # The bedroom line runs the whole width, so it covers the whole house
+    assert floors["bedroom_level"]["elevation"] == pytest.approx(3.0)
+    assert floors["bedroom_level"]["x0"] is None
+    m = view["massing"]
+    a, b = m["blocks"]
+    assert (a["x0"], a["x1"], a["z0"], a["z1"]) == (0, 7, 0, 5.6)
+    assert (a["peak_x"], a["peak_z"]) == (3.5, 8.1)
+    assert b["depth"] == 8 and a["depth"] == view["size"]["depth"]
+    assert m["openings"][0] == {"kind": "window", "x0": 9, "x1": 10.2, "z0": 1.0, "z1": 2.2}
+    # Kept in house.json
+    assert lum.house.store.load("house")["facade"]["blocks"][0]["name"] == "Two storey"
+
+    # Bad drawings are refused
+    for broken in (
+        {**body, "door": {**door, "pts": door["pts"][:3]}},
+        {**body, "blocks": [{**body["blocks"][0], "roof": "dome"}]},
+        {**body, "lines": [{"floor": "attic", "x0": 0, "x1": 1, "z": 1}]},
+        {**body, "openings": [{"kind": "window", "x0": 1, "x1": 1, "z0": 0, "z1": 1}]},
+    ):
+        assert (await client.put("/api/house/facade", json=broken)).status_code == 400
+
+    # A new photo keeps the drawing but needs the door again; starting over removes it all
+    r = await client.put("/api/house/photo?w=1000&h=700", content=JPEG)
+    assert r.json()["door"] is None and len(r.json()["blocks"]) == 2
+    assert (await client.get("/api/house")).json()["massing"] is None
+    view = (await client.delete("/api/house/facade")).json()
+    assert view["facade"] is None
+    assert (await client.get("/api/house/photo")).status_code == 404

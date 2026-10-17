@@ -14,12 +14,23 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .inventory.model import Inventory, Kind, Light
 from .store import JsonStore
 
 OUTSIDE = "_outside"
+# A standard front door: 36" x 80"
+DOOR_W_M = 0.9144
+DOOR_H_M = 2.032
+ROOFS = (
+    "flat",
+    "gable",
+    "ridge",
+)  # gable: the triangle faces the street; ridge: runs along the front
+OPENINGS = ("window", "door", "garage")
+PHOTO_MAX_BYTES = 15 * 1024 * 1024
 STOREY_M = 2.7
 CEILING_M = 2.4
 # The deepest a floor goes by default: one storey below the ground
@@ -88,6 +99,7 @@ class HouseService:
         self.data.setdefault("size", {"width": 14.0, "depth": 10.0})
         self.data.setdefault("floors", {})
         self.data.setdefault("items", {})
+        self.data.setdefault("facade", None)
 
     # ---- floors ---------------------------------------------------------------------------
 
@@ -316,6 +328,195 @@ class HouseService:
             "z": round(self.floor_z(item["floor"]) + part["h"], 3),
         }
 
+    # ---- the front photo ---------------------------------------------------------------------
+    #
+    # The user marks the front door on a photo of the front of the house. Its four corners and
+    # its real size (36" x 80" unless changed) fix the perspective, so everything else drawn on the
+    # photo has real measurements. Shapes are kept in facade metres measured from the door's
+    # bottom left corner (X across, Z up); the ground line and the leftmost wall turn them into
+    # house coordinates. Drawing house blocks sets the house width; floor lines set each floor's
+    # height and span.
+
+    def photo_path(self) -> Path:
+        return self.store.directory / "house_front.img"
+
+    def set_photo(self, data: bytes, width: int, height: int) -> dict:
+        if not data or len(data) > PHOTO_MAX_BYTES:
+            raise HouseError("the photo must be under 15 MB")
+        if photo_type(data) is None:
+            raise HouseError("the photo must be a JPEG, PNG or WebP image")
+        if not (16 <= width <= 20000 and 16 <= height <= 20000):
+            raise HouseError("bad photo size")
+        path = self.photo_path()
+        tmp = path.with_suffix(".tmp")
+        tmp.write_bytes(data)
+        tmp.replace(path)
+        facade = self.data.get("facade") or {}
+        # A new photo needs the door marked again; the drawing is in metres, so it's kept
+        facade.update({"photo": {"w": int(width), "h": int(height)}, "door": None})
+        self.data["facade"] = facade
+        self._save()
+        return facade
+
+    def clear_facade(self) -> None:
+        self.photo_path().unlink(missing_ok=True)
+        self.data["facade"] = None
+        self._save()
+
+    def set_facade(self, body: dict) -> dict:
+        """Save the drawing (door, ground, blocks, openings, floor lines) and apply it."""
+        facade = self.data.get("facade") or {}
+        if not facade.get("photo"):
+            raise HouseError("add a photo of the front first")
+        pw, ph = facade["photo"]["w"], facade["photo"]["h"]
+        out: dict[str, Any] = {"photo": facade["photo"]}
+        door = body.get("door")
+        if door:
+            pts = door.get("pts") or []
+            if len(pts) != 4:
+                raise HouseError("the door needs four corners")
+            clean = []
+            for pt in pts:
+                u, v = _num(pt[0], 1e5), _num(pt[1], 1e5)
+                if not (-pw <= u <= 2 * pw and -ph <= v <= 2 * ph):
+                    raise HouseError("a door corner is off the photo")
+                clean.append([u, v])
+            dw, dh = _num(door.get("w", DOOR_W_M)), _num(door.get("h", DOOR_H_M))
+            if not (0.3 <= dw <= 6 and 0.3 <= dh <= 6):
+                raise HouseError("the door must be 1-20 ft each way")
+            out["door"] = {"pts": clean, "w": dw, "h": dh}
+        else:
+            out["door"] = None
+        ground = body.get("ground")
+        out["ground"] = None if ground is None else {"z": _num(ground.get("z", 0))}
+
+        def rect(r: dict) -> dict:
+            x0, x1 = sorted((_num(r.get("x0")), _num(r.get("x1"))))
+            z0, z1 = sorted((_num(r.get("z0")), _num(r.get("z1"))))
+            if x1 - x0 < 0.05 or z1 - z0 < 0.05:
+                raise HouseError("a shape is too small")
+            return {"x0": x0, "x1": x1, "z0": z0, "z1": z1}
+
+        def ident(v: Any, n: int = 40) -> str:
+            return str(v or "")[:n]
+
+        blocks = []
+        for b in _list(body.get("blocks"), 50):
+            roof = b.get("roof") or "flat"
+            if roof not in ROOFS:
+                raise HouseError(f"unknown roof {roof}")
+            blk = {
+                "id": ident(b.get("id")),
+                "name": ident(b.get("name"), 60),
+                **rect(b),
+                "roof": roof,
+            }
+            if roof != "flat":
+                blk["peak_z"] = max(blk["z1"], _num(b.get("peak_z", blk["z1"] + 1.5)))
+                blk["peak_x"] = min(
+                    blk["x1"], max(blk["x0"], _num(b.get("peak_x", (blk["x0"] + blk["x1"]) / 2)))
+                )
+            for key, lo, hi in (("depth", 0.5, 200), ("y0", -50, 50)):
+                if b.get(key) not in (None, ""):
+                    v = _num(b[key])
+                    if not lo <= v <= hi:
+                        raise HouseError(f"{key} out of range")
+                    blk[key] = v
+            blocks.append(blk)
+        out["blocks"] = blocks
+        openings = []
+        for o in _list(body.get("openings"), 300):
+            kind = o.get("kind") or "window"
+            if kind not in OPENINGS:
+                raise HouseError(f"unknown opening {kind}")
+            openings.append({"id": ident(o.get("id")), "kind": kind, **rect(o)})
+        out["openings"] = openings
+        lines = []
+        floors = self.floors()
+        for ln in _list(body.get("lines"), 30):
+            fid = str(ln.get("floor") or "")
+            if fid and fid not in floors:
+                raise HouseError(f"unknown floor {fid}")
+            x0, x1 = sorted((_num(ln.get("x0")), _num(ln.get("x1"))))
+            lines.append(
+                {
+                    "id": ident(ln.get("id")),
+                    "floor": fid or None,
+                    "x0": x0,
+                    "x1": x1,
+                    "z": _num(ln.get("z")),
+                }
+            )
+        out["lines"] = lines
+        self.data["facade"] = out
+        self._apply_facade()
+        self._save()
+        return out
+
+    def facade_origin(self) -> tuple[float, float]:
+        """Facade metres of the house's left edge and of the ground."""
+        f = self.data.get("facade") or {}
+        blocks = f.get("blocks") or []
+        ox = min((b["x0"] for b in blocks), default=0.0)
+        gz = (f.get("ground") or {}).get("z", 0.0)
+        return ox, gz
+
+    def _apply_facade(self) -> None:
+        f = self.data["facade"]
+        if not f.get("door"):
+            return
+        ox, gz = self.facade_origin()
+        blocks = f.get("blocks") or []
+        if blocks:
+            width = round(max(b["x1"] for b in blocks) - ox, 3)
+            self.data["size"]["width"] = min(200.0, max(1.0, width))
+        width = self.data["size"]["width"]
+        for ln in f.get("lines") or []:
+            if not ln["floor"]:
+                continue
+            x0, x1 = max(0.0, ln["x0"] - ox), min(width, ln["x1"] - ox)
+            whole = x1 - x0 >= 0.95 * width
+            saved = self.data["floors"].setdefault(ln["floor"], {})
+            saved.update(
+                {
+                    "elevation": round(ln["z"] - gz, 3),
+                    "x0": None if whole else round(x0, 3),
+                    "x1": None if whole else round(x1, 3),
+                }
+            )
+
+    def massing(self) -> dict | None:
+        """The drawn house in house coordinates, for the 3D view."""
+        f = self.data.get("facade") or {}
+        if not f.get("door") or not f.get("blocks"):
+            return None
+        ox, gz = self.facade_origin()
+        depth = self.data["size"]["depth"]
+
+        def world(r: dict) -> dict:
+            return {
+                "x0": round(r["x0"] - ox, 3),
+                "x1": round(r["x1"] - ox, 3),
+                "z0": round(r["z0"] - gz, 3),
+                "z1": round(r["z1"] - gz, 3),
+            }
+
+        blocks = []
+        for b in f["blocks"]:
+            w = {
+                "name": b.get("name", ""),
+                **world(b),
+                "roof": b["roof"],
+                "y0": b.get("y0", 0.0),
+                "depth": b.get("depth", depth),
+            }
+            if b["roof"] != "flat":
+                w["peak_x"] = round(b["peak_x"] - ox, 3)
+                w["peak_z"] = round(b["peak_z"] - gz, 3)
+            blocks.append(w)
+        openings = [{"kind": o["kind"], **world(o)} for o in f.get("openings") or []]
+        return {"blocks": blocks, "openings": openings}
+
     def view(self) -> dict:
         inv: Inventory = self.inventory.inventory
         floors = self.floors()
@@ -330,18 +531,38 @@ class HouseService:
             "mounts": [{"id": k, "label": v["label"]} for k, v in MOUNTS.items()],
             "targets": self.targets(),
             "lights": self.data["items"],
+            "facade": self.data.get("facade"),
+            "massing": self.massing(),
         }
 
     def _save(self) -> None:
         self.store.save("house", self.data)
 
 
-def _num(v: Any) -> float:
+def photo_type(data: bytes) -> str | None:
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def _list(v: Any, most: int) -> list[dict]:
+    if v is None:
+        return []
+    if not isinstance(v, list) or len(v) > most or not all(isinstance(x, dict) for x in v):
+        raise HouseError(f"expected a list of at most {most} shapes")
+    return v
+
+
+def _num(v: Any, limit: float = 1000) -> float:
     try:
         f = float(v)
     except (TypeError, ValueError) as err:
         raise HouseError(f"not a number: {v!r}") from err
-    if math.isnan(f) or math.isinf(f) or abs(f) > 1000:
+    if math.isnan(f) or math.isinf(f) or abs(f) > limit:
         raise HouseError(f"out of range: {v!r}")
     return round(f, 3)
 

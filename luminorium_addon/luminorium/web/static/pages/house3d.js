@@ -120,10 +120,12 @@ window.House3D = class House3D {
 
     // things to draw back to front
     const items = [];
-    // the house volume: outline from the lowest floor to the top of the highest
-    const box = [[0, 0], [s.W, 0], [s.W, s.D], [0, s.D]];
+    // the house drawn on the front photo: see-through walls and roofs, windows on the front
+    if (s.massing) this.massing(items, P, col);
+    // else the house volume: outline from the lowest floor to the top of the highest
+    const box = s.massing ? [] : [[0, 0], [s.W, 0], [s.W, s.D], [0, s.D]];
     for (const [x, y] of box) items.push({ depth: depthOf(P(x, y, s.zMin), P(x, y, s.zMax)), draw: () => this.line(P(x, y, s.zMin), P(x, y, s.zMax), col.faint, 1) });
-    for (const z of [s.zMin, s.zMax]) for (let k = 0; k < 4; k++) {
+    if (box.length) for (const z of [s.zMin, s.zMax]) for (let k = 0; k < 4; k++) {
       const a = box[k], b = box[(k + 1) % 4];
       items.push({ depth: depthOf(P(a[0], a[1], z), P(b[0], b[1], z)), draw: () => this.line(P(a[0], a[1], z), P(b[0], b[1], z), col.faint, 1) });
     }
@@ -179,6 +181,45 @@ window.House3D = class House3D {
     // a hint (the page shows it under the view on narrow screens)
     if (W >= 520) this.text(this.mode === "raise" ? "Raise: drag the picked light up or down" : "Drag to turn · scroll or pinch to zoom · drag the picked light to move it",
       12, H - 12, col.muted, 12, "left");
+  }
+
+  // Each block as translucent faces: four walls, and a gable (point to the street) or a ridge
+  // (along the front) roof
+  massing(items, P, col) {
+    const WALL = "#5aa9e6", ROOF = "#8fb3d9", GLASS = "#9ad0f5";
+    const face = (pts, color, alpha, strokeAlpha = 0.7) => {
+      const q = pts.map(([x, y, z]) => P(x, y, z));
+      items.push({ depth: avgDepth(q), draw: () => this.poly(q, color, alpha, color, strokeAlpha) });
+    };
+    for (const b of this.scene.massing.blocks) {
+      const { x0, x1, z0, z1 } = b;
+      const y0 = b.y0 || 0, y1 = y0 + b.depth;
+      face([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], WALL, 0.08);
+      face([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], WALL, 0.06, 0.45);
+      face([[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], WALL, 0.06, 0.55);
+      face([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], WALL, 0.06, 0.55);
+      if (b.roof === "gable") {
+        const px = b.peak_x, pz = b.peak_z;
+        face([[x0, y0, z1], [px, y0, pz], [x1, y0, z1]], ROOF, 0.1);
+        face([[x0, y1, z1], [px, y1, pz], [x1, y1, z1]], ROOF, 0.08, 0.45);
+        face([[x0, y0, z1], [px, y0, pz], [px, y1, pz], [x0, y1, z1]], ROOF, 0.12);
+        face([[x1, y0, z1], [px, y0, pz], [px, y1, pz], [x1, y1, z1]], ROOF, 0.12);
+      } else if (b.roof === "ridge") {
+        const ym = (y0 + y1) / 2, pz = b.peak_z;
+        face([[x0, y0, z1], [x1, y0, z1], [x1, ym, pz], [x0, ym, pz]], ROOF, 0.12);
+        face([[x0, y1, z1], [x1, y1, z1], [x1, ym, pz], [x0, ym, pz]], ROOF, 0.12);
+        face([[x0, y0, z1], [x0, ym, pz], [x0, y1, z1]], ROOF, 0.1);
+        face([[x1, y0, z1], [x1, ym, pz], [x1, y1, z1]], ROOF, 0.1);
+      }
+      const lab = P(x0 + 0.2, y0, z1 + 0.15);
+      if (lab && b.name) items.push({ depth: lab.depth - 0.01, draw: () => this.text(b.name, lab.x, lab.y, col.muted, 11, "left") });
+    }
+    // windows and doors sit on the front wall of the block they're in
+    for (const o of this.scene.massing.openings) {
+      const blk = this.scene.massing.blocks.find((b) => (o.x0 + o.x1) / 2 >= b.x0 && (o.x0 + o.x1) / 2 <= b.x1);
+      const y = (blk ? blk.y0 || 0 : 0) - 0.02;
+      face([[o.x0, y, o.z0], [o.x1, y, o.z0], [o.x1, y, o.z1], [o.x0, y, o.z1]], GLASS, o.kind === "window" ? 0.22 : 0.14, 0.9);
+    }
   }
 
   line(a, b, color, width = 1, dash = []) {

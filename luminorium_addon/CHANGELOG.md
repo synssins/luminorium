@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0-dev.3
+
+- **Front photo:** measure the house from a photo of its front. Box the front door (36" × 80" by
+  default) and the perspective and scale follow. Drawing tools: front door, ground line, house
+  blocks, roofs (gable or ridge), windows and doors, floor lines, place a light, measure; with
+  select, pan and zoom, undo and redo, snapping, a magnifier and a scale bar. The blocks set the
+  house width and the floor lines set each floor's height and span.
+- **See-through house in 3D:** the drawn blocks, roofs and windows show around the floors and
+  lights.
+
 ## 0.3.0-dev.2
 
 - **House map in 3D:** the house as a volume you can turn and zoom. Each floor is a slab at its

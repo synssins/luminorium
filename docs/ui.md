@@ -13,7 +13,7 @@ There is no build step: plain HTML, CSS and JavaScript in `web/static/`.
 |---|---|
 | `style.css` | The theme as CSS variables (dark default; light under `prefers-color-scheme`, or forced from Settings with `data-theme`), plus the components: shell, buttons, pills, badges, cards, tiles, light cards, palette cards, the house map grid, and the class names the Views and camera pages use |
 | `shell.js` | Runs first on every page. Builds the menu and the top bar (title, status pill, read-only pill, **Stop all**) and moves the page's content into `<main id="page">`. Provides `window.L` (below) and polls `api/status` (and `api/inventory` when a page asks) |
-| `pages/*.js` | One script per page: `overview`, `lights`, `light`, `palettes`, `house`, `drivers`, `activity`, `settings` |
+| `pages/*.js` | One script per page: `overview`, `lights`, `light`, `palettes`, `house`, `drivers`, `activity`, `settings`. The house map also loads `house3d.js` (the 3D view) and `facade.js` (the front photo editor) |
 | `views.html` + `views.js`, `capture.html` + `capture.js`, `camera.html` | The Views editor, camera mapping and the camera check: their own HTML, loading the same shell (`data-legacy`; `data-own-stop` when the page binds Stop all itself) |
 | `spatial.css` | Extra styles for the Views and camera pages |
 
@@ -51,7 +51,7 @@ Errors go to toasts, and names are typed inline.
 | **Lights** | Search; filters (included, switches, excluded, all); levels and rooms that fold (remembered); fixture suggestions; **Group lights** mode; a card per light or fixture with state, driver and latency, capabilities, warnings, an include checkbox, **Test** and **Details** |
 | **Light** (`light?id=…` or `light?fixture=…`) | What it can do; driver choice (Automatic or a pinned driver) and timing; **Test with options** (fade, effect, hold); its place on the house map and its fixture; Home Assistant ids; what each effect name becomes on it |
 | **Palettes & shows** | Playing now, with Stop; tabs for Palettes (a **Play on** target: every light, a level or a room), Shows and Effects |
-| **House map** | Placing lights in 3D: a volumetric view, plus a plan and a side view ([house.md](house.md)) |
+| **House map** | Placing lights in 3D: a volumetric view, the front photo with its drawing tools, and a plan and a side view ([house.md](house.md)) |
 | **Views**, **Map with camera** | The photo views editor and the guided camera capture ([mapping.md](mapping.md)) |
 | **Drivers** | A card per driver: status, endpoint, counts, notes (Z-Wave nodes on unicast, Govee LAN Control) and how many lights use it |
 | **Activity** | The latest 30 events |

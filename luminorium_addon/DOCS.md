@@ -85,6 +85,13 @@ Place every light where it really is, in 3D, without a floorplan or the camera.
 Sizes and heights are in feet and inches when Home Assistant uses imperial units (Settings ›
 Units changes it). Type them as `8' 6"`, `8 ft 6 in`, `102 in`, or just `8.5`.
 
+**The quickest start is a photo of the front.** Under **House map › Front photo**, add a photo
+taken straight on from across the street, then follow the steps along the top: box the front door
+(36" × 80" unless you change it) and fit its corners; tap the ground; drag a box over each part of
+the house and tap the top of each roof; pick each floor and drag along where it is. That sets the
+house's width and every floor's height, and the 3D view shows the house as see-through walls and
+roofs. With **Place a light**, tap where a light is on the photo.
+
 1. **Floors & size:** give the house's width and depth, and for each floor (from Home
    Assistant) its height above the ground outside and its ceiling height. Split levels are floors
    half a storey apart. If a floor is only part of the house (one side of a split level), say

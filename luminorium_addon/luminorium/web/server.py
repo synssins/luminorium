@@ -20,7 +20,7 @@ from ..app import Luminorium
 from ..drivers.router import DriverChoiceError
 from ..engine.engine import ShowError
 from ..engine.testlight import LightTestError, TestOptions
-from ..house import HouseError
+from ..house import HouseError, photo_type
 from ..inventory.model import Kind
 from ..library import LibraryError
 from . import mapping_api, spatial_api
@@ -118,6 +118,7 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         crumbs = ' data-crumbs="Lights@lights"' if key == "light" else ""
         extra_js = (
             f'<script src="static/pages/house3d.js?v={__version__}"></script>\n'
+            f'<script src="static/pages/facade.js?v={__version__}"></script>\n'
             if key == "house"
             else ""
         )
@@ -486,6 +487,31 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
             )
         )
         return {"placed": n}
+
+    @app.put("/api/house/photo")
+    async def house_photo_put(request: Request, w: int = 0, h: int = 0):
+        """The front photo, as image bytes (the page shrinks it to a JPEG first)."""
+        data = await request.body()
+        return _house_errors(lambda: lum.house.set_photo(data, w, h))
+
+    @app.get("/api/house/photo")
+    async def house_photo_get():
+        path = lum.house.photo_path()
+        if not path.exists():
+            raise HTTPException(404, "no front photo")
+        with path.open("rb") as f:
+            kind = photo_type(f.read(16)) or "application/octet-stream"
+        return FileResponse(path, media_type=kind, headers={"Cache-Control": "no-cache"})
+
+    @app.put("/api/house/facade")
+    async def house_facade(body: dict):
+        _house_errors(lambda: lum.house.set_facade(body))
+        return lum.house.view()
+
+    @app.delete("/api/house/facade")
+    async def house_facade_clear():
+        lum.house.clear_facade()
+        return lum.house.view()
 
     @app.post("/api/house/identify")
     async def house_identify(body: dict):
