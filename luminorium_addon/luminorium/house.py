@@ -552,6 +552,7 @@ class HouseService:
             "walls": house_site.walls_3d(site),
             "doors": site.get("doors") or [],
             "rooms": site.get("rooms") or [],
+            "stairs": site.get("stairs") or [],
         }
 
     def clear_facade(self) -> None:
@@ -826,9 +827,11 @@ class HouseService:
         if "z0" in change:
             new["z0"] = _num(change["z0"]) + gz + new.get("below", 0.0)
         if "y0" in change:
-            if not b.get("behind"):
-                raise HouseError("the front of a block on the photo is set on the photo")
             new["y0"] = _num(change["y0"])
+            if not b.get("behind"):
+                # a block on the photo: its front wall now sticks out, is set back, or is in line
+                y0 = new["y0"]
+                new["face"] = "line" if abs(y0) < 0.005 else "out" if y0 < 0 else "back"
         if "depth" in change:
             depth = _num(change["depth"])
             if not 0.3 <= depth <= 200:

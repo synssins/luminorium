@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0-dev.20
+
+- **Walls join cleanly:** ends snap to other walls' ends and the outside walls' inside corners,
+  or onto another wall (a T), with a ring to show it; corners fill in. A drag that starts at a
+  wall's end draws a new wall from it.
+- **Angled walls:** tick Angled; the start stays put and the end goes anywhere (still snapping).
+- **Move a floor plan:** **Move this plan to** another level, and **Move the whole plan** to drag
+  it into place; a wall's level is in its panel too.
+- **Stairs** on the floor plan, with treads and an UP or DOWN arrow, and as steps in 3D.
+- **3D Shape:** the front of any block moves too (its front wall is then set back or sticks out).
+- The top view's toolbar no longer makes the page scroll on shorter windows.
+
 ## 0.3.0-dev.19
 
 - **Things to check moved to the top bar:** an alert triangle with how many; tap it for the

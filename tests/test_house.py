@@ -722,10 +722,45 @@ async def test_blocks_moved_and_split_from_3d(client, lum):
     assert back["z1"] == 2.2 and back["level"] == "main_level" and back["offset"] == -0.6
     # its front can be moved (it isn't on the photo); a photo block's front can't
     assert (await client.put(f"/api/house/blocks/{back['id']}", json={"y0": 2})).status_code == 200
-    assert (await client.put("/api/house/blocks/e", json={"y0": 2})).status_code == 400
+    # a photo block's front too: it's then set back (or sticks out)
+    view = (await client.put("/api/house/blocks/e", json={"y0": 1.2, "depth": 1.2})).json()
+    assert lum.house.data["facade"]["blocks"][1]["face"] == "back"
     for bad in ({"depth": 0.1}, {"x1": 6.1}, {"level": "attic"}):
         assert (await client.put("/api/house/blocks/e", json=bad)).status_code == 400
     assert (
         await client.post("/api/house/blocks/e/split", json={"front_depth": 1.4})
     ).status_code == 400
     assert (await client.put("/api/house/blocks/nope", json={"depth": 2})).status_code == 404
+
+
+async def test_stairs_and_angled_walls_on_the_plan(client, lum):
+    await client.put("/api/house/photo?which=top&w=1600&h=1200", content=JPEG)
+    site = {
+        "xf": {"s": 0.05, "theta": 0, "tx": 0, "ty": 0},
+        "outline": [[0, -0.6], [15, -0.6], [15, 9.8], [0, 9.8]],
+        "walls": [
+            {"id": "w1", "level": "main_level", "a": [5, 0.5], "b": [5, 8]},
+            {"id": "w2", "level": "main_level", "a": [5, 8], "b": [8, 6], "angled": True},
+        ],
+        "stairs": [
+            {
+                "id": "s",
+                "level": "main_level",
+                "to": "bedroom_level",
+                "dir": "y+",
+                "x0": 6,
+                "x1": 7,
+                "y0": 1,
+                "y1": 4,
+            }
+        ],
+    }
+    view = (await client.put("/api/house/site", json=site)).json()
+    assert view["site"]["walls"][1]["angled"] is True and "angled" not in view["site"]["walls"][0]
+    assert view["top"]["stairs"][0]["to"] == "bedroom_level"
+    for bad in (
+        {**site, "stairs": [{**site["stairs"][0], "to": "attic"}]},
+        {**site, "stairs": [{**site["stairs"][0], "dir": "z+"}]},
+        {**site, "stairs": [{**site["stairs"][0], "x1": 6.1}]},
+    ):
+        assert (await client.put("/api/house/site", json=bad)).status_code == 400

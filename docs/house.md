@@ -169,8 +169,16 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
   (outlines, straight or **curved**: a smooth curve through the points), trees and bushes (a
   centre, a radius, an optional height). Drawn on the ground in 3D.
 - **Floor plans,** one per level:
-  - **Walls:** tap where one starts and ends; it stays square to the house and snaps to other
-    walls' ends and the outside walls' inside faces. Its build: 2x4, 2x6 or 2x8 with drywall
+  - **Walls:** drag from where one starts to where it ends; it stays square to the house unless
+    **Angled** is on (then the start stays put and the end goes anywhere). Ends snap to other
+    walls' ends and the outside walls' inside corners first, else onto another wall or the inside
+    face (a T), shown by a green ring; Alt stops it. Ends are drawn square, so corners and T's
+    join cleanly. With the Wall tool a drag always starts a new wall; Select adjusts ends. **Move
+    the whole plan** drags every wall, room and stairs of the level together; **Move this plan
+    to** another level carries them there (a wall's own level is in its panel too).
+  - **Stairs:** drag over them from the bottom step to the top (or top to bottom for stairs down);
+    they lead to the next level up (or down), changeable, with **Turn round**. Drawn with their
+    treads and an UP or DOWN arrow, and in 3D as steps between the two levels' floors. Its build: 2x4, 2x6 or 2x8 with drywall
     (½") or plaster (¾") on each face. **How far from** an outside wall or a parallel wall,
     **wall face to wall face**, as measured with a tape: typing it moves the wall.
   - **Doorways:** on a wall, a width and how far from the wall's end.

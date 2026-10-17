@@ -212,7 +212,7 @@ window.House3D = class House3D {
       { face: "depth", label: "Back", at: { x: xm, y: y1, z: zm }, axis: { x: 0, y: 1, z: 0 } },
       { face: "z1", label: "Top", at: { x: xm, y: ym, z: b.z1 }, axis: { x: 0, y: 0, z: 1 } },
     ];
-    if (b.behind) faces.push({ face: "y0", label: "Front", at: { x: xm, y: y0, z: zm }, axis: { x: 0, y: -1, z: 0 } });
+    faces.push({ face: "y0", label: "Front", at: { x: xm, y: y0, z: zm }, axis: { x: 0, y: -1, z: 0 } });
     return faces;
   }
   drawBlockHandles(col) {
@@ -468,6 +468,24 @@ window.House3D = class House3D {
     if (t.plan) {
       const q = t.plan.map(([x, y]) => P(x, y, 0.02));
       if (q.every(Boolean)) items.push({ depth: avgDepth(q) + 0.05, draw: () => this.poly(q, col.card2, 0, "#dce2ea", 0.7) });
+    }
+    // stairs: a flight of steps from one level's floor to the other's
+    for (const st of t.stairs || []) {
+      const f0 = levels.get(st.level), f1 = levels.get(st.to);
+      if (!f0 || !f1) continue;
+      const along = st.dir[0], sign = st.dir[1] === "+" ? 1 : -1;
+      const lo = along === "x" ? st.x0 : st.y0, hi = along === "x" ? st.x1 : st.y1;
+      const z0 = f0.elevation, z1 = f1.elevation;
+      const n = Math.max(2, Math.round(Math.abs(z1 - z0) / 0.19));
+      const run = (hi - lo) / n;
+      for (let k = 0; k < n; k++) {
+        const s0 = sign > 0 ? lo + k * run : hi - (k + 1) * run, s1 = s0 + run;
+        const z = z0 + (z1 - z0) * (k + 1) / n;
+        const q = along === "x"
+          ? [P(s0, st.y0, z), P(s1, st.y0, z), P(s1, st.y1, z), P(s0, st.y1, z)]
+          : [P(st.x0, s0, z), P(st.x1, s0, z), P(st.x1, s1, z), P(st.x0, s1, z)];
+        if (q.every(Boolean)) items.push({ depth: avgDepth(q), draw: () => this.poly(q, "#f0b429", 0.22, "#f0b429", 0.7) });
+      }
     }
     // interior walls: a see-through panel from each level's floor to its ceiling
     const levels = new Map(this.scene.floors.map((f) => [f.id, f]));

@@ -150,6 +150,7 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
                 "b": b,
                 "studs": studs,
                 "finish": finish,
+                **({"angled": True} if w.get("angled") else {}),  # not kept square to the house
             }
         )
     out["walls"] = walls
@@ -185,6 +186,31 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
             }
         )
     out["rooms"] = rooms
+    stairs = []
+    for t in _list(body.get("stairs"), 60):
+        level, to = str(t.get("level") or ""), str(t.get("to") or "")
+        if level not in floors or (to and to not in floors):
+            raise SiteError("stairs go between two levels")
+        direction = t.get("dir") or "y+"
+        if direction not in ("x+", "x-", "y+", "y-"):
+            raise SiteError("stairs go along x or y")
+        x0, x1 = sorted((_num(t.get("x0")), _num(t.get("x1"))))
+        y0, y1 = sorted((_num(t.get("y0")), _num(t.get("y1"))))
+        if x1 - x0 < 0.3 or y1 - y0 < 0.3:
+            raise SiteError("stairs are at least 1 ft each way")
+        stairs.append(
+            {
+                "id": _id(t.get("id")),
+                "level": level,
+                "to": to or None,
+                "dir": direction,
+                "x0": x0,
+                "x1": x1,
+                "y0": y0,
+                "y1": y1,
+            }
+        )
+    out["stairs"] = stairs
     return out
 
 

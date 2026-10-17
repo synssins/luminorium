@@ -20,7 +20,7 @@ window.SiteEditor = class SiteEditor {
     this.tool = "square";
     this.sel = null;          // { kind: "outline"|"yard"|"wall"|"door"|"room"|"square"|"ref"|"check", id }
     this.level = null;        // the level whose floor plan is shown
-    this.opts = { yard: "path", studs: "2x4", finish: "drywall", smooth: false };
+    this.opts = { yard: "path", studs: "2x4", finish: "drywall", smooth: false, angled: false };
     this.draft = null;        // points being traced: { kind, pts: [[x, y]] } in house metres, or photo px
     this.undoStack = []; this.redoStack = [];
     this.view = { k: 10, x: 0, y: 0, fitted: false };
@@ -45,6 +45,7 @@ window.SiteEditor = class SiteEditor {
       yard: (s.yard || []).map((y) => JSON.parse(JSON.stringify(y))),
       walls: (s.walls || []).map((w) => JSON.parse(JSON.stringify(w))),
       doors: (s.doors || []).map((d) => ({ ...d })), rooms: (s.rooms || []).map((r) => JSON.parse(JSON.stringify(r))),
+      stairs: (s.stairs || []).map((t) => ({ ...t })),
     };
     if (!this.level) this.level = this.defaultLevel();
     this.draft = null;
@@ -275,7 +276,7 @@ window.SiteEditor = class SiteEditor {
     if (sel.kind === "ref") return d.ref;
     if (sel.kind === "check") return d.check;
     if (sel.kind === "light") return this.ctx.house().targets.find((t) => t.id === sel.id) || null;
-    const list = { yard: d.yard, wall: d.walls, door: d.doors, room: d.rooms }[sel.kind];
+    const list = { yard: d.yard, wall: d.walls, door: d.doors, room: d.rooms, stairs: d.stairs }[sel.kind];
     return list ? list.find((x) => x.id === sel.id) || null : null;
   }
 
@@ -332,6 +333,7 @@ window.SiteEditor = class SiteEditor {
       { id: "yard", label: "Yard", key: "Y", icon: "M12 3a5 5 0 0 0-5 5c0 3 5 9 5 9s5-6 5-9a5 5 0 0 0-5-5zM4 21h16", off: needScale },
       { sep: true },
       { id: "wall", label: "Wall", key: "W", icon: "M4 4v16M4 12h16", off: needScale || !this.doc.outline },
+      { id: "stairs", label: "Stairs", key: "T", icon: "M4 20h4v-4h4v-4h4V8h4", off: needScale },
       { id: "door", label: "Door in a wall", key: "D", icon: "M6 21V3h12v18M14 12h.01", off: needScale || !this.doc.walls.length },
       { id: "room", label: "Name a room", key: "R", icon: "M4 4h16v16H4zM8 10h8M8 14h5", off: needScale },
       { sep: true },
@@ -386,7 +388,9 @@ window.SiteEditor = class SiteEditor {
         if (dr) return `${dr.pts.length} point${dr.pts.length === 1 ? "" : "s"}. Tap the next; ${k === "path" ? "tap the last point again (or Enter) to finish" : "tap the first point again (or Enter) to close it"}.`;
         return k === "path" ? "Tap along the middle of the path, from one end to the other." : `Tap around the edge of the ${YARD_LABEL[k].toLowerCase()}. Turn on Curved for round shapes.`;
       }
-      case "wall": return dr ? "Tap where the wall ends." : `Tap where a wall starts on the ${this.levelName()} plan, then where it ends. Then type how far it is from another wall, and it moves into place.`;
+      case "wall": return this.movePlan ? `Drag anywhere to move the whole ${this.levelName()} plan: walls, doorways, rooms and stairs.`
+        : `Drag from where a wall starts to where it ends, on the ${this.levelName()} plan. Ends snap onto other walls and their corners (a ring shows it); hold Alt to stop it. ${this.opts.angled ? "Angled: the end goes anywhere." : "It stays square unless Angled is on."} Then type how far it is from another wall.`;
+      case "stairs": return `Drag over the stairs on the ${this.levelName()} plan, from the bottom step to the top (or the top to the bottom, for stairs going down). Then pick where they lead.`;
       case "door": return "Tap a wall where a doorway is.";
       case "room": return "Tap inside a room to name it.";
       case "light": {
@@ -459,9 +463,21 @@ window.SiteEditor = class SiteEditor {
       bits.push(el("div.chips", Object.entries(YARD_LABEL).map(([k, label]) => el("button.chip", { type: "button", "aria-pressed": String(this.opts.yard === k), on: { click: () => { this.opts.yard = k; this.draft = null; this.paint(); } } }, label))));
       if (!["tree", "bush"].includes(this.opts.yard)) bits.push(el("label.check.small", el("input", { type: "checkbox", checked: this.opts.smooth, on: { change: (e) => { this.opts.smooth = e.target.checked; this.render(); } } }), "Curved"));
       if (this.draft) bits.push(el("button.btn.small.primary", { type: "button", on: { click: () => this.finishDraft() } }, "Finish"));
-    } else if (["wall", "door", "room"].includes(this.tool)) {
+    } else if (["wall", "door", "room", "stairs"].includes(this.tool)) {
       bits.push(el("span.fc-olabel", "Level"), this.levelChips(false));
-      if (this.tool === "wall") bits.push(this.buildSelect(this.opts, (k, v) => { this.opts[k] = v; this.paint(); }));
+      if (this.tool === "wall") {
+        bits.push(this.buildSelect(this.opts, (k, v) => { this.opts[k] = v; this.paint(); }),
+          el("label.check.small", el("input", { type: "checkbox", checked: this.opts.angled, on: { change: (e) => { this.opts.angled = e.target.checked; this.paint(); } } }), "Angled"));
+        const here = d.walls.filter((w) => w.level === this.level).length + d.rooms.filter((r) => r.level === this.level).length + d.stairs.filter((t) => t.level === this.level).length;
+        if (here) {
+          const others = this.ctx.floors().filter((f) => f.id !== this.level);
+          const pick = el("select.input", { style: { width: "auto" } }, others.map((f) => el("option", { value: f.id }, f.name)));
+          bits.push(el("span", { style: { flex: "1" } }),
+            el("button.btn.small", { type: "button", "aria-pressed": String(!!this.movePlan), on: { click: () => { this.movePlan = !this.movePlan; this.paint(); } } }, this.movePlan ? "Done moving" : "Move the whole plan"),
+            el("span.fc-olabel", "Move this plan to"), pick,
+            el("button.btn.small", { type: "button", on: { click: () => this.movePlanTo(pick.value) } }, "Move"));
+        }
+      }
     } else if (this.tool === "light") {
       bits.push(el("span.fc-olabel", "On"), this.levelChips(true));
     } else if (this.tool === "measure" && this.measure) {
@@ -522,11 +538,27 @@ window.SiteEditor = class SiteEditor {
       const dist = ref ? this.faceDistance(s, ref) : null;
       body = el("div.fc-sum", el("h3", "Wall"),
         this.buildSelect(s, (k, v) => edit(() => { s[k] = v; })),
+        el("label.field", el("span", "On"), el("select", { on: { change: (e) => edit(() => { s.level = e.target.value; this.level = s.level; }) } },
+          this.ctx.floors().map((f) => el("option", { value: f.id, selected: s.level === f.id ? "" : null }, f.name)))),
+        el("label.check.small", el("input", { type: "checkbox", checked: !!s.angled, on: { change: (e) => edit(() => { if (e.target.checked) s.angled = true; else { delete s.angled; s.b = squareTo(s.a, s.b); } }) } }), "Angled"),
         this.lenRow("Length", len, (v) => edit(() => { const k = v / (len || 1); s.b = [round3(s.a[0] + (s.b[0] - s.a[0]) * k), round3(s.a[1] + (s.b[1] - s.a[1]) * k)]; })),
         ref ? el("div.field", el("span", "How far from"),
           el("select.input", { on: { change: (e) => { this.wallRef = e.target.value; this.paint(); } } }, refs.map((r) => el("option", { value: r.id, selected: r.id === ref.id ? "" : null }, r.label))),
           this.lenRow("Wall face to wall face", dist, (v) => edit(() => this.setFaceDistance(s, ref, v))),
           el("span.small.muted", "Measure from the face of one wall to the face of the other, as with a tape.")) : null,
+        del);
+    } else if (this.sel.kind === "stairs") {
+      const floors = this.ctx.floors();
+      const from = floors.find((f) => f.id === s.level), to = floors.find((f) => f.id === s.to);
+      const rise = from && to ? Math.abs(to.elevation - from.elevation) : 0;
+      const run = s.dir[0] === "x" ? s.x1 - s.x0 : s.y1 - s.y0;
+      body = el("div.fc-sum", el("h3", "Stairs"),
+        el("label.field", el("span", "From"), el("span", from ? from.name : "?")),
+        el("label.field", el("span", "Up or down to"), el("select", { on: { change: (e) => edit(() => { s.to = e.target.value; }) } },
+          floors.filter((f) => f.id !== s.level).map((f) => el("option", { value: f.id, selected: s.to === f.id ? "" : null }, f.name)))),
+        el("button.btn.small", { type: "button", on: { click: () => edit(() => { s.dir = { "x+": "x-", "x-": "x+", "y+": "y-", "y-": "y+" }[s.dir]; }) } }, "Turn round"),
+        el("dl.fc-kv", el("dt", "Width"), el("dd", L.fmtLen(s.dir[0] === "x" ? s.y1 - s.y0 : s.x1 - s.x0)), el("dt", "Length"), el("dd", L.fmtLen(run)),
+          rise ? [el("dt", "Rise"), el("dd", L.fmtLen(rise)), el("dt", "Steps"), el("dd", `about ${Math.max(1, Math.round(rise / 0.19))}`)] : null),
         del);
     } else if (this.sel.kind === "door") {
       const w = d.walls.find((x) => x.id === s.wall);
@@ -627,7 +659,7 @@ window.SiteEditor = class SiteEditor {
     else if (k === "ref") { d.ref = null; d.xf = null; }
     else if (k === "check") d.check = null;
     else {
-      const key = { yard: "yard", wall: "walls", door: "doors", room: "rooms" }[k];
+      const key = { yard: "yard", wall: "walls", door: "doors", room: "rooms", stairs: "stairs" }[k];
       d[key] = d[key].filter((x) => x.id !== this.sel.id);
       if (k === "wall") d.doors = d.doors.filter((x) => x.wall !== this.sel.id);
     }
@@ -727,15 +759,17 @@ window.SiteEditor = class SiteEditor {
       if (sel || this.tool === "outline") this.handles(ctx, d.outline, "#c58cf0");
     }
     // the floor plan of the level shown
-    const showPlan = ["wall", "door", "room", "select", "light", "aim"].includes(this.tool);
+    const showPlan = ["wall", "door", "room", "stairs", "select", "light", "aim"].includes(this.tool);
     if (showPlan) {
       for (const w of d.walls) {
         if (w.level !== this.level) continue;
         const sel = isSel("wall", w.id);
         const a = this.h2s(w.a[0], w.a[1]), b = this.h2s(w.b[0], w.b[1]);
-        ctx.lineCap = "butt"; ctx.lineWidth = Math.max(3, this.wallThick(w) * this.view.k);
+        // square ends: a corner fills in, and an end on another wall sits inside it
+        ctx.lineCap = "square"; ctx.lineWidth = Math.max(3, this.wallThick(w) * this.view.k);
         ctx.strokeStyle = sel ? "#ff8a3d" : "rgba(220,226,234,0.9)";
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.lineCap = "butt";
         // doorways: gaps
         for (const dr of d.doors.filter((x) => x.wall === w.id)) {
           const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) || 1;
@@ -747,6 +781,7 @@ window.SiteEditor = class SiteEditor {
         }
         if (sel) this.handles(ctx, [w.a, w.b], "#ff8a3d");
       }
+      for (const t of d.stairs) if (t.level === this.level) this.drawStairs(ctx, t, isSel("stairs", t.id), col);
       for (const r of d.rooms) {
         if (r.level !== this.level) continue;
         const p = this.h2s(r.at[0], r.at[1]);
@@ -795,6 +830,14 @@ window.SiteEditor = class SiteEditor {
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       label(ctx, L.fmtLen(Math.hypot(this.drag.b[0] - this.drag.a[0], this.drag.b[1] - this.drag.a[1])), (a.x + b.x) / 2, (a.y + b.y) / 2 - 10, "#fff", col, "center");
     }
+    if (this.snapMark && this.drag && (this.drag.kind === "wallDraw" || this.drag.kind === "handle")) {
+      const q = this.h2s(...this.snapMark);
+      ctx.strokeStyle = "#7bc47f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q.x, q.y, 9, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (this.drag && this.drag.kind === "stairDraw" && this.drag.b) {
+      const st = this.stairFrom(this.drag.a, this.drag.b);
+      if (st) this.drawStairs(ctx, st, true, col);
+    }
     if (this.drag && this.drag.kind === "circle" && this.drag.r) {
       const p = this.h2s(this.drag.c[0], this.drag.c[1]);
       ctx.beginPath(); ctx.arc(p.x, p.y, this.drag.r * this.view.k, 0, Math.PI * 2); ctx.strokeStyle = YARD_COLOR[this.opts.yard]; ctx.lineWidth = 2; ctx.stroke();
@@ -810,6 +853,53 @@ window.SiteEditor = class SiteEditor {
     }
     this.scaleBar(ctx);
   }
+  // Stairs from above: the treads, and an arrow up (or down) the way they go
+  drawStairs(ctx, t, sel, col) {
+    const color = sel ? "#ff8a3d" : "rgba(240,180,41,0.9)";
+    this.hpath(ctx, [[t.x0, t.y0], [t.x1, t.y0], [t.x1, t.y1], [t.x0, t.y1]]);
+    ctx.fillStyle = hexA("#f0b429", sel ? 0.25 : 0.12); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = color; ctx.stroke();
+    const along = t.dir[0], sign = t.dir[1] === "+" ? 1 : -1;
+    const lo = along === "x" ? t.x0 : t.y0, hi = along === "x" ? t.x1 : t.y1;
+    ctx.lineWidth = 1;
+    for (let v = lo + 0.28; v < hi - 0.05; v += 0.28) {
+      const a = along === "x" ? this.h2s(v, t.y0) : this.h2s(t.x0, v), b = along === "x" ? this.h2s(v, t.y1) : this.h2s(t.x1, v);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    const mid = along === "x" ? (t.y0 + t.y1) / 2 : (t.x0 + t.x1) / 2;
+    const from = sign > 0 ? lo + 0.2 : hi - 0.2, to = sign > 0 ? hi - 0.2 : lo + 0.2;
+    const a = along === "x" ? this.h2s(from, mid) : this.h2s(mid, from), b = along === "x" ? this.h2s(to, mid) : this.h2s(mid, to);
+    ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - 10 * Math.cos(ang - 0.5), b.y - 10 * Math.sin(ang - 0.5)); ctx.lineTo(b.x - 10 * Math.cos(ang + 0.5), b.y - 10 * Math.sin(ang + 0.5)); ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+    const floors = this.ctx.floors(), f0 = floors.find((f) => f.id === t.level), f1 = floors.find((f) => f.id === t.to);
+    if (f1) label(ctx, `${f0 && f1.elevation < f0.elevation ? "DOWN" : "UP"} to ${f1.name}`, a.x, a.y - 8, color, col, "center");
+  }
+  // A stair rectangle from a drag: the way they go is along the drag's longer side
+  stairFrom(a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    if (Math.abs(dx) < 0.3 || Math.abs(dy) < 0.3) return null;
+    const dir = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? "x+" : "x-") : (dy > 0 ? "y+" : "y-");
+    const floors = this.ctx.floors().slice().sort((p, q) => p.elevation - q.elevation);
+    const i = floors.findIndex((f) => f.id === this.level);
+    const to = (floors[i + 1] || floors[i - 1] || {}).id;
+    return { level: this.level, to, dir, x0: round3(Math.min(a[0], b[0])), x1: round3(Math.max(a[0], b[0])), y0: round3(Math.min(a[1], b[1])), y1: round3(Math.max(a[1], b[1])) };
+  }
+
+  // Move every wall, room and stairs of the level shown to another level
+  movePlanTo(level) {
+    if (!level) return;
+    const b = this.snapshot();
+    for (const list of [this.doc.walls, this.doc.rooms, this.doc.stairs]) for (const x of list) if (x.level === this.level) x.level = level;
+    // stairs that would now lead to their own level lead to the next one instead
+    const floors = this.ctx.floors().slice().sort((p, q) => p.elevation - q.elevation);
+    const i = floors.findIndex((f) => f.id === level);
+    for (const t of this.doc.stairs) if (t.level === level && t.to === level) t.to = (floors[i + 1] || floors[i - 1] || {}).id || null;
+    const name = (this.ctx.floors().find((f) => f.id === level) || {}).name;
+    this.level = level;
+    this.commit(b);
+    L.toast(`Moved to ${name}`);
+  }
+
   photoLine(ctx, pts, color, name) {
     const h = pts.map(([u, v]) => this.p2h(u, v));
     this.hpath(ctx, h, false); ctx.lineWidth = 2.5; ctx.strokeStyle = color; ctx.stroke();
@@ -921,6 +1011,7 @@ window.SiteEditor = class SiteEditor {
       if (Math.hypot(c[0] - x, c[1] - y) < dr.width / 2) return { kind: "door", id: dr.id };
     }
     for (const w of d.walls) if (w.level === this.level && segDist([x, y], w.a, w.b) <= this.wallThick(w) / 2 + tol) return { kind: "wall", id: w.id };
+    for (const t of d.stairs) if (t.level === this.level && x >= t.x0 && x <= t.x1 && y >= t.y0 && y <= t.y1) return { kind: "stairs", id: t.id };
     for (const yd of [...d.yard].reverse()) {
       if (yd.c && Math.hypot(yd.c[0] - x, yd.c[1] - y) <= yd.r) return { kind: "yard", id: yd.id };
       if (yd.kind === "path" && yd.pts.some((q, i) => i && segDist([x, y], yd.pts[i - 1], q) <= (yd.width ?? 1.2) / 2 + tol)) return { kind: "yard", id: yd.id };
@@ -939,7 +1030,10 @@ window.SiteEditor = class SiteEditor {
     if (this.pointers.size === 2) { const [a, b] = [...this.pointers.values()]; this.drag = { kind: "pinch", dist: Math.hypot(a.x - b.x, a.y - b.y), view: { ...this.view }, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }; return; }
     if (this.tool === "pan" || e.button === 1 || e.button === 2) { this.drag = { kind: "pan", start: p, view: { ...this.view } }; return; }
     const before = this.snapshot();
-    const h = this.hitHandle(p);
+    // with the Wall tool a drag always draws a new wall (from another's end, say); ends are
+    // adjusted with Select
+    const h0 = this.hitHandle(p);
+    const h = h0 && !(this.tool === "wall" && h0.kind === "wall") ? h0 : null;
     if (h) {
       if (e.altKey && h.kind === "outline" && this.doc.outline.length > 3) { this.doc.outline.splice(h.i, 1); this.commit(before); return; }
       if (e.altKey && h.kind === "yard") { const y = this.shape({ kind: "yard", id: h.id }); if (y.pts.length > (y.kind === "path" ? 2 : 3)) { y.pts.splice(h.i, 1); this.commit(before); } return; }
@@ -949,7 +1043,13 @@ window.SiteEditor = class SiteEditor {
     const [x, y] = this.s2h(p);
     if (this.tool === "square") { this.drag = { kind: "squareDraw", start: p, cur: p, before }; return; }
     if (this.tool === "measure") { this.measure = null; this.drag = { kind: "measure", a: [x, y], start: p }; return; }
-    if (this.tool === "wall") { this.drag = { kind: "wallDraw", a: this.snapPlan([x, y]), start: p, before }; return; }
+    if (this.tool === "wall" && this.movePlan) {
+      const pick = (list) => list.filter((q) => q.level === this.level).map((q) => ({ q, o: JSON.parse(JSON.stringify(q)) }));
+      this.drag = { kind: "movePlan", h0: [x, y], start: p, before, items: [...pick(this.doc.walls), ...pick(this.doc.rooms), ...pick(this.doc.stairs)] };
+      return;
+    }
+    if (this.tool === "wall") { this.snapMark = null; this.drag = { kind: "wallDraw", a: this.snapWall([x, y], null, null, e.altKey), start: p, before }; return; }
+    if (this.tool === "stairs") { this.drag = { kind: "stairDraw", a: [x, y], start: p, before }; return; }
     if (this.tool === "yard" && (this.opts.yard === "tree" || this.opts.yard === "bush")) { this.drag = { kind: "circle", c: [x, y], start: p, before }; return; }
     if (this.tool === "select" || this.tool === "aim") {
       const hit = this.hitShape(p);
@@ -973,6 +1073,7 @@ window.SiteEditor = class SiteEditor {
     this.drag = { kind: "tap", start: p, before };
   }
   move(e) {
+    this.altHeld = e.altKey;
     const p = this.local(e);
     if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, p);
     this.hover = p;
@@ -993,7 +1094,18 @@ window.SiteEditor = class SiteEditor {
     if (d.kind === "handle") { this.dragHandle(d.h, p, [x, y]); this.render(); return; }
     if (d.kind === "moveShape") { this.dragShape(d, [x, y]); this.render(); return; }
     if (d.kind === "measure") { this.measure = { a: d.a, b: [x, y], len: Math.hypot(x - d.a[0], y - d.a[1]) }; this.paintOptions(); this.render(); return; }
-    if (d.kind === "wallDraw") { d.b = this.snapPlan(squareTo(d.a, [x, y])); this.render(); return; }
+    if (d.kind === "wallDraw") { d.b = this.wallEnd(d.a, [x, y], null, e.altKey); this.render(); return; }
+    if (d.kind === "stairDraw") { d.b = [x, y]; this.render(); return; }
+    if (d.kind === "movePlan") {
+      const dx = x - d.h0[0], dy = y - d.h0[1];
+      const mv = ([px, py]) => [round3(px + dx), round3(py + dy)];
+      for (const { q, o } of d.items) {
+        if (o.a) { q.a = mv(o.a); q.b = mv(o.b); }
+        if (o.at) q.at = mv(o.at);
+        if (o.x0 !== undefined) { q.x0 = round3(o.x0 + dx); q.x1 = round3(o.x1 + dx); q.y0 = round3(o.y0 + dy); q.y1 = round3(o.y1 + dy); }
+      }
+      this.render(); return;
+    }
     if (d.kind === "circle") { d.r = Math.hypot(x - d.c[0], y - d.c[1]); this.render(); return; }
     if (d.kind === "squareDraw") { d.b = true; this.render(); return; }
   }
@@ -1016,7 +1128,11 @@ window.SiteEditor = class SiteEditor {
     const s = this.shape({ kind: h.kind === "yardR" ? "yard" : h.kind, id: h.id });
     if (h.kind === "yardR") { s.r = round3(Math.max(0.1, Math.hypot(x - s.c[0], y - s.c[1]))); return; }
     if (h.kind === "yard") { s.pts[h.i] = [round3(x), round3(y)]; return; }
-    if (h.kind === "wall") { const other = h.i === 0 ? s.b : s.a; const q = this.snapPlan(squareTo(other, [x, y])); if (h.i === 0) s.a = q; else s.b = q; }
+    if (h.kind === "wall") {
+      const other = h.i === 0 ? s.b : s.a;
+      const q = this.wallEnd(other, [x, y], s, this.altHeld, s.angled);
+      if (h.i === 0) s.a = q; else s.b = q;
+    }
   }
   dragShape(d, [x, y]) {
     const dx = x - d.h0[0], dy = y - d.h0[1], o = d.orig, s = this.shape(d.hit);
@@ -1026,6 +1142,7 @@ window.SiteEditor = class SiteEditor {
     if (d.hit.kind === "yard") { if (o.c) s.c = mv(o.c); else s.pts = o.pts.map(mv); return; }
     if (d.hit.kind === "wall") { s.a = mv(o.a); s.b = mv(o.b); return; }
     if (d.hit.kind === "room") { s.at = mv(o.at); return; }
+    if (d.hit.kind === "stairs") { s.x0 = round3(o.x0 + dx); s.x1 = round3(o.x1 + dx); s.y0 = round3(o.y0 + dy); s.y1 = round3(o.y1 + dy); return; }
     if (d.hit.kind === "door") {
       const w = this.doc.walls.find((q) => q.id === s.wall); if (!w) return;
       const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) || 1;
@@ -1058,6 +1175,7 @@ window.SiteEditor = class SiteEditor {
     }
     const [x, y] = this.s2h(p);
     if (d.kind === "handle") {
+      this.snapMark = null;
       if (d.h.kind === "aimTip" || d.h.kind === "aimEdge") { const ah = this.aimHandles; if (ah) this.ctx.aim(ah.light.id, ah.light.item.aim); return; }
       this.commit(d.before); return;
     }
@@ -1072,11 +1190,21 @@ window.SiteEditor = class SiteEditor {
       if (!this.doc.ref) this.setTool("ref");
       return;
     }
+    if (d.kind === "movePlan") { this.commit(d.before); return; }
+    if (d.kind === "stairDraw") {
+      const st = this.stairFrom(d.a, [x, y]);
+      if (!st) return this.render();
+      const id = uid();
+      this.doc.stairs.push({ id, ...st });
+      this.sel = { kind: "stairs", id };
+      this.commit(d.before); return;
+    }
     if (d.kind === "wallDraw") {
-      d.b = this.snapPlan(squareTo(d.a, [x, y]));
+      d.b = this.wallEnd(d.a, [x, y], null, e.altKey);
+      this.snapMark = null;
       if (!d.b || Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1]) < 0.3) return this.render();
       const id = uid();
-      this.doc.walls.push({ id, level: this.level, a: d.a.map(round3), b: d.b.map(round3), studs: this.opts.studs, finish: this.opts.finish });
+      this.doc.walls.push({ id, level: this.level, a: d.a.map(round3), b: d.b.map(round3), studs: this.opts.studs, finish: this.opts.finish, ...(this.opts.angled ? { angled: true } : {}) });
       this.sel = { kind: "wall", id };
       this.commit(d.before); return;
     }
@@ -1164,6 +1292,48 @@ window.SiteEditor = class SiteEditor {
     if (this.sel && this.sel.kind === "outline" && d.outline) add(d.outline, true);
     else if (this.sel && this.sel.kind === "yard") { const s = this.shape(this.sel); if (s && s.pts) add(s.pts, s.kind !== "path"); }
   }
+  // Where a wall's end goes, dragged from its other end `a`: square to the house (unless angled),
+  // then onto what's near (snapWall)
+  wallEnd(a, p, skip, free, angled = this.opts.angled) {
+    if (angled) return this.snapWall(p, null, skip, free);
+    return this.snapWall(squareTo(a, p), a, skip, free);
+  }
+  // A wall end near (x, y): another wall's end or a corner of the outside walls' inside face
+  // first, else onto another wall or that face (a T). With `from` (the other end, square walls),
+  // the end stays on the line from it. Marks where it snapped (snapMark); `free` (Alt): no snap.
+  snapWall([x, y], from, skip, free) {
+    this.snapMark = null;
+    if (free) return [round3(x), round3(y)];
+    const tol = 12 / this.view.k;
+    const walls = this.doc.walls.filter((w) => w.level === this.level && w !== skip);
+    const inner = this.planInner() || [];
+    const pts = [...walls.flatMap((w) => [w.a, w.b]), ...inner];
+    const segs = [...walls.map((w) => [w.a, w.b]), ...inner.map((q, i) => [q, inner[(i + 1) % inner.length]])];
+    const across = from ? Math.abs(y - from[1]) < 1e-9 : false; // a square wall running across (y stays)
+    let best = null;
+    const take = (q) => { const d = Math.hypot(q[0] - x, q[1] - y); if (d <= tol && (!best || d < best.d)) best = { q, d }; };
+    // ends and corners
+    for (const q of pts) {
+      if (!from) take(q);
+      else take(across ? [q[0], y] : [x, q[1]]); // in line with it (an end, or square to it)
+    }
+    if (best) { this.snapMark = best.q; return best.q.map(round3); }
+    // onto a wall or the outside walls' inside face
+    for (const [a, b] of segs) {
+      if (from) {
+        // where the wall's line meets it
+        const q = across ? crossAt(a, b, "y", y) : crossAt(a, b, "x", x);
+        if (q) take(q);
+      } else {
+        const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+        if (!l2) continue;
+        const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2));
+        take([a[0] + t * dx, a[1] + t * dy]);
+      }
+    }
+    if (best) { this.snapMark = best.q; return best.q.map(round3); }
+    return [round3(x), round3(y)];
+  }
   // Snap a plan point to wall ends and the outside walls' inside faces
   snapPlan([x, y]) {
     const tol = 10 / this.view.k;
@@ -1204,6 +1374,15 @@ function segDist(p, a, b) {
   return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
 }
 // Keep a wall square to the house: along x or along y from its start
+// Where segment a-b crosses the line where coordinate `axis` ("x" or "y") is v, or null
+function crossAt(a, b, axis, v) {
+  const i = axis === "x" ? 0 : 1, j = 1 - i;
+  const lo = Math.min(a[i], b[i]), hi = Math.max(a[i], b[i]);
+  if (v < lo - 1e-9 || v > hi + 1e-9 || Math.abs(b[i] - a[i]) < 1e-9) return null;
+  const t = (v - a[i]) / (b[i] - a[i]);
+  const q = [0, 0]; q[i] = v; q[j] = a[j] + t * (b[j] - a[j]);
+  return q;
+}
 function squareTo(a, b) { return Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]) ? [b[0], a[1]] : [a[0], b[1]]; }
 // A polygon pulled in by d (each edge moved in, corners where they meet)
 function insetPoly(poly, d) {
