@@ -188,9 +188,183 @@ window.House3D = class House3D {
     }
     items.sort((a, b) => b.depth - a.depth);
     for (const it of items) it.draw();
+    if (this.mode === "shape") this.drawBlockHandles(col);
+    this.drawCube(col, W);
     // a hint (the page shows it under the view on narrow screens)
-    if (W >= 520) this.text(this.aimMode ? "Aim: click what the light should point at (a wall, the ground, a tree)" : this.mode === "raise" ? "Raise: drag the picked light up or down" : "Drag to turn · right-drag or wheel-drag to slide · scroll or pinch to zoom · drag the picked light to move it",
+    if (W >= 520) this.text(this.aimMode ? "Aim: click what the light should point at (a wall, the ground, a tree)"
+      : this.mode === "shape" ? "Shape: tap a block, then drag a handle to move that face · right-drag to slide"
+      : this.mode === "raise" ? "Raise: drag the picked light up or down" : "Drag to turn · right-drag or wheel-drag to slide · scroll or pinch to zoom · drag the picked light to move it",
       12, H - 12, col.muted, 12, "left");
+  }
+
+  // ---- blocks: picking one and dragging its faces (Shape) --------------------------------------
+
+  selectedBlock() {
+    const m = this.scene.massing;
+    return m && this.scene.selBlock ? m.blocks.find((b) => b.id === this.scene.selBlock) || null : null;
+  }
+  // The faces of the picked block that can be dragged: where the handle is, which way is out
+  blockFaces(b) {
+    const y0 = b.y0 || 0, y1 = y0 + b.depth, ym = (y0 + y1) / 2, xm = (b.x0 + b.x1) / 2, zm = (b.z0 + b.z1) / 2;
+    const faces = [
+      { face: "x1", label: "Right side", at: { x: b.x1, y: ym, z: zm }, axis: { x: 1, y: 0, z: 0 } },
+      { face: "x0", label: "Left side", at: { x: b.x0, y: ym, z: zm }, axis: { x: -1, y: 0, z: 0 } },
+      { face: "depth", label: "Back", at: { x: xm, y: y1, z: zm }, axis: { x: 0, y: 1, z: 0 } },
+      { face: "z1", label: "Top", at: { x: xm, y: ym, z: b.z1 }, axis: { x: 0, y: 0, z: 1 } },
+    ];
+    if (b.behind) faces.push({ face: "y0", label: "Front", at: { x: xm, y: y0, z: zm }, axis: { x: 0, y: -1, z: 0 } });
+    return faces;
+  }
+  drawBlockHandles(col) {
+    const b = this.selectedBlock();
+    this._handles = [];
+    if (!b) return;
+    const ctx = this.ctx;
+    for (const f of this.blockFaces(b)) {
+      const p = this.project(f.at), q = this.project(add(f.at, scale(f.axis, 0.8)));
+      if (!p || !q) continue;
+      const active = this.drag && this.drag.kind === "face" && this.drag.face.face === f.face;
+      ctx.save();
+      ctx.strokeStyle = active ? "#ff8a3d" : "#ffd166"; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+      // an arrow head pointing out of the face
+      const a = Math.atan2(q.y - p.y, q.x - p.x);
+      ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - 9 * Math.cos(a - 0.45), q.y - 9 * Math.sin(a - 0.45)); ctx.lineTo(q.x - 9 * Math.cos(a + 0.45), q.y - 9 * Math.sin(a + 0.45)); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); ctx.stroke();
+      ctx.restore();
+      this._handles.push({ ...f, p, q });
+    }
+    if (this.drag && this.drag.kind === "face" && this.drag.delta !== undefined) {
+      const d = this.drag, p = this.project(d.face.at);
+      if (p) {
+        const sign = d.delta >= 0 ? "+" : "−";
+        this.text(`${d.face.label} ${sign}${L.fmtLen(Math.abs(d.delta))}`, p.x + 12, p.y - 12, "#ffd166", 13, "left", true);
+      }
+    }
+  }
+  hitHandle(pt) {
+    for (const h of this._handles || []) {
+      if (Math.hypot(pt.x - h.p.x, pt.y - h.p.y) <= 12 || Math.hypot(pt.x - h.q.x, pt.y - h.q.y) <= 12) return h;
+    }
+    return null;
+  }
+  // The block a screen point is on (nearest), or null
+  hitBlock(sx, sy) {
+    const cam = this.cam, m = this.scene.massing;
+    if (!cam || !m) return null;
+    const d = this.ray(sx, sy, cam);
+    let best = null;
+    for (const b of m.blocks) {
+      const y0 = b.y0 || 0;
+      const t = rayBox(cam.pos, d, [b.x0, y0, b.z0], [b.x1, y0 + b.depth, b.z1]);
+      if (t !== null && (!best || t < best.t)) best = { t, id: b.id };
+    }
+    return best ? best.id : null;
+  }
+
+  // ---- the view cube: which way is up, and a click to look from a side, an edge or a corner ----
+
+  cubeBox(W) { const r = 34; return { cx: W - 64, cy: 66, r }; }
+  drawCube(col, W) {
+    const cam = this.cam;
+    if (!cam) return;
+    const ctx = this.ctx, { cx, cy, r } = this.cubeBox(W);
+    // the cube turns with the view, without perspective
+    const P = (v) => ({ x: cx + (v.x * cam.r.x + v.y * cam.r.y + v.z * cam.r.z) * r, y: cy - (v.x * cam.u.x + v.y * cam.u.y + v.z * cam.u.z) * r, depth: v.x * cam.f.x + v.y * cam.f.y + v.z * cam.f.z });
+    const faces = [
+      { n: { x: 0, y: -1, z: 0 }, label: "FRONT", a: { x: 1, y: 0, z: 0 }, b: { x: 0, y: 0, z: 1 } },
+      { n: { x: 0, y: 1, z: 0 }, label: "BACK", a: { x: -1, y: 0, z: 0 }, b: { x: 0, y: 0, z: 1 } },
+      { n: { x: 1, y: 0, z: 0 }, label: "RIGHT", a: { x: 0, y: 1, z: 0 }, b: { x: 0, y: 0, z: 1 } },
+      { n: { x: -1, y: 0, z: 0 }, label: "LEFT", a: { x: 0, y: -1, z: 0 }, b: { x: 0, y: 0, z: 1 } },
+      { n: { x: 0, y: 0, z: 1 }, label: "TOP", a: { x: 1, y: 0, z: 0 }, b: { x: 0, y: 1, z: 0 } },
+      { n: { x: 0, y: 0, z: -1 }, label: "BOTTOM", a: { x: 1, y: 0, z: 0 }, b: { x: 0, y: -1, z: 0 } },
+    ];
+    const hover = this._cubeHover;
+    const visible = faces.filter((f) => f.n.x * cam.f.x + f.n.y * cam.f.y + f.n.z * cam.f.z < -0.02);
+    ctx.save();
+    for (const f of visible) {
+      const corner = (sa, sb) => P(add(f.n, add(scale(f.a, sa), scale(f.b, sb))));
+      const q = [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)];
+      ctx.beginPath(); q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath();
+      ctx.fillStyle = col.card2; ctx.globalAlpha = 0.92; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = col.line2; ctx.lineWidth = 1; ctx.stroke();
+      // what the pointer is over: the face's middle, or a strip by an edge, or a corner
+      if (hover && dotv(hover, f.n) > 0.5) {
+        const ua = dotv(hover, f.a), ub = dotv(hover, f.b);
+        const span = (k) => (k === 0 ? [-0.6, 0.6] : k > 0 ? [0.6, 1] : [-1, -0.6]);
+        const [a0, a1] = span(ua), [b0, b1] = span(ub);
+        const h = [corner(a0, b0), corner(a1, b0), corner(a1, b1), corner(a0, b1)];
+        ctx.beginPath(); h.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath();
+        ctx.fillStyle = col.accent; ctx.globalAlpha = 0.45; ctx.fill(); ctx.globalAlpha = 1;
+      }
+      // the face's name, laid on the face
+      const o = P(f.n), ax = P(add(f.n, f.a)), bx = P(add(f.n, f.b));
+      ctx.save();
+      ctx.setTransform(...this._dprT((ax.x - o.x) / r, (ax.y - o.y) / r, -(bx.x - o.x) / r, -(bx.y - o.y) / r, o.x, o.y));
+      ctx.font = `700 ${f.label.length > 4 ? 10 : 11}px ${getComputedStyle(document.body).fontFamily}`;
+      ctx.fillStyle = col.text; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(f.label, 0, 0);
+      ctx.restore();
+    }
+    // X, Y and Z from the cube's front left bottom corner
+    const origin = { x: -1, y: -1, z: -1 };
+    for (const [axis, color, name] of [[{ x: 1, y: 0, z: 0 }, "#ff5d6c", "X"], [{ x: 0, y: 1, z: 0 }, "#7bc47f", "Y"], [{ x: 0, y: 0, z: 1 }, "#5aa9e6", "Z"]]) {
+      const a = P(origin), b = P(add(origin, scale(axis, 2.7)));
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.fillStyle = color; ctx.font = `700 11px ${getComputedStyle(document.body).fontFamily}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(name, b.x + (b.x - a.x) * 0.12, b.y + (b.y - a.y) * 0.12);
+    }
+    // home: the usual view
+    const home = { x: cx + r + 8, y: cy + r + 14 };
+    ctx.fillStyle = col.muted; ctx.font = `600 15px ${getComputedStyle(document.body).fontFamily}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("⌂", home.x, home.y);
+    this._home = home;
+    ctx.restore();
+  }
+  _dprT(a, b, c, d, e, f) {
+    const k = window.devicePixelRatio || 1;
+    return [a * k, b * k, c * k, d * k, e * k, f * k];
+  }
+  // Which part of the cube is under a screen point: a direction with each of x, y, z in
+  // {-1, 0, 1} (a face, an edge or a corner), or null
+  cubeHit(pt) {
+    const cam = this.cam;
+    if (!cam) return null;
+    const { cx, cy, r } = this.cubeBox(this.canvas.clientWidth);
+    const sx = (pt.x - cx) / r, sy = -(pt.y - cy) / r;
+    if (Math.hypot(sx, sy) > 1.9) return null;
+    // a ray straight into the screen at that point, through the unit cube
+    const o = add(add(scale(cam.r, sx), scale(cam.u, sy)), scale(cam.f, -5));
+    const t = rayBox(o, cam.f, [-1, -1, -1], [1, 1, 1]);
+    if (t === null) return null;
+    const p = add(o, scale(cam.f, t));
+    const k = (v) => (v > 0.6 ? 1 : v < -0.6 ? -1 : 0);
+    const dir = { x: k(p.x), y: k(p.y), z: k(p.z) };
+    return dir.x || dir.y || dir.z ? dir : null;
+  }
+  // Turn the view to look from a direction (smoothly)
+  lookFrom(dir) {
+    const n = Math.hypot(dir.x, dir.y, dir.z) || 1;
+    const d = { x: dir.x / n, y: dir.y / n, z: dir.z / n };
+    const pitch = Math.asin(Math.max(-1, Math.min(1, d.z))) * 0.999;
+    const flat = Math.hypot(d.x, d.y);
+    // straight above or below: the front of the house at the bottom, as Fusion's Top does
+    let yaw = flat > 1e-6 ? Math.atan2(d.x, -d.y) : 0;
+    // the short way round
+    while (yaw - this.yaw > Math.PI) yaw -= 2 * Math.PI;
+    while (yaw - this.yaw < -Math.PI) yaw += 2 * Math.PI;
+    this.animateTo(yaw, Math.max(-1.55, Math.min(1.55, pitch)));
+  }
+  animateTo(yaw, pitch, pan = null) {
+    const y0 = this.yaw, p0 = this.pitch, pan0 = { ...this.pan }, t0 = performance.now(), dur = 380;
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      this.yaw = y0 + (yaw - y0) * e; this.pitch = p0 + (pitch - p0) * e;
+      if (pan) this.pan = { x: pan0.x + (pan.x - pan0.x) * e, y: pan0.y + (pan.y - pan0.y) * e, z: pan0.z + (pan.z - pan0.z) * e };
+      this.render();
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   // Each block as translucent faces: four walls, and a gable (point to the street) or a ridge
@@ -211,6 +385,12 @@ window.House3D = class House3D {
     for (const b of this.scene.massing.blocks) {
       const { x0, x1, z0, z1 } = b;
       const y0 = b.y0 || 0, y1 = y0 + b.depth;
+      if (b.id && b.id === this.scene.selBlock) {
+        // the block picked in Shape: its outline in the accent colour
+        const P8 = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]].map(([x, y, z]) => P(x, y, z));
+        const E = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
+        items.push({ depth: -1e9, draw: () => { for (const [i, j] of E) this.line(P8[i], P8[j], "#ffd166", 2); } });
+      }
       face([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], WALL, 0.08);
       face([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], WALL, 0.06, 0.45);
       face([[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], WALL, 0.06, 0.55);
@@ -461,6 +641,22 @@ window.House3D = class House3D {
     this.canvas.setPointerCapture(e.pointerId);
     const pt = this.local(e);
     this.pointers.set(e.pointerId, pt);
+    if (e.button === 0 && this.pointers.size === 1) {
+      // the view cube and home
+      if (this._home && Math.hypot(pt.x - this._home.x, pt.y - this._home.y) <= 10) { this.drag = { kind: "cube", home: true, start: pt }; return; }
+      const dir = this.cubeHit(pt);
+      if (dir) { this.drag = { kind: "cube", dir, start: pt }; return; }
+      // Shape: a face handle of the picked block
+      if (this.mode === "shape") {
+        const h = this.hitHandle(pt);
+        if (h) {
+          const p = this.project(h.at), q = this.project(add(h.at, h.axis));
+          const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+          this.drag = { kind: "face", face: h, start: pt, dir: { x: (q.x - p.x) / len, y: (q.y - p.y) / len }, ppm: len, block: this.scene.selBlock };
+          return;
+        }
+      }
+    }
     if (this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()];
       // two fingers: pinch to zoom, move together to slide the view
@@ -473,7 +669,7 @@ window.House3D = class House3D {
       this.drag = { kind: "pan", start: pt, pan: { ...this.pan }, moved: false };
       return;
     }
-    const hit = this.hit(pt);
+    const hit = this.mode === "shape" ? null : this.hit(pt);
     const sel = this.scene.lights.find((l) => l.sel);
     if (hit && sel && hit.id === sel.id && (hit.part === null ? this.scene.selPart === null : hit.part === this.scene.selPart)) {
       this.drag = { kind: this.mode === "raise" && hit.part === null ? "raise" : "move", start: pt, part: hit.part, light: sel, moved: false,
@@ -487,7 +683,19 @@ window.House3D = class House3D {
     const pt = this.local(e);
     if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, pt);
     const d = this.drag;
-    if (!d) return;
+    if (!d) {
+      // the cube shows what a click would turn to
+      const hov = this.cubeHit(pt);
+      if (JSON.stringify(hov) !== JSON.stringify(this._cubeHover || null)) { this._cubeHover = hov; this.canvas.style.cursor = hov ? "pointer" : ""; this.render(); }
+      return;
+    }
+    if (d.kind === "cube") return;
+    if (d.kind === "face") {
+      const along = (pt.x - d.start.x) * d.dir.x + (pt.y - d.start.y) * d.dir.y;
+      d.delta = L.snapLen(along / d.ppm);
+      this.h.onFace && this.h.onFace(d.block, d.face.face, d.delta, false);
+      return;
+    }
     if (d.kind === "pinch" && this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()];
       this.zoom = Math.min(4, Math.max(0.35, d.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / d.dist)));
@@ -544,9 +752,21 @@ window.House3D = class House3D {
     if (d.kind === "pinch") { if (this.pointers.size === 0) this.drag = null; return; }
     this.drag = null;
     if (cancel) return;
+    if (d.kind === "cube") {
+      const pt = this.local(e);
+      if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 6) return;
+      if (d.home) return this.animateTo(-0.55, 0.62, { x: 0, y: 0, z: 0 });
+      return this.lookFrom(d.dir);
+    }
+    if (d.kind === "face") { if (d.delta) this.h.onFace && this.h.onFace(d.block, d.face.face, d.delta, true); return; }
     if (d.kind === "move" && d.moved && d.at) return this.h.onMove(d.light.id, d.part, d.at.x, d.at.y, true);
     if (d.kind === "raise" && d.moved) return this.h.onRaise(d.light.id, d.h, true);
     if (d.kind === "orbit" && !d.moved) {
+      if (this.mode === "shape") {
+        const id = this.hitBlock(d.start.x, d.start.y);
+        if (this.h.onBlock) this.h.onBlock(id);
+        return;
+      }
       // aiming: what's under the tap is where the picked light points
       if (this.aimMode) {
         const hit = this.raycast(d.start.x, d.start.y);
@@ -610,6 +830,7 @@ function raySphere(o, d, c, r) {
   const t = -b - Math.sqrt(disc);
   return t > 0 ? t : null;
 }
+function dotv(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 function sub(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
 function add(a, b) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; }
 function scale(a, k) { return { x: a.x * k, y: a.y * k, z: a.z * k }; }

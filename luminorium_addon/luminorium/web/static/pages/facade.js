@@ -45,6 +45,7 @@ window.FacadeEditor = class FacadeEditor {
       floor_depth: f.floor_depth ?? 0.3048,
       eave: f.eave ?? EAVE_M,
       edges_v: f.edges_v || 1,
+      ...(f.ox != null ? { ox: f.ox } : {}),
     };
     this.edgeDraft = null;
     this.roofDraft = null;
@@ -233,7 +234,7 @@ window.FacadeEditor = class FacadeEditor {
     g.z = round3((ends[0].Z + ends[1].Z) / 2);
     const foot = g.pts.map(([u, v]) => this.onGround(u, v, g.z));
     g.footprint = foot.every(Boolean) ? foot.map((q) => [round3(q.X), round3(q.Y)]) : null;
-    const auto = this.doc.blocks.filter((b) => b.face === "auto");
+    const auto = this.photoBlocks().filter((b) => b.face === "auto");
     if (!auto.length || !g.footprint) return;
     this.keepOnPhoto(() => {
       for (const b of auto) b.y0 = round3(this.footY((b.x0 + b.x1) / 2) ?? 0);
@@ -298,6 +299,9 @@ window.FacadeEditor = class FacadeEditor {
     return xs.length ? { x0: Math.min(...xs), x1: Math.max(...xs), w: Math.max(...xs) - Math.min(...xs) } : null;
   }
 
+  // The blocks drawn on the photo (not the back parts of split blocks, which it can't show)
+  photoBlocks() { return this.doc.blocks.filter((b) => !b.behind); }
+
   // The plane a shape is drawn on (its Y)
   planeOf(kind, s) {
     if (kind === "edge") return -(this.doc.eave ?? EAVE_M);
@@ -306,7 +310,7 @@ window.FacadeEditor = class FacadeEditor {
     if (kind === "opening" || kind === "line") {
       const X = kind === "opening" ? (s.x0 + s.x1) / 2 : (s.x0 + s.x1) / 2;
       const Z = kind === "opening" ? (s.z0 + s.z1) / 2 : s.z;
-      const b = this.doc.blocks.find((q) => X >= q.x0 && X <= q.x1 && Z >= q.z0 - 0.05 && Z <= q.z1 + 0.05);
+      const b = this.photoBlocks().find((q) => X >= q.x0 && X <= q.x1 && Z >= q.z0 - 0.05 && Z <= q.z1 + 0.05);
       return b ? b.y0 || 0 : 0;
     }
     return 0;
@@ -315,7 +319,7 @@ window.FacadeEditor = class FacadeEditor {
   keepOnPhoto(fn, only = null) {
     const pts = [];
     const add = (kind, s, get, set) => { if (!only || only.includes(s)) pts.push({ kind, s, img: get().map(([X, Z]) => this.toImage(X, Z, this.planeOf(kind, s))), set }); };
-    for (const b of this.doc.blocks) add("block", b, () => [[b.x0, b.z0], [b.x1, b.z1]], (q) => { [[b.x0, b.z0], [b.x1, b.z1]] = q; });
+    for (const b of this.photoBlocks()) add("block", b, () => [[b.x0, b.z0], [b.x1, b.z1]], (q) => { [[b.x0, b.z0], [b.x1, b.z1]] = q; });
     for (const o of this.doc.openings) add("opening", o, () => [[o.x0, o.z0], [o.x1, o.z1]], (q) => { [[o.x0, o.z0], [o.x1, o.z1]] = q; });
     for (const l of this.doc.lines) add("line", l, () => [[l.x0, l.z], [l.x1, l.z]], (q) => { l.x0 = q[0][0]; l.x1 = q[1][0]; l.z = (q[0][1] + q[1][1]) / 2; });
     for (const r of this.doc.roofs) add("roof", r, () => r.pts, (q) => { r.pts = q; });
@@ -342,7 +346,8 @@ window.FacadeEditor = class FacadeEditor {
     return a && b ? Math.hypot(a.X - b.X, a.Z - b.Z) / 10 : 0.01;
   }
   origin() {
-    const ox = this.doc.blocks.length ? Math.min(...this.doc.blocks.map((b) => b.x0)) : 0;
+    const front = this.photoBlocks();
+    const ox = this.doc.ox ?? (front.length ? Math.min(...front.map((b) => b.x0)) : 0);
     return { ox, gz: this.doc.ground ? this.doc.ground.z : 0 };
   }
   // the width the photo covers, in facade metres, for lines that run across it
@@ -361,13 +366,13 @@ window.FacadeEditor = class FacadeEditor {
     const d = this.doc;
     if (axis === "x") {
       cands.push(0, d.door ? d.door.w : 0);
-      for (const b of d.blocks) if (b !== skip) cands.push(b.x0, b.x1);
+      for (const b of this.photoBlocks()) if (b !== skip) cands.push(b.x0, b.x1);
       for (const o of d.openings) if (o !== skip) cands.push(o.x0, o.x1);
       for (const r of d.roofs) if (r !== skip) cands.push(...r.pts.map((q) => q[0]));
     } else {
       cands.push(0, d.door ? d.door.h : 0);
       if (d.ground) cands.push(d.ground.z);
-      for (const b of d.blocks) if (b !== skip) cands.push(b.z0, b.z1);
+      for (const b of this.photoBlocks()) if (b !== skip) cands.push(b.z0, b.z1);
       for (const o of d.openings) if (o !== skip) cands.push(o.z0, o.z1);
       for (const l of d.lines) if (l !== skip) cands.push(l.z);
       for (const r of d.roofs) if (r !== skip) cands.push(...r.pts.map((q) => q[1]));
@@ -785,7 +790,7 @@ window.FacadeEditor = class FacadeEditor {
     if (this.ready()) {
       const span = this.span();
       // blocks: wall and roof
-      for (const b of d.blocks) {
+      for (const b of this.photoBlocks()) {
         const sel = isSel("block", b.id);
         const by = b.y0 || 0;
         const wall = this.fpoly([[b.x0, b.z0], [b.x1, b.z0], [b.x1, b.z1], [b.x0, b.z1]], by);
@@ -1191,7 +1196,7 @@ window.FacadeEditor = class FacadeEditor {
     const roof = d.roofs.filter((r) => { const f = this.s2f(p, r.y0 || 0); return f && insidePoly({ x: f.X, y: f.Z }, r.pts); })
       .sort((a, b) => polyArea(a.pts) - polyArea(b.pts))[0];
     if (roof) return { kind: "roof", id: roof.id };
-    const bl = d.blocks.filter((b) => insideOn(b, b.y0 || 0)).sort((a, b) => area(a) - area(b))[0];
+    const bl = this.photoBlocks().filter((b) => insideOn(b, b.y0 || 0)).sort((a, b) => area(a) - area(b))[0];
     if (bl) return { kind: "block", id: bl.id };
     if (g && g.pts && this.nearPolyline(p, g.pts.map(([u, v]) => this.i2s({ x: u, y: v })), 8) !== null) return { kind: "ground" };
     if (g && !g.pts && Math.abs(f0.Z - g.z) <= tol) return { kind: "ground" };
@@ -1443,7 +1448,7 @@ window.FacadeEditor = class FacadeEditor {
       if (!line || line.x1 - line.x0 < 0.3) {
         // a tap: run the line across the block it's on, else the house
         const X = f ? f.X : d.a.X;
-        const b = this.doc.blocks.find((q) => X >= q.x0 && X <= q.x1);
+        const b = this.photoBlocks().find((q) => X >= q.x0 && X <= q.x1);
         const o = this.origin();
         const W = this.doc.blocks.length ? Math.max(...this.doc.blocks.map((q) => q.x1)) : o.ox + this.ctx.house().size.width;
         line = b ? { x0: b.x0, x1: b.x1, z: d.a.Z } : { x0: o.ox, x1: W, z: d.a.Z };
@@ -1520,7 +1525,7 @@ window.FacadeEditor = class FacadeEditor {
         if (!this.ctx.selection().target) { L.toast("Pick a light from the list first"); return; }
         // the block under the tap, measured on its own wall
         const area = (r) => (r.x1 - r.x0) * (r.z1 - r.z0);
-        const blk = [...this.doc.blocks].sort((a, b) => area(a) - area(b)).find((b) => {
+        const blk = [...this.photoBlocks()].sort((a, b) => area(a) - area(b)).find((b) => {
           const fb = this.s2f(p, b.y0 || 0);
           return fb && fb.X >= b.x0 && fb.X <= b.x1 && fb.Z >= b.z0 && fb.Z <= b.z1 + 0.5;
         });

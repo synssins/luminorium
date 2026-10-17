@@ -476,6 +476,18 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
             )
         )
 
+    @app.put("/api/house/blocks/{block}")
+    async def house_block(block: str, body: dict):
+        """Move a house block's faces from 3D: {x0?, x1?, z0?, z1?, y0?, depth?} in house metres."""
+        _house_errors(lambda: lum.house.set_block(block, body))
+        return lum.house.view()
+
+    @app.post("/api/house/blocks/{block}/split")
+    async def house_block_split(block: str, body: dict):
+        """Split a block front to back: {front_depth} stays, a new block behind takes the rest."""
+        _house_errors(lambda: lum.house.split_block(block, body.get("front_depth", 0)))
+        return lum.house.view()
+
     @app.put("/api/house/items/{target}/fixtures")
     async def house_fixtures(target: str, body: dict):
         """How many fixtures one switch runs: {count: 2-50}, or 0 for one."""

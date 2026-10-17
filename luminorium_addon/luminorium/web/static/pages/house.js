@@ -89,6 +89,7 @@
       zMin: Math.min(0, ...bottoms, ...(m ? m.blocks.map((b) => b.z0) : [])), zMax: Math.max(2.5, ...tops, ...peaks),
       massing: m,
       top: house.top,
+      selBlock: ui.mode3d === "shape" ? ui.block : null,
       floors: house.floors.map((f) => ({ ...f, active: f.id === ui.floor, label: L.fmtLen(f.elevation, { signed: true }) })),
       lights, grid: L.units() === "imperial" ? L.FT : 1,
       placeZ: floorZ(ui.floor), selPart: ui.part, labels: false,
@@ -98,7 +99,7 @@
     if (view3d) return;
     canvas3d = el("canvas", { "aria-label": "The house in 3D: floors and lights", role: "img",
       class: "hm-canvas", style: { width: "100%", display: "block", borderRadius: "10px", cursor: "grab" } });
-    view3d = new window.House3D(canvas3d, {
+    view3d = canvas3d.view = new window.House3D(canvas3d, { // .view: for scripted checks
       onPick: (id, part) => { const t = target(id); ui.sel = id; ui.part = part; if (t && part === null) ui.floor = floorOfTarget(t); paint(); },
       onPlace: async (x, y) => {
         const at = { x: r2(x), y: r2(y) };
@@ -119,6 +120,17 @@
         else { const p = t.parts.find((q) => q.index === part); p.world.x = at.x; p.world.y = at.y; }
         view3d.setScene(scene3d());
         if (done) { if (part === null) await placeItem(at); else await placePart(part, at); }
+      },
+      onBlock: (id) => { ui.block = id; paint(); },
+      onFace: async (id, face, delta, done) => {
+        const b = house.massing && house.massing.blocks.find((q) => q.id === id);
+        if (!b) return;
+        if (!ui.faceBase || ui.faceBase.id !== id) ui.faceBase = { ...b };
+        const base = ui.faceBase;
+        const change = faceChange(base, face, delta);
+        Object.assign(b, change);
+        view3d.setScene(scene3d());
+        if (done) { ui.faceBase = null; await changeBlock(id, change); }
       },
       onAimAt: async (point, what) => {
         const t = target(ui.sel);
@@ -235,6 +247,74 @@
     await placeItem({ x, y, floor, ...(t.item && t.item.floor === floor ? {} : { h: null, mount: t.item?.mount || (floor === house.outside ? "post" : "ceiling") }) });
     toast(`${t.name}: ${floorName(floor)}`);
   }
+  // ---- house blocks in 3D (Shape) ----------------------------------------------------------------
+
+  // A face moved out (delta > 0) or in, as the block's new values in house metres
+  function faceChange(b, face, delta) {
+    const y0 = b.y0 || 0;
+    if (face === "x1") return { x1: b.x1 + delta };
+    if (face === "x0") return { x0: b.x0 - delta };
+    if (face === "z1") return { z1: b.z1 + delta };
+    if (face === "depth") return { depth: Math.max(0.3, b.depth + delta) };
+    if (face === "y0") return { y0: y0 - delta, depth: Math.max(0.3, b.depth + delta) };
+    return {};
+  }
+  async function changeBlock(id, change) {
+    const ok = await run(async () => { house = await api(`api/house/blocks/${encodeURIComponent(id)}`, { method: "PUT", body: change }); return true; });
+    if (!ok) house = await api("api/house");
+    if (facade) facade.load(house.facade); // keep the front photo's drawing in step
+    paint();
+  }
+  async function splitBlock(id, frontDepth) {
+    const ok = await run(async () => { house = await api(`api/house/blocks/${encodeURIComponent(id)}/split`, { method: "POST", body: { front_depth: frontDepth } }); return true; });
+    if (ok) {
+      if (facade) facade.load(house.facade);
+      const blocks = house.massing.blocks;
+      ui.block = blocks[blocks.length - 1].id; // the new back part
+      toast("Split. The back part is picked: drag its top down, or set its level.");
+    }
+    paint();
+  }
+  function blockPanel(b) {
+    const fmt = L.fmtLen;
+    const faces = view3d ? view3d.blockFaces(b) : [];
+    ui.moveFace = faces.some((f) => f.face === ui.moveFace) ? ui.moveFace : "depth";
+    let amount = 0.3048;
+    const amountInput = el("input.input", { value: fmt(amount), inputmode: "decimal", style: { width: "100px" },
+      on: { change: (e) => { const v = L.parseLen(e.target.value); if (!(v > 0)) { toast("Give a length, like 2' 6\""); e.target.value = fmt(amount); return; } amount = v; e.target.value = fmt(v); } } });
+    let front = Math.round((b.depth / 2) / 0.0254) * 0.0254;
+    const frontInput = el("input.input", { value: fmt(front), inputmode: "decimal", style: { width: "100px" },
+      on: { change: (e) => { const v = L.parseLen(e.target.value); if (!(v > 0.3 && v < b.depth - 0.3)) { toast(`Between 1 ft and ${fmt(b.depth - 0.3)}`); e.target.value = fmt(front); return; } front = v; } } });
+    const mode = !b.offset ? "same" : b.offset > 0 ? "up" : "down";
+    let off = Math.abs(b.offset || 0.6096);
+    return el("aside.card.accent.hm-insp", { "aria-label": "Picked house block" },
+      el("div", el("h2", b.name || "House block"), el("span.small.muted", b.behind ? "Behind another block (not on the front photo)" : "From the front photo")),
+      el("label.field", el("span", "Name"), el("input.input", { value: b.name || "", on: { change: (e) => changeBlock(b.id, { name: e.target.value }) } })),
+      el("dl", { class: "fc-kv" }, el("dt", "Width"), el("dd", fmt(b.x1 - b.x0)), el("dt", "Front to back"), el("dd", fmt(b.depth)),
+        el("dt", "Height"), el("dd", fmt(b.z1 - b.z0)), el("dt", "Top"), el("dd", `${fmt(b.z1)} up`)),
+      el("section", { "aria-label": "Move a face", style: { display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
+        el("h3", "Move a face"),
+        el("select.input", { on: { change: (e) => { ui.moveFace = e.target.value; } } }, faces.map((f) => el("option", { value: f.face, selected: f.face === ui.moveFace ? "" : null }, f.label))),
+        el("div.row", { style: { gap: "8px" } }, amountInput,
+          el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, faceChange(b, ui.moveFace, amount)) } }, "Out"),
+          el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, faceChange(b, ui.moveFace, -amount)) } }, "In")),
+        el("span.small.muted", "Or drag a yellow handle in the view.")),
+      el("section", { "aria-label": "Split", style: { display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
+        el("h3", "Split front to back"),
+        el("label.field", el("span", "The front part is"), frontInput),
+        el("button.btn.small", { type: "button", on: { click: () => splitBlock(b.id, front) } }, "Split"),
+        el("span.small.muted", "For a part of the house where the back differs from the front, like a lower back entrance behind the front entry.")),
+      el("section", { "aria-label": "Its level", style: { display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
+        el("label.field", el("span", "Part of"), el("select", { on: { change: (e) => changeBlock(b.id, { level: e.target.value || null }) } },
+          el("option", { value: "" }, "Not set"), house.floors.map((f) => el("option", { value: f.id, selected: b.level === f.id ? "" : null }, f.name)))),
+        b.level ? el("div.field", el("span", "Its floor"),
+          el("div.seg", { role: "radiogroup", "aria-label": "Its floor" }, [["same", "Same as the level"], ["up", "Higher"], ["down", "Lower"]].map(([k, label]) =>
+            el("button", { type: "button", role: "radio", "aria-checked": String(mode === k), on: { click: () => changeBlock(b.id, { offset: k === "same" ? 0 : (k === "up" ? 1 : -1) * off }) } }, label))),
+          mode !== "same" ? el("input.input", { value: fmt(off), inputmode: "decimal", style: { width: "100px" },
+            on: { change: (e) => { const v = L.parseLen(e.target.value); if (!(v >= 0)) return; off = v; changeBlock(b.id, { offset: (mode === "up" ? 1 : -1) * v }); } } }) : null) : null),
+      el("button.btn", { type: "button", on: { click: () => { ui.block = null; paint(); } } }, "Done"));
+  }
+
   async function setFixtures(t, count) {
     await run(() => api(`api/house/items/${encodeURIComponent(t.id)}/fixtures`, { method: "PUT", body: { count } }));
     ui.part = count ? 0 : null;
@@ -346,6 +426,12 @@
   }
 
   function inspector() {
+    if (ui.view === "3d" && ui.mode3d === "shape") {
+      const b = ui.block && house.massing && house.massing.blocks.find((q) => q.id === ui.block);
+      if (b) return blockPanel(b);
+      return el("aside.card.hm-insp", el("h2", "Shape"),
+        el("p.muted", { style: { margin: 0 } }, "Tap a house block in the view to pick it. Then drag the yellow handles on its sides, back and top, or type how far to move a face. Split a block to give the back part its own height and level."));
+    }
     const t = ui.sel && target(ui.sel);
     if (!t) return el("aside.card.hm-insp",
       el("h2", "Pick a light"), el("p.muted", { style: { margin: 0 } }, "Choose one on the left, then tap where it is: on the floor in 3D, on the Front photo, or from above in the Top view. In 3D, drag it to fine-tune, and use Raise to set its height."));
@@ -506,18 +592,18 @@
     if (ui.view === "3d") {
       ensure3d();
       const t = ui.sel && target(ui.sel);
-      const hint = ui.aiming && t ? `Click what ${t.name} should point at: a wall, the ground, or a tree. Drag to turn the view first if you need to.`
+      const hint = ui.mode3d === "shape" ? (ui.block ? "Drag a yellow handle to move that face; the distance shows as you go. Or type an amount in the panel." : "Tap a house block to pick it.")
+        : ui.aiming && t ? `Click what ${t.name} should point at: a wall, the ground, or a tree. Drag to turn the view first if you need to.`
         : !t ? "Pick a light from the list, or tap one."
         : !t.placed ? `Tap where ${t.name} is on the ${floorName(ui.floor)} floor.`
         : ui.mode3d === "raise" ? "Drag the picked light up or down."
         : ui.mode3d === "move" && t.placed ? "Drag the picked light to move it. Tap anywhere else to let go of it." : "Drag the picked light across its floor.";
       main = el("section.card", { "aria-label": "The house in 3D", style: { padding: "14px 16px" } },
         el("div.row", { style: { justifyContent: "space-between" } },
-          el("div.seg", { role: "radiogroup", "aria-label": "Dragging the picked light" },
-            [["move", "Move"], ["raise", "Raise"]].map(([k, label]) => el("button", { type: "button", role: "radio", "aria-checked": String(ui.mode3d === k),
-              on: { click: () => { ui.mode3d = k; paint(); } } }, label))),
-          el("div.row", { style: { gap: "6px" } }, [["3d", "3D"], ["top", "Top"], ["front", "Front"]].map(([k, label]) =>
-            el("button.btn.small", { type: "button", on: { click: () => view3d.preset(k) } }, label)))),
+          el("div.seg", { role: "radiogroup", "aria-label": "What dragging does" },
+            [["move", "Move"], ["raise", "Raise"], ["shape", "Shape"]].map(([k, label]) => el("button", { type: "button", role: "radio", "aria-checked": String(ui.mode3d === k),
+              title: k === "shape" ? "Pick a house block and drag its faces" : null,
+              on: { click: () => { ui.mode3d = k; if (k !== "shape") ui.block = null; paint(); } } }, label)))),
         floorTabs, lineBanner, canvas3d, el("span.small.muted", hint));
     } else if (ui.view === "top") {
       ensureSite();

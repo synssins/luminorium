@@ -268,8 +268,19 @@ grid is in feet (heavier every 5 ft), and dragging snaps to a whole inch (5 cm i
   dimmed. The view is drawn by `pages/house3d.js`, a small perspective renderer on a 2D canvas
   (no 3D library to download, so it works offline).
   - Drag empty space to turn the view; drag with the right button or the wheel (or Shift and the
-    left button, or two fingers) to slide it; scroll or pinch to zoom. **3D**, **Top** and
-    **Front** reset the angle and the slide.
+    left button, or two fingers) to slide it; scroll or pinch to zoom.
+  - **The view cube** (top right) turns with the view, with X (across), Y (back) and Z (up) at its
+    corner. Click a face (FRONT, BACK, LEFT, RIGHT, TOP, BOTTOM), an edge or a corner to look from
+    there; the view turns smoothly. **⌂** goes back to the usual view and takes the slide away.
+  - **Shape:** tap a house block to pick it. Yellow handles on its sides, back and top (and its
+    front, for a block behind another) drag those faces, showing the distance as they go, an inch
+    (or 5 cm) at a time. The panel shows its size and moves a face **Out** or **In** by a typed
+    amount, **splits it front to back** (the front part keeps the depth typed; a new block behind
+    it, "(back)", takes the rest, with its own top, level and floor), and sets its level and floor.
+    `PUT /api/house/blocks/{id}` `{x0?, x1?, z0?, z1?, y0?, depth?, name?, level?, offset?}` and
+    `POST /api/house/blocks/{id}/split` `{front_depth}`, in house metres. Blocks behind others
+    (`behind`) aren't on the front photo. The house's left edge is fixed (`facade.ox`) once there
+    are blocks, so moving a block's left face doesn't shift what's placed by it.
   - Tap a light to pick it. A light (or part) not placed yet goes where you then tap the floor,
     on the floor chosen above the view. Tapping off a placed light lets go of it: it only moves
     when dragged.

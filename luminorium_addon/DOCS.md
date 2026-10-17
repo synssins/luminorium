@@ -133,7 +133,7 @@ roofs. With **Place a light**, tap where a light is on the photo.
    half a storey apart. If a floor is only part of the house (one side of a split level), say
    which stretch, left to right.
 2. Pick a light on the list, or tap it in the **3D** view. Tap the floor where it is, then drag
-   it to fine-tune (**Move**). Drag empty space to turn the view, drag with the right button or the wheel to slide it, and scroll or pinch to zoom.
+   it to fine-tune (**Move**). Drag empty space to turn the view, drag with the right button or the wheel to slide it, and scroll or pinch to zoom. Click the cube at the top right to look from the front, a side, the top or a corner. **Shape** lets you pick a part of the house and drag its sides, back and top, or split it front to back (a lower back entrance behind the front entry, say).
    The **Front photo** and **Top view** place lights exactly where you tap.
 3. Choose its **Type** (ceiling, pendant, wall, floor lamp, tabletop, under cabinet, strip, path or
    post, in the ground). That sets a height, which you can change with the slider, or with **Raise** in the 3D view

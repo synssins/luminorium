@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0-dev.18
+
+- **View cube** at the top right of the 3D view, with X, Y and Z: click a face, an edge or a
+  corner to turn the view there; ⌂ goes back to the usual view. (Replaces the 3D, Top and Front
+  buttons.)
+- **Shape the house in 3D:** pick a block, drag the handles on its sides, back and top (the
+  distance shows as you drag), or move a face out or in by a typed amount.
+- **Split a block front to back:** the back part gets its own depth, top, level and floor, for a
+  lower back entrance behind the front entry and the like.
+- Moving the leftmost block no longer shifts the house's left edge (and what's placed by it).
+
 ## 0.3.0-dev.17
 
 - **Square walls from above:** the roof outline (and so the outside walls) is squared to the

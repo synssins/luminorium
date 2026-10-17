@@ -680,3 +680,52 @@ async def test_one_switch_several_fixtures(client, lum):
     assert (
         await client.put(f"/api/house/items/{STRING}/fixtures", json={"count": 2})
     ).status_code == 400
+
+
+async def test_blocks_moved_and_split_from_3d(client, lum):
+    await client.put("/api/house/photo?w=800&h=600", content=JPEG)
+    door = {"pts": [[400, 300], [436, 300], [436, 380], [400, 380]], "w": 0.9144, "h": 2.032}
+    body = {
+        "door": door,
+        "ground": {"z": 0},
+        "blocks": [
+            {"id": "a", "name": "Bedrooms", "x0": -2, "x1": 6, "z0": 0, "z1": 5},
+            {"id": "e", "name": "Entry", "x0": 6, "x1": 9, "z0": 0, "z1": 3, "y0": 0.9},
+        ],
+    }
+    await client.put("/api/house/facade", json=body)
+    view = (await client.get("/api/house")).json()
+    entry = next(b for b in view["massing"]["blocks"] if b["id"] == "e")
+    assert (entry["x0"], entry["x1"]) == (
+        8,
+        11,
+    )  # house x: from the left edge, 2 m left of the door
+    # drag the entry's back in to 3 m deep, and its right side out 0.5 m
+    view = (await client.put("/api/house/blocks/e", json={"depth": 3, "x1": 11.5})).json()
+    entry = next(b for b in view["massing"]["blocks"] if b["id"] == "e")
+    assert (entry["depth"], entry["x1"]) == (3, 11.5)
+    # moving the leftmost block's left face doesn't shift the house
+    view = (await client.put("/api/house/blocks/a", json={"x0": -1})).json()
+    assert next(b for b in view["massing"]["blocks"] if b["id"] == "e")["x0"] == 8
+    # split the entry: 1.5 m in front; the back part is lower and on its own level
+    view = (await client.post("/api/house/blocks/e/split", json={"front_depth": 1.5})).json()
+    front, back = [b for b in view["massing"]["blocks"] if b["id"].startswith("e")]
+    assert front["depth"] == 1.5 and back["depth"] == 1.5
+    assert back["y0"] == pytest.approx(2.4) and back["behind"] is True
+    view = (
+        await client.put(
+            f"/api/house/blocks/{back['id']}",
+            json={"z1": 2.2, "level": "main_level", "offset": -0.6},
+        )
+    ).json()
+    back = next(b for b in view["massing"]["blocks"] if b["id"] == back["id"])
+    assert back["z1"] == 2.2 and back["level"] == "main_level" and back["offset"] == -0.6
+    # its front can be moved (it isn't on the photo); a photo block's front can't
+    assert (await client.put(f"/api/house/blocks/{back['id']}", json={"y0": 2})).status_code == 200
+    assert (await client.put("/api/house/blocks/e", json={"y0": 2})).status_code == 400
+    for bad in ({"depth": 0.1}, {"x1": 6.1}, {"level": "attic"}):
+        assert (await client.put("/api/house/blocks/e", json=bad)).status_code == 400
+    assert (
+        await client.post("/api/house/blocks/e/split", json={"front_depth": 1.4})
+    ).status_code == 400
+    assert (await client.put("/api/house/blocks/nope", json={"depth": 2})).status_code == 404

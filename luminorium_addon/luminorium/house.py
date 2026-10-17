@@ -566,6 +566,8 @@ class HouseService:
             raise HouseError("add a photo of the front first")
         pw, ph = facade["photo"]["w"], facade["photo"]["h"]
         out: dict[str, Any] = {"photo": facade["photo"]}
+        if facade.get("ox") is not None:
+            out["ox"] = facade["ox"]
         door = body.get("door")
         if door:
             pts = door.get("pts") or []
@@ -634,6 +636,8 @@ class HouseService:
         _migrate_roofs(body)  # a page from before roofs were their own shapes
         for b in _list(body.get("blocks"), 50):
             blk = {"id": ident(b.get("id")), "name": ident(b.get("name"), 60), **rect(b)}
+            if b.get("behind"):
+                blk["behind"] = True  # behind another block: not on the photo
             for key in ("floor", "level"):
                 # level: the HA floor this part of the house belongs to; floor: the HA floor
                 # whose floor is this block's bottom (a basement in the ground)
@@ -719,8 +723,8 @@ class HouseService:
     def facade_origin(self) -> tuple[float, float]:
         """Facade metres of the house's left edge and of the ground."""
         f = self.data.get("facade") or {}
-        blocks = f.get("blocks") or []
-        ox = min((b["x0"] for b in blocks), default=0.0)
+        blocks = [b for b in f.get("blocks") or [] if not b.get("behind")]
+        ox = f["ox"] if f.get("ox") is not None else min((b["x0"] for b in blocks), default=0.0)
         gz = (f.get("ground") or {}).get("z", 0.0)
         return ox, gz
 
@@ -728,10 +732,17 @@ class HouseService:
         f = self.data["facade"]
         if not f.get("door"):
             return
-        ox, gz = self.facade_origin()
         blocks = f.get("blocks") or []
+        if blocks and f.get("ox") is None:
+            # fix the house's left edge once there are blocks
+            f["ox"] = (
+                min(b["x0"] for b in blocks if not b.get("behind"))
+                if any(not b.get("behind") for b in blocks)
+                else min(b["x0"] for b in blocks)
+            )
+        ox, gz = self.facade_origin()
         if blocks:
-            width = round(max(b["x1"] for b in blocks) - ox, 3)
+            width = round(max(b["x1"] for b in blocks) - min(ox, *(b["x0"] for b in blocks)), 3)
             self.data["size"]["width"] = min(200.0, max(1.0, width))
         width = self.data["size"]["width"]
         depth = f.get("floor_depth", FLOOR_DEPTH_M)
@@ -784,6 +795,96 @@ class HouseService:
                 if 1.5 <= ceiling <= 12:
                     self.data["floors"][fid]["ceiling"] = ceiling
 
+    # ---- changing blocks in 3D ------------------------------------------------------------
+
+    def _block(self, bid: str) -> dict:
+        f = self.data.get("facade") or {}
+        for b in f.get("blocks") or []:
+            if b.get("id") == bid:
+                return b
+        raise KeyError(f"block {bid}")
+
+    def _block_depth(self, b: dict) -> float:
+        m = self.massing() or {}
+        for w in m.get("blocks") or []:
+            if w["id"] == b.get("id"):
+                return w["depth"]
+        return b.get("depth", self.data["size"]["depth"])
+
+    def set_block(self, bid: str, change: dict) -> dict:
+        """Move a block's faces, in house metres: x0, x1 (left, right), z1 (top), z0 (bottom),
+        y0 (front; only for a block behind another), depth (to its back)."""
+        b = self._block(bid)
+        ox, gz = self.facade_origin()
+        new = dict(b)
+        if "x0" in change:
+            new["x0"] = _num(change["x0"]) + ox
+        if "x1" in change:
+            new["x1"] = _num(change["x1"]) + ox
+        if "z1" in change:
+            new["z1"] = _num(change["z1"]) + gz
+        if "z0" in change:
+            new["z0"] = _num(change["z0"]) + gz + new.get("below", 0.0)
+        if "y0" in change:
+            if not b.get("behind"):
+                raise HouseError("the front of a block on the photo is set on the photo")
+            new["y0"] = _num(change["y0"])
+        if "depth" in change:
+            depth = _num(change["depth"])
+            if not 0.3 <= depth <= 200:
+                raise HouseError("a block is 1-650 ft deep")
+            new["depth"] = depth
+        if "name" in change:
+            new["name"] = str(change["name"] or "")[:60]
+        if "level" in change:
+            if change["level"] and change["level"] not in self.floors():
+                raise HouseError(f"unknown floor {change['level']}")
+            if change["level"]:
+                new["level"] = change["level"]
+            else:
+                for k in ("level", "offset", "floor"):
+                    new.pop(k, None)
+        if "offset" in change:
+            off = _num(change["offset"] or 0)
+            if not -5 <= off <= 5:
+                raise HouseError("a space's floor is within 15 ft of its level's")
+            if off:
+                new["offset"] = off
+            else:
+                new.pop("offset", None)
+        if new["x1"] - new["x0"] < 0.3 or new["z1"] - new["z0"] < 0.3:
+            raise HouseError("a block is at least 1 ft each way")
+        b.clear()
+        b.update({k: round(v, 3) if isinstance(v, float) else v for k, v in new.items()})
+        self._apply_facade()
+        self._save()
+        return b
+
+    def split_block(self, bid: str, front_depth: float) -> dict:
+        """Split a block front to back: the front part keeps `front_depth`, a new block behind
+        it takes the rest, with the same left, right, top, bottom and level to start with."""
+        b = self._block(bid)
+        total = self._block_depth(b)
+        front_depth = _num(front_depth)
+        if not 0.3 <= front_depth <= total - 0.3:
+            raise HouseError("split somewhere inside the block, at least 1 ft from each end")
+        back = {k: v for k, v in b.items() if k not in ("id", "name", "face", "depth", "floor")}
+        back.update(
+            {
+                "id": f"{b.get('id', 'b')}-{len((self.data['facade'] or {}).get('blocks') or [])}",
+                "name": f"{b.get('name') or 'Block'} (back)",
+                "behind": True,
+                "face": "back",
+                "y0": round(b.get("y0", 0.0) + front_depth, 3),
+                "depth": round(total - front_depth, 3),
+            }
+        )
+        b["depth"] = round(front_depth, 3)
+        self.data["facade"]["blocks"].append(back)
+        self._apply_facade()
+        self._save()
+        return back
+
     def massing(self) -> dict | None:
         """The drawn house in house coordinates, for the 3D view."""
         f = self.data.get("facade") or {}
@@ -814,7 +915,9 @@ class HouseService:
         blocks = []
         for b in f["blocks"]:
             w = {
+                "id": b.get("id", ""),
                 "name": b.get("name", ""),
+                "behind": bool(b.get("behind")),
                 **world(b),
                 "y0": b.get("y0", 0.0),
                 "depth": depth_of(b),
