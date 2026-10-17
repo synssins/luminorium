@@ -175,7 +175,9 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
     face (a T), shown by a green ring; Alt stops it. The reach is 12 px or two wall thicknesses
     and a bit, whichever is more, so zoomed in an end dropped anywhere on a wall snaps to its centre
     line. A square wall ending near another wall's end or a corner slides sideways onto it (up to
-    two wall thicknesses; its start moves with it), and so does dragging an end onto one. Ends are
+    two wall thicknesses; its start moves with it), and so does dragging an end onto one. Dragging
+    a whole wall (Select) snaps too: whichever end comes near another wall's end, an inside corner,
+    or onto a wall across its way takes the wall there; Alt drags it freely. Ends are
     drawn square, so corners and T's join cleanly. With the Wall tool a drag always starts a new wall; Select adjusts ends. **Move
     the whole plan** drags every wall, room and stairs of the level together; **Move this plan
     to** another level carries them there (a wall's own level is in its panel too).

@@ -842,7 +842,7 @@ window.SiteEditor = class SiteEditor {
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       label(ctx, L.fmtLen(Math.hypot(this.drag.b[0] - a0[0], this.drag.b[1] - a0[1])), (a.x + b.x) / 2, (a.y + b.y) / 2 - 10, "#fff", col, "center");
     }
-    if (this.snapMark && this.drag && (this.drag.kind === "wallDraw" || this.drag.kind === "handle")) {
+    if (this.snapMark && this.drag && (this.drag.kind === "wallDraw" || this.drag.kind === "handle" || (this.drag.kind === "moveShape" && this.drag.hit.kind === "wall"))) {
       const q = this.h2s(...this.snapMark);
       ctx.strokeStyle = "#7bc47f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q.x, q.y, 9, 0, Math.PI * 2); ctx.stroke();
     }
@@ -1177,7 +1177,7 @@ window.SiteEditor = class SiteEditor {
     const mv = ([px, py]) => [round3(px + dx), round3(py + dy)];
     if (d.hit.kind === "outline") { this.doc.outline = o.map(mv); return; }
     if (d.hit.kind === "yard") { if (o.c) s.c = mv(o.c); else s.pts = o.pts.map(mv); return; }
-    if (d.hit.kind === "wall") { s.a = mv(o.a); s.b = mv(o.b); return; }
+    if (d.hit.kind === "wall") { const [a, b] = this.snapWallMove(s, mv(o.a), mv(o.b), this.altHeld); s.a = a; s.b = b; return; }
     if (d.hit.kind === "room") { s.at = mv(o.at); return; }
     if (d.hit.kind === "stairs") { s.x0 = round3(o.x0 + dx); s.x1 = round3(o.x1 + dx); s.y0 = round3(o.y0 + dy); s.y1 = round3(o.y1 + dy); return; }
     if (d.hit.kind === "door") {
@@ -1337,6 +1337,38 @@ window.SiteEditor = class SiteEditor {
   wallEnd(a, p, skip, free, angled = this.opts.angled) {
     if (angled) return this.snapWall(p, null, skip, free);
     return this.snapWall(squareTo(a, p), a, skip, free);
+  }
+  // A whole wall dragged to a, b: whichever of its ends comes near another wall's end, a corner of
+  // the outside walls' inside face, or onto another wall (not one alongside it), takes it there,
+  // and the rest of the wall comes too (so it stays the same length and way round). Alt: no snap.
+  snapWallMove(w, a, b, free) {
+    this.snapMark = null;
+    if (free) return [a, b];
+    const walls = this.doc.walls.filter((q) => q.level === this.level && q !== w);
+    const half = Math.max(this.wallThick(w), ...walls.map((q) => this.wallThick(q))) / 2;
+    const tol = Math.max(16 / this.view.k, 2 * half + 12 / this.view.k);
+    const inner = this.planInner() || [];
+    const pts = [...walls.flatMap((q) => [q.a, q.b]), ...inner];
+    const segs = [...walls.map((q) => [q.a, q.b]), ...inner.map((q, i) => [q, inner[(i + 1) % inner.length]])];
+    const ux = b[0] - a[0], uy = b[1] - a[1], ul = Math.hypot(ux, uy) || 1;
+    let best = null;
+    const take = (end, q, rank) => {
+      const d = Math.hypot(q[0] - end[0], q[1] - end[1]);
+      if (d <= tol && (!best || rank < best.rank || (rank === best.rank && d < best.d))) best = { d, rank, q, dx: q[0] - end[0], dy: q[1] - end[1] };
+    };
+    for (const end of [a, b]) {
+      for (const q of pts) take(end, q, 0); // ends and corners first
+      for (const [p, q] of segs) {
+        const dx = q[0] - p[0], dy = q[1] - p[1], l2 = dx * dx + dy * dy;
+        if (!l2 || Math.abs(ux * dy - uy * dx) / (ul * Math.sqrt(l2)) < 0.1) continue; // alongside: no
+        const t = Math.max(0, Math.min(1, ((end[0] - p[0]) * dx + (end[1] - p[1]) * dy) / l2));
+        take(end, [p[0] + t * dx, p[1] + t * dy], 1);
+      }
+    }
+    if (!best) return [a, b];
+    this.snapMark = best.q;
+    const mv = ([x, y]) => [round3(x + best.dx), round3(y + best.dy)];
+    return [mv(a), mv(b)];
   }
   // A wall end near (x, y): another wall's end or a corner of the outside walls' inside face
   // first, else onto another wall or that face (a T). With `from` (the other end, square walls),

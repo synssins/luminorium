@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.27
+
+- **Dragging a whole wall snaps:** with Select, drag a wall by its middle and whichever end comes
+  near another wall's end, an inside corner, or onto a wall across its way, takes the wall there
+  (same length, same way round). Alt drags it freely.
+
 ## 0.3.0-dev.26
 
 - **Stairs you can size:** type the width, tread depth, step height and number of steps (not
