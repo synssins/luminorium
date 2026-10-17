@@ -89,6 +89,40 @@ def default_floors(inv: Inventory) -> dict[str, dict]:
     return out
 
 
+def _fit_unset(floors: dict[str, dict], known: set[str]) -> None:
+    """Move the floors the user hasn't set to fit the ones they have. Floors are in level order
+    (as default_floors gives them); one between two set floors goes evenly between them, one
+    beyond them keeps going at the step between its nearest two set floors (one storey when only
+    one is set). Without this, a floor line drawn for Main at +3' 8" left the levels under it
+    where the first guess put them, with Main at 0."""
+    order = list(floors)
+    idx = [i for i, fid in enumerate(order) if fid in known]
+    if not idx or len(idx) == len(order):
+        return
+    z = {i: floors[order[i]]["elevation"] for i in idx}
+
+    def step(a: int, b: int) -> float:
+        return (z[b] - z[a]) / (b - a)
+
+    for i, fid in enumerate(order):
+        if fid in known:
+            continue
+        below = [k for k in idx if k < i]
+        above = [k for k in idx if k > i]
+        if below and above:
+            a, b = below[-1], above[0]
+            elevation = z[a] + step(a, b) * (i - a)
+        elif below:
+            a = below[-1]
+            s = step(below[-2], a) if len(below) > 1 else STOREY_M
+            elevation = z[a] + s * (i - a)
+        else:
+            b = above[0]
+            s = step(b, above[1]) if len(above) > 1 else STOREY_M
+            elevation = z[b] - s * (b - i)
+        floors[fid]["elevation"] = round(elevation, 2)
+
+
 class HouseService:
     def __init__(self, store: JsonStore, inventory, parts_for=None):
         """parts_for(light) -> list[Part]: a segmented light's parts (WLED LEDs, Govee segments)."""
@@ -111,6 +145,7 @@ class HouseService:
                 merged[fid].update(
                     {k: v for k, v in saved.items() if k in ("elevation", "ceiling", "x0", "x1")}
                 )
+        _fit_unset(merged, {fid for fid, s in self.data["floors"].items() if "elevation" in s})
         return merged
 
     def floor_z(self, floor_id: str) -> float:

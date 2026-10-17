@@ -46,6 +46,21 @@ def test_default_floors_plain_house():
     )
 
 
+def test_unset_floors_fit_the_set_ones(lum):
+    # Chris's house as drawn on the photo: Main +1.12 m, Bedroom +2.82 m (half a storey apart)
+    lum.house.settings(
+        None, {"main_level": {"elevation": 1.12}, "bedroom_level": {"elevation": 2.82}}
+    )
+    floors = {f["id"]: f["elevation"] for f in lum.house.view()["floors"]}
+    assert floors["ground_level"] == pytest.approx(-0.58)
+    assert floors["basement"] == pytest.approx(-2.28)
+    # With one set, the others are a storey apart from it
+    lum.house.data["floors"] = {}
+    lum.house.settings(None, {"ground_level": {"elevation": 0}})
+    floors = {f["id"]: f["elevation"] for f in lum.house.view()["floors"]}
+    assert floors["main_level"] == pytest.approx(2.7) and floors["basement"] == pytest.approx(-2.7)
+
+
 def test_split_levels_and_heights(lum):
     house = lum.house
     house.settings(
@@ -342,6 +357,10 @@ async def test_front_photo_sets_width_floors_and_massing(client, lum):
     # The bedroom line runs the whole width, so it covers the whole house
     assert floors["bedroom_level"]["elevation"] == pytest.approx(3.0)
     assert floors["bedroom_level"]["x0"] is None
+    # The levels without a line follow the step between the drawn ones (2.4 m here), instead of
+    # staying where the first guess (Main at 0) put them
+    assert floors["ground_level"]["elevation"] == pytest.approx(-1.8)
+    assert floors["basement"]["elevation"] == pytest.approx(-4.2)
     m = view["massing"]
     a, b = m["blocks"]
     assert (a["x0"], a["x1"], a["z0"], a["z1"]) == (0, 7, 0, 5.6)

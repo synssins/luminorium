@@ -25,6 +25,9 @@ Code: `luminorium/house.py` (`HouseService`), the API in `web/server.py`, the pa
   in this house Basement −7′ 10″, Ground −3′ 11″, Main 0, Bedroom +3′ 11″. Above main, floors keep
   the same step in a split-level house, and are a full storey (2.7 m) each in a plain one. The
   user corrects it under **Floors & size**.
+- **Floors the user hasn't set follow the ones they have** (a height saved, or a floor line on the
+  front photo): a floor between two set ones goes evenly between them, and one beyond them keeps
+  going at the step between the nearest two (a storey, 2.7 m, when only one is set).
 - **Outside** (`_outside`) is the yard. A height outside is above the ground.
 - **Items:** a light or a fixture. Each has a `floor`, `x`, `y`, `h` (the height above that floor)
   and a `mount`. Its world position is (`x`, `y`, `elevation + h`).

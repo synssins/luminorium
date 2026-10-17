@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-dev.6
+
+- **Floors you haven't set follow the ones you have.** Drawing floor lines for some levels on the
+  front photo (or setting their heights) now moves the others to match: between two set floors
+  evenly, beyond them at the same step. Before, they stayed where the first guess put them, with
+  Main at ground level, so the Ground Level showed far under the ground.
+
 ## 0.3.0-dev.5
 
 - **Animations: sweep.** Colour travels from one end of the house to the other, by where each
