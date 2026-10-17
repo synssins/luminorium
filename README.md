@@ -5,12 +5,12 @@ Zigbee (Zigbee2MQTT), Z-Wave dimmers and relays, WiZ, WLED, Govee, ESPHome and M
 Assistant stays the source of truth for lights, areas and floors; Luminorium adds effects,
 palettes, spatial shows mapped with a phone camera, and automations on top.
 
-**Status:** phase 2 of 8 (direct drivers). It reads the house's lights from HA, shows them by
-floor and area with what each can do, and has a safe Test button, Stop all, and crash recovery.
-Lights are driven directly where that is better (Zigbee2MQTT over MQTT, Z-Wave JS with
-multicast, WiZ, WLED and Govee over the LAN), through HA otherwise, under per-network rate
-budgets. None of the direct drivers has been tried on the real lights yet
-([docs/driver-tests.md](docs/driver-tests.md)). Nothing here runs effects yet.
+**Status:** phases 1–3 are in: the light inventory, the safety net (Test, Stop all, crash
+recovery), direct drivers (Zigbee2MQTT over MQTT, Z-Wave JS with multicast, WiZ, WLED and Govee
+over the LAN, HA as the fallback, under per-network rate budgets) and the show engine core
+(palettes, native and software effects, dip and flash, shows as YAML;
+[docs/engine.md](docs/engine.md)). None of the direct drivers has been tried on the real lights
+yet ([docs/driver-tests.md](docs/driver-tests.md)).
 
 ## Documentation
 
@@ -23,6 +23,7 @@ budgets. None of the direct drivers has been tried on the real lights yet
 | [docs/inventory.md](docs/inventory.md) | How HA entities become lights: kinds, exclusions, segments, duplicates, profiles |
 | [docs/drivers.md](docs/drivers.md) | The drivers (HA, z2m, Z-Wave JS, WiZ, WLED, Govee LAN), how each light's driver is chosen, discovery, fakes |
 | [docs/driver-tests.md](docs/driver-tests.md) | Short real-light checks of the direct drivers, waiting for approval (none run) |
+| [docs/engine.md](docs/engine.md) | The show engine: colour, layers, palettes, effect resolution, the planner, shows, storage |
 | [docs/safety.md](docs/safety.md) | Rate governor, batches, snapshots, Stop all, crash restore, outside changes, read-only |
 | [docs/api.md](docs/api.md) | The HTTP API |
 | [docs/development.md](docs/development.md) | Setup, tests, the fake HA, running on a PC, fixtures |
@@ -45,7 +46,7 @@ budgets. None of the direct drivers has been tried on the real lights yet
 
 ```bash
 py -3.13 -m venv .venv
-.venv/Scripts/python -m pip install aiohttp fastapi uvicorn pytest pytest-asyncio httpx ruff
+.venv/Scripts/python -m pip install aiohttp fastapi uvicorn pyyaml pytest pytest-asyncio httpx ruff
 .venv/Scripts/python -m pytest
 .venv/Scripts/python tools/dev.py
 ```

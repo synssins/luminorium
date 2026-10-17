@@ -1,0 +1,11 @@
+id: warm_white
+name: Warm white
+category: [white, cosy]
+colors:
+  - { kelvin: 2700, weight: 3 }
+  - { kelvin: 2400, weight: 2 }
+  - { kelvin: 3000, weight: 1 }
+brightness: [50, 80]
+transition_s: [15, 40]
+hold_s: [20, 60]
+spread: per_element

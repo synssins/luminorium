@@ -1,7 +1,8 @@
 # Architecture (as built)
 
-This describes the code as it is today (phase 2: direct drivers). [DESIGN.md](../DESIGN.md) is
-the full target design; [BRIEF.md](../BRIEF.md) has the phases.
+This describes the code as it is today (phases 1–3: inventory and safety, direct drivers, the
+show engine core). [DESIGN.md](../DESIGN.md) is the full target design; [BRIEF.md](../BRIEF.md)
+has the phases.
 
 ## Process
 
@@ -15,6 +16,12 @@ One Python process (asyncio) in one add-on container:
                  │      │                follows registry and state_changed events           │
                  │      ├─ inventory/builder.py   build(): pure function → Inventory          │
                  │      └─ inventory/profiles.py  capabilities, network, rate, latency       │
+                 │                                                                           │
+                 │ engine/engine.py     Engine: shows, layers, 20 Hz tick (docs/engine.md)   │
+                 │      ├─ engine/layers.py   palette cycler, effects, dip, flash            │
+                 │      ├─ engine/planner.py  fades, low-pass, threshold, budgets            │
+                 │      └─ engine/color.py    OKLab, render to each light                    │
+                 │ library.py           palettes and shows as YAML in /config                │
                  │                                                                           │
                  │ engine/safety.py     Safety: sessions, snapshots, Stop all, restore,      │
                  │      │               outside-change detection                             │
@@ -58,9 +65,15 @@ settings and runs the FastAPI app under uvicorn; the app's lifespan starts and s
 | `discovery.py` | Mosquitto from the Supervisor; Z-Wave JS server URLs from HA and the Supervisor. |
 | `engine/governor.py` | `Governor.send()` / `send_many()`: per-light interval, latest value wins, priorities, network and HA token buckets, batches as one message. See [safety.md](safety.md). |
 | `engine/safety.py` | `Safety`: sessions, snapshots, `command()`, `end_session()`, `stop_all()`, `restore_leftovers()`, outside-change detection. |
+| `engine/color.py` | `Color`, OKLab blending, `Look`, `render()` to each light's capabilities, `perceptible()`. See [engine.md](engine.md). |
+| `engine/effects.py` | `EffectLibrary`: normalised effects from `data/effects/*.yaml` and `/config/effects`; native exact → close → software → static. |
+| `engine/layers.py` | `Span`; layers `static`, `palette`, `native_effect`, `software_effect`, `dip`, `flash`; `Palette` and its seeded per-element walk. |
+| `engine/planner.py` | `Planner`: latency lead, one fade per fade, steps, low-pass for slow lights, perceptual threshold, per-network budgets. |
+| `engine/engine.py` | `Engine`: play/stop, targets → elements (fixtures as one), the 20 Hz tick, overlap by priority, `on_end` hand-back. One Safety session, `engine`. |
+| `library.py` | `Library`: built-in palettes (`data/palettes`) and the user's palettes and shows (`/config/palettes`, `/config/shows`). |
 | `engine/testlight.py` | `LightTester`: on (full) → hold → off → hold → restore, as a session named `test:<entity_id>`; `start_fixture()` does the same for all of a fixture's lights at once (`test:<fixture id>`). |
 | `web/server.py` | `create_app()`: pages, static files, JSON API ([api.md](api.md)), client allow-list. |
-| `web/static/` | `index.html` + `app.js` + `style.css` (lights page), `camera.html` (phone camera check). No build step. |
+| `web/static/` | `index.html` + `app.js` + `style.css` (lights page), `shows.js` (the Palettes panel), `camera.html` (phone camera check). No build step. |
 
 ## Data in `/data`
 
@@ -70,8 +83,9 @@ settings and runs the FastAPI app under uvicorn; the app's lifespan starts and s
 | `choices.json` | The user's decisions: `include` (`{entity_id: true/false}`), `fixtures` (`[{id, name, members}]`), `dismissed` fixture suggestions (`[[entity_id, …]]`) and `drivers` (`{entity_id: "ha" or a direct driver}`, pinned drivers). |
 | `snapshots.json` | Lights currently touched and their state before: `{entity_id: {state, session, taken_at}}`. Absent when nothing is touched. Used to restore after a crash. |
 
-`/config` (the add-on's `addon_config` folder) is mapped for user content (shows, palettes,
-plugins) in later phases. Both are included in HA backups.
+`/config` (the add-on's `addon_config` folder) holds user content: `palettes/*.yaml`,
+`shows/*.yaml` and `effects/*.yaml` ([engine.md](engine.md#storage)); plugins later. Both are
+included in HA backups.
 
 ## Startup and shutdown
 
@@ -88,7 +102,6 @@ plugins) in later phases. Both are included in HA backups.
 
 ## What's not here yet
 
-Effects and palettes, shows, triggers, views and mapping, plugins, MQTT entities, a Hue/Bifrost
-driver: phases 3–8 in [BRIEF.md](../BRIEF.md). WLED DDP and Govee razer streaming exist in the
-drivers but have no user until the effects engine. The mapping analysis is being prototyped
-separately in `proto/mapping/`.
+Colour fields and the designer, triggers, views and mapping, plugins, MQTT entities, a
+Hue/Bifrost driver: phases 4–8 in [BRIEF.md](../BRIEF.md). The mapping analysis is prototyped in
+`proto/mapping/`.

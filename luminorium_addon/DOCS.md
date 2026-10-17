@@ -2,9 +2,10 @@
 
 Light effects, shows and sequences across every light Home Assistant knows about.
 
-This is phase 2: the inventory, the safety net and direct drivers. Luminorium reads your floors,
-areas and lights from Home Assistant and shows each light with what it can do. A **Test** button
-turns one light on, then off, then puts it back exactly as it was.
+Luminorium reads your floors, areas and lights from Home Assistant and shows each light with what
+it can do, and drives each light the fastest way it can reach it. A **Test** button turns one
+light on, then off, then puts it back exactly as it was. **Palettes** play slowly changing colours
+in a room, and the API plays effects and shows (early days: the designer comes later).
 
 ## Lights
 
@@ -51,6 +52,20 @@ them as a **fixture** and Luminorium tests them together, and later maps them as
 - **Group lights** (above the list): tick the lights, optionally name the fixture, then **Group
   as one fixture**.
 - On a fixture: **Rename**, **Ungroup**, and **Test** (all its lights on, off, then restored).
+
+## Palettes
+
+Unfold **Palettes** under the lights, pick a palette and a room (or every light), and **Play**.
+Each light wanders through the palette's colours on its own, with long fades. **Stop** puts the
+lights back as they were.
+
+Starter palettes: Forest, Ocean, Fire, Aurora, Sunset, Team colours, Warm white. Your own go in
+the add-on's config folder (`/addon_configs/<slug>/palettes/<id>.yaml`); one with the same id as
+a starter palette replaces it. Saved shows go in `shows/`, extra effect names in `effects/`.
+
+Effects use a light's own built-in effect where it has one (a Hue "fireplace", a WiZ
+"Fireplace", a WLED "Fire 2012"), and otherwise run in software within what the light and its
+network can take. Z-Wave dimmers get slow fades, never a flood of commands.
 
 ## Safety
 

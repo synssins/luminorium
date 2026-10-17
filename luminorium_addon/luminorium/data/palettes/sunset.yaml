@@ -1,0 +1,14 @@
+id: sunset
+name: Sunset
+category: [sky, warm]
+colors:
+  - { hex: "#ff6a30", weight: 3 }   # orange
+  - { hex: "#ff3860", weight: 2 }   # coral pink
+  - { hex: "#c03080", weight: 1 }   # magenta
+  - { hex: "#6030a0", weight: 1 }   # violet dusk
+  - { kelvin: 2200, weight: 2 }     # golden hour
+brightness: [35, 75]
+transition_s: [10, 25]
+hold_s: [5, 25]
+spread: per_element
+white: { kelvin: 2200 }

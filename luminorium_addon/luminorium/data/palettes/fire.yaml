@@ -1,0 +1,13 @@
+id: fire
+name: Fire
+category: [fire, cosy]
+colors:
+  - { hex: "#ff4a00", weight: 3 }   # flame orange
+  - { hex: "#ff7a10", weight: 3 }   # amber
+  - { hex: "#ff2000", weight: 1 }   # ember red
+  - { kelvin: 1900, weight: 2 }     # glow
+brightness: [40, 85]
+transition_s: [2, 6]
+hold_s: [1, 4]
+spread: per_element
+white: { kelvin: 2000 }

@@ -7,7 +7,7 @@ are needed.
 
 ```bash
 py -3.13 -m venv .venv
-.venv/Scripts/python -m pip install aiohttp fastapi uvicorn pytest pytest-asyncio httpx ruff
+.venv/Scripts/python -m pip install aiohttp fastapi uvicorn pyyaml pytest pytest-asyncio httpx ruff
 ```
 
 The add-on's own pinned dependencies are in `luminorium_addon/requirements.txt`.
@@ -23,6 +23,10 @@ The add-on's own pinned dependencies are in `luminorium_addon/requirements.txt`.
 | `tests/test_inventory.py` | The builder on the real-house fixtures: floors, exclusions, switches, settings, segments, duplicates, Z-Wave and Hue profiles, user choices |
 | `tests/test_governor.py` | Latest value wins, priorities, restore skips the per-light wait, network budget, cancel |
 | `tests/test_safety.py` | Test button sequence and restore, relays, refusals, outside changes, Stop all, crash recovery, read-only, reconnect |
+| `tests/test_color.py` | Conversions, OKLab blending, rendering to xy/hs/rgb/rgbw/rgbww/white-only/dimmer/relay lights, the perceptual threshold |
+| `tests/test_effects_palettes.py` | Effect resolution per integration and fallbacks, user effect files, palette determinism and range, starter palettes, the YAML library |
+| `tests/test_planner.py` | The planner on simulated time: Z-Wave budget, one fade per palette change, low-pass for slow lights, threshold, steps without transitions, latency compensation |
+| `tests/test_engine.py` | The engine on the fake HA: palettes, seeds, dip restore, effects and fallback, overlap, fixtures, Stop all, outside changes, `on_end`, the API |
 | `tests/test_web.py` | API endpoints, include/exclude, pages, the ingress-only allow-list |
 | `tests/test_driver_z2m.py` | MQTT client and z2m driver against the fake broker: names by IEEE (trailing space), payloads, groups, bridge offline, reconnect, bad credentials, read-only |
 | `tests/test_driver_zwave.py` | Z-Wave JS driver against the fake server: URL fallback, durations only on v2+, multicast by security class, read-back and resend, latest value wins over a read-back, read-only |
@@ -41,7 +45,8 @@ The add-on's own pinned dependencies are in `luminorium_addon/requirements.txt`.
 A websocket server speaking HA's protocol from the fixtures:
 - auth (token `fake-token`), the four registry lists, `get_states`, `subscribe_events`, `ping`
 - `zwave_js/node_status` and `zwave_js/node_capabilities`
-- `call_service` for `light.turn_on/turn_off` and `switch.turn_on/turn_off`: updates its states,
+- `call_service` for `light.turn_on/turn_off` and `switch.turn_on/turn_off`: updates its states
+  (brightness, xy, hs, rgb, rgbw, rgbww, colour temperature, effect),
   emits `state_changed` with the call's context, records each call (`fake.calls`,
   `fake.calls_for(entity_id)`)
 - `latency` per entity and `default_latency` to delay state changes
