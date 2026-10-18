@@ -353,7 +353,10 @@ CAD layout"):
     green (back) or blue (up) arrows at its front left bottom corner to move it that way only; or
     type **Move by** across, back and up. The distance moved shows as you drag. Faces, and a moved
     block's sides, snap flush to another block's faces within 6"; hold Alt to stop snapping.
-    **Delete** removes it. **Windows and doors** sit on the front wall of the block they're in
+    **Delete** removes it. Blocks don't go into one another: a moved block stops face to face
+    against the next, and a dragged face stops at the next block's face. Where two blocks meet
+    face to face they share that face: dragging it (or typing **Out**/**In**) moves both, one
+    growing as the other shrinks (neither below a foot). Alt drags freely. **Windows and doors** sit on the front wall of the block they're in
     (the one around their middle, across and up, as on the front photo; `massing.openings[].y`),
     so pushing that wall back takes them with it. In Shape, tap one to pick it (orange): drag it
     along its wall an inch at a time (Alt: free), or type its kind, width, height, how far from

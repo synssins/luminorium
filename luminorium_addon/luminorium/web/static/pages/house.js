@@ -180,12 +180,15 @@
       onFace: async (id, face, delta, done, alt) => {
         const b = house.massing && house.massing.blocks.find((q) => q.id === id);
         if (!b) return;
-        if (!ui.faceBase || ui.faceBase.id !== id) ui.faceBase = { ...b };
+        if (!ui.faceBase || ui.faceBase.id !== id || ui.faceBase.face !== face) {
+          ui.faceBase = { ...b, face, links: touching(b, face).map((o) => ({ id: o.id, base: { ...o } })) };
+        }
         const base = ui.faceBase;
-        const change = alt ? faceChange(base, face, delta) : snapChange(base, faceChange(base, face, delta));
+        const { change, others } = faceEdit(base, face, delta, alt, alt ? [] : base.links);
         Object.assign(b, change);
+        for (const o of others) Object.assign(house.massing.blocks.find((q) => q.id === o.id), o.change);
         view3d.setScene(scene3d());
-        if (done) { ui.faceBase = null; await changeBlock(id, change); }
+        if (done) { ui.faceBase = null; for (const o of others) await changeBlock(o.id, o.change, true); await changeBlock(id, change); }
       },
       onBlockMove: async (id, dx, dy, dz, done, alt) => {
         const b = house.massing && house.massing.blocks.find((q) => q.id === id);
@@ -193,7 +196,7 @@
         if (!b.behind) { if (done) toast("This block is drawn on the front photo: move it there, or drag its faces here"); return; }
         if (!ui.faceBase || ui.faceBase.id !== id) ui.faceBase = { ...b };
         const base = ui.faceBase;
-        const m = alt ? { dx, dy, dz } : snapMove(base, dx, dy, dz);
+        const m = alt ? { dx, dy, dz } : unoverlap(base, snapMove(base, dx, dy, dz));
         const change = moveChange(base, m);
         Object.assign(b, change);
         view3d.setScene(scene3d());
@@ -373,8 +376,87 @@
       dz: dz ? pick("z", b.z0, b.z1, dz) : 0,
     };
   }
-  async function changeBlock(id, change) {
+  // ---- blocks meet face to face: no overlaps, and a shared face moves both blocks -------------
+
+  const box = (b) => ({ x0: b.x0, x1: b.x1, y0: b.y0 || 0, y1: (b.y0 || 0) + b.depth, z0: b.z0, z1: b.z1 });
+  const over = (a0, a1, b0, b1, m = 0.05) => Math.min(a1, b1) - Math.max(a0, b0) > m;
+  // Which face of another block sits against this face: x1 meets their x0, the back (depth) their
+  // front, and so on
+  const FACING = { x1: ["x", "x1", "x0"], x0: ["x", "x0", "x1"], depth: ["y", "y1", "y0"], y0: ["y", "y0", "y1"], z1: ["z", "z1", "z0"], z0: ["z", "z0", "z1"] };
+  function touching(b, face) {
+    const [axis, mine, theirs] = FACING[face], A = box(b);
+    const others = ["x", "y", "z"].filter((k) => k !== axis);
+    return house.massing.blocks.filter((o) => {
+      if (o.id === b.id) return false;
+      const B = box(o);
+      return Math.abs(B[theirs] - A[mine]) < 0.03 && others.every((k) => over(A[`${k}0`], A[`${k}1`], B[`${k}0`], B[`${k}1`]));
+    });
+  }
+  // A face dragged or typed: the block's change, plus the blocks whose faces it shares (they move
+  // with it, one growing as the other shrinks), and no further than the next block's face
+  function faceEdit(base, face, delta, alt, links) {
+    let change = alt ? faceChange(base, face, delta) : snapChange(base, faceChange(base, face, delta));
+    const [axis, mine, theirs] = FACING[face];
+    const A0 = box(base);
+    const val = (c) => box({ ...base, ...c })[mine];
+    let v = val(change);
+    if (!alt) {
+      // not into a block that isn't sharing this face
+      const others = ["x", "y", "z"].filter((k) => k !== axis);
+      const out = mine.endsWith("1") ? 1 : -1;
+      for (const o of house.massing.blocks) {
+        if (o.id === base.id || links.some((l) => l.id === o.id)) continue;
+        const B = box(o);
+        if (!others.every((k) => over(A0[`${k}0`], A0[`${k}1`], B[`${k}0`], B[`${k}1`]))) continue;
+        const wall = B[theirs];
+        if (out > 0 && wall >= A0[mine] - 0.03 && v > wall) v = wall;
+        if (out < 0 && wall <= A0[mine] + 0.03 && v < wall) v = wall;
+      }
+      // a shared face can't squeeze its neighbour below a foot
+      for (const l of links) { const B = box(l.base); if (out > 0) v = Math.min(v, B[`${axis}1`] - 0.3); else v = Math.max(v, B[`${axis}0`] + 0.3); }
+      change = setFace(base, face, v);
+    }
+    const others = links.map((l) => ({ id: l.id, change: setFace(l.base, FACING[face][2] === "y0" ? "y0" : FACING[face][2] === "y1" ? "depth" : FACING[face][2], v) }));
+    return { change, others };
+  }
+  // A face of a block moved to v (absolute), as a change
+  function setFace(b, face, v) {
+    const y0 = b.y0 || 0, y1 = y0 + b.depth;
+    if (face === "x0") return { x0: v };
+    if (face === "x1") return { x1: v };
+    if (face === "z0") return { z0: v };
+    if (face === "z1") return { z1: v };
+    if (face === "y0") return { y0: v, depth: Math.max(0.3, y1 - v) };
+    if (face === "depth") return { depth: Math.max(0.3, v - y0) };
+    return {};
+  }
+  // A whole block moved: pushed back out of any block it would go into
+  function unoverlap(b, m) {
+    const out = { ...m };
+    for (let k = 0; k < 4; k++) {
+      const A = box({ ...b, ...moveChange(b, out) });
+      let hit = null;
+      for (const o of house.massing.blocks) {
+        if (o.id === b.id) continue;
+        const B = box(o);
+        if (!["x", "y", "z"].every((a) => over(A[`${a}0`], A[`${a}1`], B[`${a}0`], B[`${a}1`], 0.01))) continue;
+        // the least way out, along an axis it's moving on
+        let best = null;
+        for (const a of ["x", "y", "z"]) {
+          if (!out[`d${a}`]) continue;
+          const pen = out[`d${a}`] > 0 ? A[`${a}1`] - B[`${a}0`] : -(B[`${a}1`] - A[`${a}0`]);
+          if (!best || Math.abs(pen) < Math.abs(best.pen)) best = { a, pen };
+        }
+        if (best) { hit = best; break; }
+      }
+      if (!hit) break;
+      out[`d${hit.a}`] -= hit.pen;
+    }
+    return out;
+  }
+  async function changeBlock(id, change, quiet = false) {
     const ok = await run(async () => { house = await api(`api/house/blocks/${encodeURIComponent(id)}`, { method: "PUT", body: change }); return true; });
+    if (quiet && ok) return;
     if (!ok) house = await api("api/house");
     if (facade) facade.load(house.facade); // keep the front photo's drawing in step
     paint();
@@ -422,6 +504,13 @@
       el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, moveChange(b, { dx: v.across, dy: v.back, dz: v.up })) } }, "Move"),
       el("span.small.muted", "Less than 0 moves the other way (left, toward the street, down). In the view: drag the block across the ground, Shift+drag it up or down, or drag one of its arrows; hold Alt to stop snapping."));
   }
+  // A face moved by a typed amount: as dragging does (shared faces too, not into a block)
+  async function typedFace(b, face, delta) {
+    const links = touching(b, face).map((o) => ({ id: o.id, base: { ...o } }));
+    const { change, others } = faceEdit({ ...b }, face, delta, true, links);
+    for (const o of others) await changeBlock(o.id, o.change, true);
+    await changeBlock(b.id, change);
+  }
   function blockPanel(b) {
     const fmt = L.fmtLen;
     const faces = view3d ? view3d.blockFaces(b) : [];
@@ -443,8 +532,8 @@
         el("h3", "Move a face"),
         el("select.input", { on: { change: (e) => { ui.moveFace = e.target.value; } } }, faces.map((f) => el("option", { value: f.face, selected: f.face === ui.moveFace ? "" : null }, f.label))),
         el("div.row", { style: { gap: "8px" } }, amountInput,
-          el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, faceChange(b, ui.moveFace, amount)) } }, "Out"),
-          el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, faceChange(b, ui.moveFace, -amount)) } }, "In")),
+          el("button.btn.small", { type: "button", on: { click: () => typedFace(b, ui.moveFace, amount) } }, "Out"),
+          el("button.btn.small", { type: "button", on: { click: () => typedFace(b, ui.moveFace, -amount) } }, "In")),
         el("span.small.muted", b.behind ? "Or drag a yellow handle in the view." : "Or drag a yellow handle in the view. This block is drawn on the front photo, so it moves there.")),
       b.behind ? moveByBox(b) : null,
       el("section", { "aria-label": "Split", style: { display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },

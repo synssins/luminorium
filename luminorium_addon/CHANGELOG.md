@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.38
+
+- **Blocks meet face to face:** a moved block stops against the next instead of going into it,
+  and a dragged face stops at the next block. Two blocks that touch share that face: drag it (or
+  type Out/In) and both change, one growing as the other shrinks. Alt still drags freely.
+
 ## 0.3.0-dev.37
 
 - **3D, easier to read:** each level's floor lies only under its own blocks (no more basement
