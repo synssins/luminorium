@@ -1888,7 +1888,9 @@ function stairInfo(t, floors) {
   const run = along === "x" ? t.x1 - t.x0 : t.y1 - t.y0;
   const width = along === "x" ? t.y1 - t.y0 : t.x1 - t.x0;
   const f0 = floors.find((f) => f.id === t.level), f1 = floors.find((f) => f.id === t.to);
-  const rise = f0 && f1 ? Math.abs(f1.elevation - f0.elevation) : 0;
+  // between two blocks' floors (set in 3D), else the levels'
+  const z0 = t.z0 ?? (f0 && f0.elevation), z1 = t.z1 ?? (f1 && f1.elevation);
+  const rise = z0 != null && z1 != null ? Math.abs(z1 - z0) : 0;
   const steps = t.steps || (rise ? Math.max(1, Math.round(rise / 0.19) - 1) : Math.max(1, Math.round(run / 0.28)));
   const riser = t.riser || (rise ? rise / (steps + 1) : 0.19);
   return { run, width, rise, steps, tread: run / steps, riser, climb: riser * (steps + 1) };

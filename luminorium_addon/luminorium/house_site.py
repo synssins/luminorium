@@ -221,6 +221,14 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
             st["steps"] = int(_num(t.get("steps"), 1, 60))
         if t.get("riser") is not None:
             st["riser"] = _num(t.get("riser"), 0.05, 0.4)
+        # Between two blocks' floors (a landing a few steps down): the heights they run between,
+        # and the blocks, instead of the levels' floors
+        for key in ("z0", "z1"):
+            if t.get(key) is not None:
+                st[key] = _num(t.get(key), -20, 40)
+        for key in ("from_block", "to_block"):
+            if t.get(key):
+                st[key] = _id(t.get(key))
         stairs.append(st)
     out["stairs"] = stairs
     return out

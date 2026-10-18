@@ -639,6 +639,8 @@ class HouseService:
             blk = {"id": ident(b.get("id")), "name": ident(b.get("name"), 60), **rect(b)}
             if b.get("behind"):
                 blk["behind"] = True  # behind another block: not on the photo
+            if b.get("group"):
+                blk["group"] = ident(b["group"])  # joined with the blocks in the same group
             for key in ("floor", "level"):
                 # level: the HA floor this part of the house belongs to; floor: the HA floor
                 # whose floor is this block's bottom (a basement in the ground)
@@ -839,6 +841,12 @@ class HouseService:
             new["depth"] = depth
         if "name" in change:
             new["name"] = str(change["name"] or "")[:60]
+        if "group" in change:
+            # joined to other blocks (one shape, moved together), or not
+            if change["group"]:
+                new["group"] = str(change["group"])[:40]
+            else:
+                new.pop("group", None)
         if "level" in change:
             if change["level"] and change["level"] not in self.floors():
                 raise HouseError(f"unknown floor {change['level']}")
@@ -974,6 +982,8 @@ class HouseService:
                 # drawn bottom
                 w["z0"] = round(w["z0"] - b["below"], 3)
                 w["below"] = b["below"]
+            if b.get("group"):
+                w["group"] = b["group"]
             if b.get("level"):
                 # a space inside a level, with its own floor (a landing, storage over the entry)
                 w["level"] = b["level"]

@@ -98,6 +98,8 @@
       selBlock: ui.mode3d === "shape" ? ui.block : null,
       selOpening: ui.mode3d === "shape" ? ui.opening : null,
       selYard: ui.mode3d === "shape" ? ui.yard : null,
+      selStair: ui.mode3d === "shape" ? ui.stair : null,
+      blockPicks: ui.mode3d === "shape" ? ui.blockPicks || [] : [],
       // a block picked in Shape: everything above its top is hidden, to see into it
       // (the solid view: the level shown cuts at its ceiling, to look into its rooms)
       cutZ: (() => {
@@ -141,7 +143,29 @@
         view3d.setScene(scene3d());
         if (done) { if (part === null) await placeItem(at); else await placePart(part, at); }
       },
-      onBlock: (id) => { ui.block = id; ui.opening = null; ui.yard = null; ui.yardPicks = []; paint(); },
+      onBlock: (id, ctrl) => {
+        ui.opening = null; ui.yard = null; ui.yardPicks = []; ui.stair = null;
+        if (ctrl && id) {
+          // Ctrl (or ⌘) + tap: pick several blocks, to join them
+          const now = ui.blockPicks && ui.blockPicks.length ? [...ui.blockPicks] : ui.block ? [ui.block] : [];
+          const i = now.indexOf(id);
+          if (i >= 0) now.splice(i, 1); else now.push(id);
+          ui.blockPicks = now.length > 1 ? now : [];
+          ui.block = now[now.length - 1] || null;
+        } else { ui.block = id; ui.blockPicks = []; }
+        paint();
+      },
+      onStair: (id) => { ui.stair = id; ui.block = null; ui.blockPicks = []; ui.opening = null; ui.yard = null; ui.yardPicks = []; paint(); },
+      onStairMove: async (id, dx, dy, done, alt) => {
+        const st = house.top && (house.top.stairs || []).find((q) => q.id === id);
+        if (!st) return;
+        if (!ui.stairBase || ui.stairBase.id !== id) ui.stairBase = { ...st };
+        const b = ui.stairBase, sx = alt ? dx : L.snapLen(dx), sy = alt ? dy : L.snapLen(dy);
+        const mv = (q) => { q.x0 = r3(b.x0 + sx); q.x1 = r3(b.x1 + sx); q.y0 = r3(b.y0 + sy); q.y1 = r3(b.y1 + sy); };
+        mv(st);
+        view3d.setScene(scene3d());
+        if (done) { ui.stairBase = null; await saveSite((s) => { const q = s.stairs.find((x) => x.id === id); if (!q) return false; mv(q); }); }
+      },
       onOpening: (id) => { ui.opening = id; ui.block = null; ui.yard = null; ui.yardPicks = []; paint(); },
       // a flat yard shape: tap to pick it; Ctrl (or ⌘) + tap to pick several, to merge them
       onYard: (id, ctrl) => {
@@ -205,11 +229,16 @@
         if (!b.behind) { if (done) toast("This block is drawn on the front photo: move it there, or drag its faces here"); return; }
         if (!ui.faceBase || ui.faceBase.id !== id) ui.faceBase = { ...b };
         const base = ui.faceBase;
-        const m = alt ? { dx, dy, dz } : unoverlap(base, snapMove(base, dx, dy, dz));
+        // joined to others: they all go together, and only bump into blocks outside the group
+        if (!ui.groupBase || ui.groupBase.id !== id) ui.groupBase = { id, members: b.group ? house.massing.blocks.filter((q) => q.group === b.group && q.id !== id).map((q) => ({ ...q })) : [] };
+        const skip = new Set([id, ...ui.groupBase.members.map((q) => q.id)]);
+        const m = alt ? { dx, dy, dz } : unoverlap(base, snapMove(base, dx, dy, dz), skip);
         const change = moveChange(base, m);
         Object.assign(b, change);
+        const moves = ui.groupBase.members.map((q) => ({ id: q.id, change: moveChange(q, m) }));
+        for (const mm of moves) Object.assign(house.massing.blocks.find((q) => q.id === mm.id), mm.change);
         view3d.setScene(scene3d());
-        if (done) { ui.faceBase = null; await changeBlock(id, change); }
+        if (done) { ui.faceBase = null; ui.groupBase = null; for (const mm of moves) await changeBlock(mm.id, mm.change, true); await changeBlock(id, change); }
       },
       onAimAt: async (point, what) => {
         const t = target(ui.sel);
@@ -440,13 +469,13 @@
     return {};
   }
   // A whole block moved: pushed back out of any block it would go into
-  function unoverlap(b, m) {
+  function unoverlap(b, m, skip = new Set([b.id])) {
     const out = { ...m };
     for (let k = 0; k < 4; k++) {
       const A = box({ ...b, ...moveChange(b, out) });
       let hit = null;
       for (const o of house.massing.blocks) {
-        if (o.id === b.id) continue;
+        if (skip.has(o.id)) continue;
         const B = box(o);
         if (!["x", "y", "z"].every((a) => over(A[`${a}0`], A[`${a}1`], B[`${a}0`], B[`${a}1`], 0.01))) continue;
         // the least way out, along an axis it's moving on
@@ -513,6 +542,93 @@
       el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, moveChange(b, { dx: v.across, dy: v.back, dz: v.up })) } }, "Move"),
       el("span.small.muted", "Less than 0 moves the other way (left, toward the street, down). In the view: drag the block across the ground, Shift+drag it up or down, or drag one of its arrows; hold Alt to stop snapping."));
   }
+  // ---- joined blocks and stairs between their floors -------------------------------------------
+
+  // The picked blocks as one shape: one outline, no walls between them, moved together; each
+  // keeps its own floor
+  async function joinBlocks(ids) {
+    const blocks = ids.map((id) => house.massing.blocks.find((q) => q.id === id)).filter(Boolean);
+    if (blocks.length < 2) return;
+    const group = (blocks.find((q) => q.group) || {}).group || Math.random().toString(36).slice(2, 10);
+    // everything already joined to any of them comes too
+    const all = house.massing.blocks.filter((q) => blocks.includes(q) || (q.group && blocks.some((b) => b.group === q.group)));
+    for (const q of all.slice(0, -1)) await changeBlock(q.id, { group }, true);
+    await changeBlock(all[all.length - 1].id, { group });
+    ui.blockPicks = []; ui.block = blocks[blocks.length - 1].id;
+    toast("Joined. They move together now, and each keeps its own floor. Add stairs between them from the tool bar.");
+  }
+  async function unjoin(b) {
+    const all = house.massing.blocks.filter((q) => q.group && q.group === b.group);
+    for (const q of all.slice(0, -1)) await changeBlock(q.id, { group: null }, true);
+    if (all.length) await changeBlock(all[all.length - 1].id, { group: null });
+  }
+  // Where stairs can lead from a block: the other blocks (their floors) and the levels
+  function stairTargets(b) {
+    const bl = house.massing.blocks.filter((q) => q.id !== b.id).map((q, i) => ({ key: `b:${q.id}`, label: q.name || `Block ${i + 1}`, z: q.z0, block: q }));
+    const lv = house.floors.map((f) => ({ key: `l:${f.id}`, label: f.name, z: f.elevation, level: f.id }));
+    return [...bl, ...lv];
+  }
+  function levelAt(z) { return [...house.floors].sort((a, c) => c.elevation - a.elevation).find((f) => f.elevation <= z + 0.05) || house.floors[0]; }
+  // New stairs in the picked block, from its floor to the nearest floor below (a block it's joined
+  // to first): sized from the drop, a step about 7 1/2" and a tread 11"
+  async function addStairs(b) {
+    if (!house.site) { toast("Set up the Top view first (its photo and scale): stairs are kept there"); return; }
+    const mates = b.group ? house.massing.blocks.filter((q) => q.group === b.group && q.id !== b.id && Math.abs(q.z0 - b.z0) > 0.1) : [];
+    const target = mates[0] ? { z: mates[0].z0, block: mates[0] } : (() => { const f = [...house.floors].sort((x, y) => y.elevation - x.elevation).find((q) => q.elevation < b.z0 - 0.1); return f ? { z: f.elevation, level: f.id } : null; })();
+    if (!target) { toast("Nothing below this block's floor for stairs to go to"); return; }
+    const rise = Math.abs(b.z0 - target.z), steps = Math.max(1, Math.round(rise / 0.19) - 1), run = steps * 0.2794, w = 0.9144;
+    const y0 = b.y0 || 0;
+    // toward the block it leads to, else toward the front
+    let dir = "y-";
+    if (target.block) {
+      const tb = target.block, dxc = (tb.x0 + tb.x1) / 2 - (b.x0 + b.x1) / 2, dyc = ((tb.y0 || 0) + tb.depth / 2) - (y0 + b.depth / 2);
+      dir = Math.abs(dxc) > Math.abs(dyc) ? (dxc > 0 ? "x+" : "x-") : (dyc > 0 ? "y+" : "y-");
+    }
+    const cx = (b.x0 + b.x1) / 2, cy = y0 + b.depth / 2;
+    const along = dir[0] === "x";
+    const st = {
+      id: Math.random().toString(36).slice(2, 10), level: (b.level || levelAt(b.z0).id), to: target.level || null, dir,
+      x0: r3(along ? cx - run / 2 : cx - w / 2), x1: r3(along ? cx + run / 2 : cx + w / 2), y0: r3(along ? cy - w / 2 : cy - run / 2), y1: r3(along ? cy + w / 2 : cy + run / 2),
+      steps, z0: r3(b.z0), z1: r3(target.z), from_block: b.id, ...(target.block ? { to_block: target.block.id } : {}),
+    };
+    ui.block = null; ui.stair = st.id;
+    await saveSite((s) => { s.stairs.push(st); });
+    toast(`Added ${steps} steps down. Drag them where they are; set where they lead and their steps in the panel.`);
+  }
+  function stairPanel(st) {
+    const fmt = L.fmtLen;
+    const from = house.massing.blocks.find((q) => q.id === st.from_block);
+    const fromZ = st.z0 ?? (floorsById().get(st.level) || {}).elevation ?? 0;
+    const toZ = st.z1 ?? (floorsById().get(st.to) || {}).elevation ?? 0;
+    const rise = Math.abs(toZ - fromZ);
+    const along = st.dir[0];
+    const run = along === "x" ? st.x1 - st.x0 : st.y1 - st.y0, width = along === "x" ? st.y1 - st.y0 : st.x1 - st.x0;
+    const steps = st.steps || Math.max(1, Math.round(rise / 0.19) - 1), tread = run / steps, riser = st.riser || rise / (steps + 1);
+    const edit = (fn) => saveSite((s) => { const q = s.stairs.find((x) => x.id === st.id); if (!q) return false; if (fn(q) === false) s.stairs = s.stairs.filter((x) => x.id !== st.id); });
+    // the bottom stays: the run grows or shrinks from the other end
+    const setRun = (q, n, tr) => { q.steps = n; const len = n * tr; if (q.dir[1] === "+") q[`${along}1`] = r3(q[`${along}0`] + len); else q[`${along}0`] = r3(q[`${along}1`] - len); };
+    const targets = from ? stairTargets(from) : house.floors.map((f) => ({ key: `l:${f.id}`, label: f.name, z: f.elevation, level: f.id }));
+    const cur = st.to_block ? `b:${st.to_block}` : st.to ? `l:${st.to}` : "";
+    const len = (label, value, set) => el("label.field", el("span", label), el("input.input", { value: fmt(value), inputmode: "decimal",
+      on: { change: (e) => { const v = L.parseLen(e.target.value); if (!(v > 0.02)) { toast("Give a length, like 7 1/2\""); e.target.value = fmt(value); return; } edit((q) => set(q, v)); } } }));
+    return el("aside.card.accent.hm-insp", { "aria-label": "Picked stairs" },
+      el("div", el("h2", "Stairs"), el("span.small.muted", `From ${from ? from.name || "a block" : (floorsById().get(st.level) || {}).name || "a level"} · ${fmt(rise)} ${toZ < fromZ ? "down" : "up"}`)),
+      el("label.field", el("span", "They lead to"), el("select", { on: { change: (e) => {
+        const t = targets.find((x) => x.key === e.target.value);
+        if (t) edit((q) => { q.z1 = r3(t.z); if (t.block) { q.to_block = t.block.id; q.to = null; } else { delete q.to_block; q.to = t.level; } });
+      } } }, targets.map((t) => el("option", { value: t.key, selected: t.key === cur ? "" : null }, t.label)))),
+      el("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" } },
+        len("Width", width, (q, v) => { if (along === "x") q.y1 = r3(q.y0 + v); else q.x1 = r3(q.x0 + v); }),
+        len("Tread depth", tread, (q, v) => setRun(q, steps, v)),
+        len("Step height", riser, (q, v) => { q.riser = r3(v); }),
+        el("label.field", el("span", "Steps"), el("input.input", { type: "number", min: 1, max: 60, value: steps,
+          on: { change: (e) => { const n = Math.round(Number(e.target.value)); if (!(n >= 1 && n <= 60)) { toast("1 to 60 steps"); return; } edit((q) => setRun(q, n, tread)); } } }))),
+      el("span.small.muted", "Steps: not counting the floor at the top. Drag the stairs in the view to move them."),
+      el("div.row", { style: { gap: "8px", flexWrap: "wrap" } },
+        el("button.btn", { type: "button", on: { click: () => { ui.stair = null; paint(); } } }, "Done"),
+        el("button.btn", { type: "button", on: { click: () => edit((q) => { q.dir = { "x+": "x-", "x-": "x+", "y+": "y-", "y-": "y+" }[q.dir]; }) } }, "Turn round"),
+        el("button.btn.danger", { type: "button", on: { click: () => { ui.stair = null; edit(() => false); } } }, "Delete")));
+  }
   // A face moved by a typed amount: as dragging does (shared faces too, not into a block)
   async function typedFace(b, face, delta) {
     const links = touching(b, face).map((o) => ({ id: o.id, base: { ...o } }));
@@ -534,6 +650,9 @@
     let off = Math.abs(b.offset || 0.6096);
     return el("aside.card.accent.hm-insp", { "aria-label": "Picked house block" },
       el("div", el("h2", b.name || "House block"), el("span.small.muted", b.behind ? "Behind another block (not on the front photo)" : "From the front photo")),
+      b.group ? el("div.row", { style: { gap: "8px", alignItems: "center" } },
+        el("span.small", `Joined with ${house.massing.blocks.filter((q) => q.group === b.group && q.id !== b.id).length} other block(s): they move together.`),
+        el("button.btn.small", { type: "button", on: { click: () => unjoin(b) } }, "Unjoin")) : null,
       el("label.field", el("span", "Name"), el("input.input", { value: b.name || "", on: { change: (e) => changeBlock(b.id, { name: e.target.value }) } })),
       el("dl", { class: "fc-kv" }, el("dt", "Width"), el("dd", fmt(b.x1 - b.x0)), el("dt", "Front to back"), el("dd", fmt(b.depth)),
         el("dt", "Height"), el("dd", fmt(b.z1 - b.z0)), el("dt", "Top"), el("dd", `${fmt(b.z1)} up`)),
@@ -928,6 +1047,17 @@
         el("button.btn.danger", { type: "button", on: { click: () => { ui.opening = null; changeOpening(o.id, () => false); } } }, "Delete")));
   }
   function inspector() {
+    if (ui.view === "3d" && ui.mode3d === "shape" && ui.blockPicks && ui.blockPicks.length > 1) {
+      const names = ui.blockPicks.map((id, i) => (house.massing.blocks.find((q) => q.id === id) || {}).name || `Block ${i + 1}`);
+      return el("aside.card.accent.hm-insp", { "aria-label": "Picked blocks" }, el("h2", `${ui.blockPicks.length} blocks picked`), el("span.small", names.join(", ")),
+        el("span.small.muted", "Join makes them one shape: one outline, no wall between them, moved together. Each keeps its own floor, so a landing a few steps down stays a few steps down."),
+        el("div.row", { style: { gap: "8px" } }, el("button.btn.primary", { type: "button", on: { click: () => joinBlocks(ui.blockPicks) } }, "Join"),
+          el("button.btn", { type: "button", on: { click: () => { ui.blockPicks = []; paint(); } } }, "Cancel")));
+    }
+    if (ui.view === "3d" && ui.mode3d === "shape" && ui.stair) {
+      const st = house.top && (house.top.stairs || []).find((q) => q.id === ui.stair);
+      if (st) return stairPanel(st);
+    }
     if (ui.view === "3d" && ui.mode3d === "shape" && ui.yardPicks && ui.yardPicks.length > 1) return yardManyPanel(ui.yardPicks);
     if (ui.view === "3d" && ui.mode3d === "shape" && ui.yard) {
       const y = yardShape(ui.yard);
@@ -1081,6 +1211,8 @@
     blocks: "M3 20V10h8v10M11 20V6h10v14M3 20h18",
     yard: "M12 3a5 5 0 0 0-5 5c0 3 5 9 5 9s5-6 5-9a5 5 0 0 0-5-5zM4 21h16",
     fold: "M15 6l-6 6 6 6",
+    join: "M3 6h8v12H3zM13 6h8v12h-8zM11 12h2",
+    stairs: "M4 20h4v-4h4v-4h4V8h4",
     dims: "M3 7v10M21 7v10M3 12h18M7 9l-4 3 4 3M17 9l4 3-4 3",
     solid: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9",
     path: "M4 20c4-2 4-6 8-8s4-6 8-8",
@@ -1093,7 +1225,7 @@
       disabled: disabled ? "" : null, on: { click } }, svgI(iconD), el("span", label));
   }
   function pickedBlock() { return ui.block && house.massing ? house.massing.blocks.find((q) => q.id === ui.block) || null : null; }
-  function setMode3d(k) { ui.mode3d = k; if (k !== "shape") { ui.block = null; ui.opening = null; ui.yard = null; ui.yardPicks = []; } ui.aiming = false; paint(); }
+  function setMode3d(k) { ui.mode3d = k; if (k !== "shape") { ui.block = null; ui.opening = null; ui.yard = null; ui.yardPicks = []; ui.stair = null; ui.blockPicks = []; } ui.aiming = false; paint(); }
   // The 3D view's tools, in groups, with the level shown at the right
   function tools3d() {
     const b = ui.mode3d === "shape" ? pickedBlock() : null;
@@ -1107,6 +1239,8 @@
         tool("Shape", I.shape, { pressed: ui.mode3d === "shape", title: "Pick a house block and drag its faces", click: () => setMode3d("shape") })),
       grp(tool("Add block", I.add, { disabled: !house.massing, title: house.massing ? "Add a house block (beside the picked one)" : "Draw the house on the Front photo first",
         click: () => { ui.mode3d = "shape"; addBlock(b); } }),
+        tool("Join", I.join, { disabled: !(ui.mode3d === "shape" && ui.blockPicks && ui.blockPicks.length > 1), title: "Ctrl+click two or more blocks, then join them into one shape", click: () => joinBlocks(ui.blockPicks) }),
+        tool("Stairs", I.stairs, { disabled: !b, title: b ? "Add stairs in the picked block, down to the floor below it" : "Pick a block in Shape first", click: () => addStairs(b) }),
         tool("Split", I.split, { disabled: !b, title: b ? "Split the picked block front to back, in half (set where in the panel)" : "Pick a block in Shape first",
           click: () => splitBlock(b.id, Math.round((b.depth / 2) / 0.0254) * 0.0254) })),
       grp(tool("Add path", I.path, { title: "Add a path or walkway on the ground", click: () => addYard("path") }),

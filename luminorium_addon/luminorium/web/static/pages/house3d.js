@@ -300,6 +300,23 @@ window.House3D = class House3D {
     }
     return null;
   }
+  // Stairs under a screen point: on their lower floor, inside their footprint
+  hitStairs(sx, sy) {
+    const t = this.scene.top;
+    if (!t) return null;
+    const levels = new Map(this.scene.floors.map((f) => [f.id, f]));
+    for (const st of t.stairs || []) {
+      if (!st.id) continue;
+      const a = st.z0 != null ? st.z0 : (levels.get(st.level) || {}).elevation, b = st.z1 != null ? st.z1 : (levels.get(st.to) || {}).elevation;
+      if (a == null || b == null) continue;
+      // any height up the flight: check a few
+      for (const k of [0.15, 0.5, 0.85]) {
+        const at = this.onPlane(sx, sy, a + (b - a) * k);
+        if (at && at.x >= st.x0 && at.x <= st.x1 && at.y >= st.y0 && at.y <= st.y1) return { id: st.id, z: a + (b - a) * k };
+      }
+    }
+    return null;
+  }
   // The picked flat shape's corners: [{part, i, at}] (part -1 is its own line or outline)
   yardCorners() {
     const t = this.scene.top, id = this.scene.selYard;
@@ -609,10 +626,20 @@ window.House3D = class House3D {
       this.poly(hole, col.bg, 0.92, col.line2, 1);
     }
     const cut = this.scene.cutZ ?? Infinity;
+    const selB = this.scene.massing.blocks.find((q) => q.id === this.scene.selBlock);
+    const picks = this.scene.blockPicks || [];
     for (const b of this.scene.massing.blocks) {
       const { x0, x1, z0, z1 } = b;
       if (z0 >= cut - 0.05) continue;
       const y0 = b.y0 || 0, y1 = y0 + b.depth;
+      // the faces it shares with a block it's joined to aren't walls
+      const inner = joinedFaces(b, this.scene.massing.blocks);
+      const inGroup = selB && b.id !== selB.id && b.group && b.group === selB.group;
+      if (inGroup || (picks.includes(b.id) && b.id !== this.scene.selBlock)) {
+        const P8 = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]].map(([x, y, z]) => P(x, y, z));
+        const E = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
+        items.push({ depth: -1e9, draw: () => { for (const [i, j] of E) this.line(P8[i], P8[j], inGroup ? "#ffd166" : "#ffffff", inGroup ? 1.5 : 2, inGroup ? [5, 4] : []); } });
+      }
       if (b.id && b.id === this.scene.selBlock) {
         // the block picked in Shape: its outline in the accent colour
         const P8 = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]].map(([x, y, z]) => P(x, y, z));
@@ -622,14 +649,16 @@ window.House3D = class House3D {
       if (solid) {
         // walls cut off at the level shown, like a dollhouse with the floors above lifted off
         const top = Math.min(z1, cut);
-        wallFace([x0, y0], [x1, y0], z0, top); wallFace([x1, y1], [x0, y1], z0, top);
-        wallFace([x0, y1], [x0, y0], z0, top); wallFace([x1, y0], [x1, y1], z0, top);
+        if (!inner.y0) wallFace([x0, y0], [x1, y0], z0, top);
+        if (!inner.y1) wallFace([x1, y1], [x0, y1], z0, top);
+        if (!inner.x0) wallFace([x0, y1], [x0, y0], z0, top);
+        if (!inner.x1) wallFace([x1, y0], [x1, y1], z0, top);
         solidFace([[x0, y0, z0 + 0.005], [x1, y0, z0 + 0.005], [x1, y1, z0 + 0.005], [x0, y1, z0 + 0.005]], SOLID.floor);
       } else {
-        face([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], WALL, 0.08);
-        face([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], WALL, 0.06, 0.45);
-        face([[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], WALL, 0.06, 0.55);
-        face([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], WALL, 0.06, 0.55);
+        if (!inner.y0) face([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], WALL, 0.08);
+        if (!inner.y1) face([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], WALL, 0.06, 0.45);
+        if (!inner.x0) face([[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], WALL, 0.06, 0.55);
+        if (!inner.x1) face([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], WALL, 0.06, 0.55);
       }
       const lab = P(x0 + 0.2, y0, z1 + 0.15);
       if (lab && b.name) items.push({ depth: lab.depth - 0.01, draw: () => this.text(b.name, lab.x, lab.y, col.muted, 11, "left") });
@@ -713,8 +742,10 @@ window.House3D = class House3D {
     const levels = new Map(this.scene.floors.map((f) => [f.id, f]));
     // stairs: a flight of steps from one level's floor to the other's
     for (const st of t.stairs || []) {
-      const f0 = levels.get(st.level), f1 = levels.get(st.to);
+      const f0 = st.z0 != null ? { elevation: st.z0 } : levels.get(st.level), f1 = st.z1 != null ? { elevation: st.z1 } : levels.get(st.to);
       if (!f0 || !f1) continue;
+      if (Math.min(f0.elevation, f1.elevation) >= (this.scene.cutZ ?? Infinity) - 0.05) continue;
+      const pickedStair = this.scene.selStair && st.id === this.scene.selStair;
       const along = st.dir[0], sign = st.dir[1] === "+" ? 1 : -1;
       const lo = along === "x" ? st.x0 : st.y0, hi = along === "x" ? st.x1 : st.y1;
       // as the Top view's panel has them: typed steps and step height, else from the levels
@@ -728,7 +759,7 @@ window.House3D = class House3D {
         const q = along === "x"
           ? [P(s0, st.y0, z), P(s1, st.y0, z), P(s1, st.y1, z), P(s0, st.y1, z)]
           : [P(st.x0, s0, z), P(st.x1, s0, z), P(st.x1, s1, z), P(st.x0, s1, z)];
-        if (q.every(Boolean)) items.push({ depth: avgDepth(q), draw: () => this.poly(q, "#f0b429", 0.22, "#f0b429", 0.7) });
+        if (q.every(Boolean)) items.push({ depth: avgDepth(q), draw: () => this.poly(q, pickedStair ? "#ff8a3d" : "#f0b429", pickedStair ? 0.5 : 0.22, pickedStair ? "#ff8a3d" : "#f0b429", 0.8) });
       }
     }
     // interior walls: a see-through panel from each level's floor to its ceiling
@@ -925,6 +956,11 @@ window.House3D = class House3D {
           this.drag = { kind: "face", face: h, start: pt, dir: { x: (q.x - p.x) / len, y: (q.y - p.y) / len }, ppm: len, block: this.scene.selBlock };
           return;
         }
+        // the picked stairs: across, at their height
+        if (this.scene.selStair && !e.ctrlKey && !e.metaKey) {
+          const hs = this.hitStairs(pt.x, pt.y);
+          if (hs && hs.id === this.scene.selStair) { const at = this.onPlane(pt.x, pt.y, hs.z); if (at) { this.drag = { kind: "stairMove", start: pt, at0: at, z: hs.z, id: hs.id, moved: false }; return; } }
+        }
         // a corner of the picked flat shape, or the shape itself: across the ground
         const yc = this.scene.selYard ? this.hitYardCorner(pt) : null;
         if (yc) { this.drag = { kind: "yardPoint", start: pt, id: this.scene.selYard, part: yc.part, i: yc.i, moved: false }; return; }
@@ -989,6 +1025,12 @@ window.House3D = class House3D {
       if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 3) d.moved = true;
       const at = this.onPlane(pt.x, pt.y, d.z);
       if (at && d.moved) { d.dx = at.x - d.at0.x; d.dy = at.y - d.at0.y; d.dz = 0; this.h.onBlockMove && this.h.onBlockMove(d.block, d.dx, d.dy, 0, false, d.alt); }
+      return;
+    }
+    if (d.kind === "stairMove") {
+      if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 3) d.moved = true;
+      const at = this.onPlane(pt.x, pt.y, d.z);
+      if (at && d.moved) { d.at = at; this.h.onStairMove && this.h.onStairMove(d.id, at.x - d.at0.x, at.y - d.at0.y, false, d.alt); }
       return;
     }
     if (d.kind === "yardMove" || d.kind === "yardPoint") {
@@ -1088,6 +1130,7 @@ window.House3D = class House3D {
       return this.lookFrom(d.dir);
     }
     if (d.kind === "face") { if (d.delta) this.h.onFace && this.h.onFace(d.block, d.face.face, d.delta, true, d.alt); return; }
+    if (d.kind === "stairMove" && d.moved && d.at) { this.h.onStairMove && this.h.onStairMove(d.id, d.at.x - d.at0.x, d.at.y - d.at0.y, true, d.alt); return; }
     if (d.kind === "yardMove" && d.moved && d.at) { this.h.onYardMove && this.h.onYardMove(d.id, d.at.x - d.at0.x, d.at.y - d.at0.y, true, d.alt); return; }
     if (d.kind === "yardPoint" && d.moved && d.at) { this.h.onYardPoint && this.h.onYardPoint(d.id, d.part, d.i, d.at.x, d.at.y, true, d.alt); return; }
     if (d.kind === "openingMove") { if (d.moved && d.dx !== undefined && this.h.onOpeningMove) this.h.onOpeningMove(d.id, d.dx, d.dz, true, d.alt); return; }
@@ -1102,7 +1145,10 @@ window.House3D = class House3D {
         const ctrl = d.ctrl;
         const op = ctrl ? null : this.hitOpening(d.start.x, d.start.y);
         if (op && this.h.onOpening) { this.h.onOpening(op); return; }
-        const id = ctrl ? null : this.hitBlock(d.start.x, d.start.y);
+        const hs = ctrl ? null : this.hitStairs(d.start.x, d.start.y);
+        if (hs && this.h.onStair) { this.h.onStair(hs.id); return; }
+        const id = this.hitBlock(d.start.x, d.start.y);
+        if (ctrl && id && this.h.onBlock) { this.h.onBlock(id, true); return; }
         const yd = id ? null : this.hitYard(d.start.x, d.start.y);
         if (yd && this.h.onYard) { this.h.onYard(yd, ctrl); return; }
         if (this.h.onBlock) this.h.onBlock(id);
@@ -1123,6 +1169,22 @@ window.House3D = class House3D {
 };
 
 // Points along a smooth curve through pts (Catmull-Rom), in the ground's metres
+// Which faces of a block it shares with a block it's joined to (the same group)
+function joinedFaces(b, blocks) {
+  const out = { x0: false, x1: false, y0: false, y1: false };
+  if (!b.group) return out;
+  const by0 = b.y0 || 0, by1 = by0 + b.depth;
+  const over = (a0, a1, c0, c1) => Math.min(a1, c1) - Math.max(a0, c0) > 0.05;
+  for (const o of blocks) {
+    if (o === b || o.group !== b.group) continue;
+    const oy0 = o.y0 || 0, oy1 = oy0 + o.depth;
+    if (over(by0, by1, oy0, oy1) && Math.abs(o.x1 - b.x0) < 0.03) out.x0 = true;
+    if (over(by0, by1, oy0, oy1) && Math.abs(o.x0 - b.x1) < 0.03) out.x1 = true;
+    if (over(b.x0, b.x1, o.x0, o.x1) && Math.abs(oy1 - by0) < 0.03) out.y0 = true;
+    if (over(b.x0, b.x1, o.x0, o.x1) && Math.abs(oy0 - by1) < 0.03) out.y1 = true;
+  }
+  return out;
+}
 // A flat yard shape as ground outlines: an area's outline (and any merged in), a path's strips
 function flatPolys(y) {
   const pieces = [y.pts, ...(y.parts || [])];

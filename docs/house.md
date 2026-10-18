@@ -356,7 +356,17 @@ CAD layout"):
     **Delete** removes it. Blocks don't go into one another: a moved block stops face to face
     against the next, and a dragged face stops at the next block's face. Where two blocks meet
     face to face they share that face: dragging it (or typing **Out**/**In**) moves both, one
-    growing as the other shrinks (neither below a foot). Alt drags freely. **Windows and doors** sit on the front wall of the block they're in
+    growing as the other shrinks (neither below a foot). Alt drags freely.
+    **Join** (Ctrl+click two or more blocks): one shape, with no wall between them, moved
+    together; each keeps its own floor (`group` on each block). Only the blocks picked join, so a
+    landing joins the back entry block, not the whole ground floor. **Unjoin** in its panel.
+    **Stairs** (a block picked): steps from its floor down to the floor below it (a block it's
+    joined to first, else the next level down), sized from the drop (about 7 1/2" a step, 11"
+    treads), toward that block. Tap stairs to pick them: drag them where they are; their panel
+    sets where they lead (any other block's floor, or a level), width, tread depth, step height,
+    steps, **Turn round** and **Delete**. Stairs between blocks keep their heights (`z0`, `z1`,
+    `from_block`, `to_block` in `site.stairs`), so two flights from one landing at 90° to each
+    other are two stairs. **Windows and doors** sit on the front wall of the block they're in
     (the one around their middle, across and up, as on the front photo; `massing.openings[].y`),
     so pushing that wall back takes them with it. In Shape, tap one to pick it (orange): drag it
     along its wall an inch at a time (Alt: free), or type its kind, width, height, how far from

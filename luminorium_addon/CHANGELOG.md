@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0-dev.40
+
+- **Join blocks** (3D, Shape): Ctrl+click two or more and **Join**: one shape, no wall between
+  them, moved together, each keeping its own floor (a landing a few steps down stays down).
+  **Unjoin** separates them.
+- **Stairs in 3D:** with a block picked, **Stairs** adds steps from its floor down to the block
+  it's joined to (or the level below), sized from the drop. Tap stairs to pick them, drag them
+  into place, and set where they lead, their width, tread, step height and steps.
+
 ## 0.3.0-dev.39
 
 - **Solid view** (3D tool bar): a dollhouse with solid walls and floors and the roofs off, cut at

@@ -785,6 +785,11 @@ async def test_stairs_and_angled_walls_on_the_plan(client, lum):
     typed = {**site, "stairs": [{**site["stairs"][0], "steps": 12, "riser": 0.19}]}
     st = (await client.put("/api/house/site", json=typed)).json()["site"]["stairs"][0]
     assert (st["steps"], st["riser"]) == (12, 0.19)
+    # between two blocks' floors (a landing a few steps down): their heights and the blocks
+    landing = {**site["stairs"][0], "z0": 0.6, "z1": -0.15, "from_block": "a", "to_block": "b"}
+    st = (await client.put("/api/house/site", json={**site, "stairs": [landing]})).json()
+    st = st["top"]["stairs"][0]
+    assert (st["z0"], st["z1"], st["from_block"], st["to_block"]) == (0.6, -0.15, "a", "b")
     for bad in (
         {**site, "stairs": [{**site["stairs"][0], "steps": 0}]},
         {**site, "stairs": [{**site["stairs"][0], "riser": 0.9}]},
@@ -812,6 +817,11 @@ async def test_blocks_added_and_deleted_in_3d(client, lum):
     new = view["massing"]["blocks"][-1]
     assert (new["x0"], new["x1"], new["depth"], new["z1"]) == (8, 11, 4, 2.7)
     assert new["behind"] is True and new["level"] == "main_level"
+    # joined to another block, and apart again
+    joined = (await client.put(f"/api/house/blocks/{new['id']}", json={"group": "g1"})).json()
+    assert joined["massing"]["blocks"][-1]["group"] == "g1"
+    apart = (await client.put(f"/api/house/blocks/{new['id']}", json={"group": None})).json()
+    assert "group" not in apart["massing"]["blocks"][-1]
     assert view["size"]["width"] == 11  # the house is wider now
     # it moves freely
     view = (
