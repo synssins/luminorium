@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0-dev.46
+
+- **Ceilings stop light:** a beam aimed upward ends at its level's ceiling instead of rising
+  through it (and over the walls) into the level above.
+
 ## 0.3.0-dev.45
 
 - **Light types:** flush mount, can (recessed) and ceiling fan join the types. A light can be a

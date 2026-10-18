@@ -885,7 +885,10 @@ window.House3D = class House3D {
     const len = 2.5, half = Math.min(75, a.beam / 2) * Math.PI / 180, r = Math.tan(half) * len;
     // each line out of the light stops at the first wall (or the floor) in its way
     const walls = this.obstacles(l.floor, l.floorZ);
-    const clip = (v, max) => { const n = Math.hypot(...v) || 1, u = v.map((c) => c / n); const t = Math.min(max, this.rayHit3d(l, u, max, walls, l.floorZ)); return P(l.x + u[0] * t, l.y + u[1] * t, l.z + u[2] * t); };
+    // and its ceiling (inside), so it doesn't shine through into the level above
+    const lv = this.scene.floors.find((q) => q.id === l.floor);
+    const ceilZ = lv ? lv.elevation + lv.ceiling : Infinity;
+    const clip = (v, max) => { const n = Math.hypot(...v) || 1, u = v.map((c) => c / n); const t = Math.min(max, this.rayHit3d(l, u, max, walls, l.floorZ, ceilZ)); return P(l.x + u[0] * t, l.y + u[1] * t, l.z + u[2] * t); };
     const rim = Array.from({ length: 18 }, (_, i) => {
       const k = (i / 18) * Math.PI * 2, c = Math.cos(k) * r, s = Math.sin(k) * r;
       const v = [dir[0] * len + e1[0] * c + e2[0] * s, dir[1] * len + e1[1] * c + e2[1] * s, dir[2] * len + e1[2] * c + e2[2] * s];
@@ -944,10 +947,11 @@ window.House3D = class House3D {
     return best;
   }
   // How far a ray from the light (unit u) goes before a wall it meets at a height the wall has,
-  // or the floor under it
-  rayHit3d(o, u, max, walls, floorZ) {
+  // the floor under it, or the ceiling over it
+  rayHit3d(o, u, max, walls, floorZ, ceilZ = Infinity) {
     let best = max;
     if (u[2] < -1e-6) best = Math.min(best, (floorZ - o.z) / u[2]);
+    if (u[2] > 1e-6 && ceilZ > o.z) best = Math.min(best, (ceilZ - o.z) / u[2]);
     const flat = Math.hypot(u[0], u[1]);
     if (flat < 1e-6) return best;
     for (const w of walls) {

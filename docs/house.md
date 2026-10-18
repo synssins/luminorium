@@ -247,8 +247,8 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
 - **Icons** on the 3D orbs say what each light is: a bar, a spot or flood (it's aimed), else by
   its type (ceiling, flush mount, can, fan, pendant, wall, lamp, eaves, post), else a bulb.
 - **Walls stop light:** a flood's or spot's beam, and the pools of light in the solid view, end at
-  the first wall in their way: the interior walls of the light's level and the blocks' walls (a
-  beam aimed over a wall's top goes on).
+  the first wall in their way: the interior walls of the light's level and the blocks' walls, or
+  at the light's floor or ceiling (inside; an outside light has no ceiling).
 
 ## Floods and spots
 
