@@ -372,6 +372,14 @@ CAD layout"):
     height), not as a slab the size of the house; a level with no block shows just its name.
     Picking a block in Shape hides everything above its top (blocks, roofs, floors, windows,
     lights), to see into it, until it's let go.
+  - **Solid** (tool bar) makes it a dollhouse: each block a hollow room with solid walls and a
+    solid floor, no roofs, cut off at the ceiling of the level chosen at the right of the tool
+    bar (so picking a level shows its rooms; picking a block in Shape cuts at its top instead).
+    The ground is solid, with a hole where a block goes into it, so a basement is a pit lined
+    by its own walls; paths and yard shapes lie on the ground. Each light that's on throws a
+    pool of its own colour on its floor, sized and brightened by its brightness, from the
+    lights' live state (`look` in `/api/inventory`, refreshed with the page's status). No
+    shadows yet. Remembered.
   - **Dimensions** (tool bar) labels each block with across × front to back and its height.
     **Inside** takes off the walls, as a tape reads in the room: half an inside wall (2x4 with
     drywall, 4 1/2") where a block meets another face to face, an outside wall (the Top view's

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-dev.39
+
+- **Solid view** (3D tool bar): a dollhouse with solid walls and floors and the roofs off, cut at
+  the ceiling of the level you pick, so you see into its rooms. The ground is solid, and a
+  basement is a pit lined by its own walls. Each light that's on lights a pool of its own
+  colour on the floor, as bright as it is now.
+
 ## 0.3.0-dev.38
 
 - **Blocks meet face to face:** a moved block stops against the next instead of going into it,

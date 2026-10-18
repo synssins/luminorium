@@ -1,6 +1,6 @@
 name: Luminorium
 # Give every build its own version: HA reuses a cached image when the tag is unchanged.
-version: "0.3.0-dev.38"
+version: "0.3.0-dev.39"
 slug: luminorium
 description: "Light effects, shows and sequences across every light in Home Assistant"
 url: https://github.com/synssins/luminorium

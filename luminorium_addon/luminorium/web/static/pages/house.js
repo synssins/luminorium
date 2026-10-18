@@ -21,6 +21,7 @@
     folded: new Set(L.store("house.folded", [])), // levels folded away in the list
     // the panel open on the left: lights, levels, rooms, blocks, yard, or "" for none
     dims: !!L.store("house.dims", false),          // block dimensions shown in 3D
+    solid: !!L.store("house.solid", false),        // solid walls and ground, lit by the lights
     dimsInside: L.store("house.dimsInside", true) !== false, // inside (as taped) or overall
     panel: ["lights", "levels", "rooms", "blocks", "yard", ""].includes(L.store("house.panel", "lights")) ? L.store("house.panel", "lights") : "lights",
   };
@@ -98,8 +99,16 @@
       selOpening: ui.mode3d === "shape" ? ui.opening : null,
       selYard: ui.mode3d === "shape" ? ui.yard : null,
       // a block picked in Shape: everything above its top is hidden, to see into it
-      cutZ: (() => { const b = ui.mode3d === "shape" && ui.block && m && m.blocks.find((q) => q.id === ui.block); return b ? b.z1 : null; })(),
+      // (the solid view: the level shown cuts at its ceiling, to look into its rooms)
+      cutZ: (() => {
+        const b = ui.mode3d === "shape" && ui.block && m && m.blocks.find((q) => q.id === ui.block);
+        if (b) return b.z1;
+        const f = ui.solid && floorsById().get(ui.floor);
+        return f ? f.elevation + f.ceiling : null;
+      })(),
       dims: ui.dims ? blockDims() : [],
+      solid: !!ui.solid,
+      glows: ui.solid ? glows() : [],
       yardPicks: ui.mode3d === "shape" ? ui.yardPicks || [] : [],
       floors: house.floors.map((f) => ({ ...f, active: f.id === ui.floor, label: L.fmtLen(f.elevation, { signed: true }) })),
       lights, grid: L.units() === "imperial" ? L.FT : 1,
@@ -676,6 +685,32 @@
       }));
   }
 
+  // ---- the solid view: each light's live colour and brightness, as a pool on its floor ---------
+
+  let looks = new Map(); // light entity -> { brightness, rgb_color, color_temp_kelvin }
+  async function refreshLooks() {
+    try {
+      const inv = await api("api/inventory");
+      inventory = inv;
+      looks = new Map(inv.lights.map((l) => [l.entity_id, l.look || {}]));
+      if (ui.view === "3d" && ui.solid && view3d) view3d.setScene(scene3d());
+    } catch { /* the next refresh tries again */ }
+  }
+  function glows() {
+    const out = [];
+    const members = new Map((inventory.fixtures || []).map((f) => [f.id, f.members || []]));
+    for (const t of house.targets) {
+      if (!t.world || !t.item || t.state !== "on") continue;
+      const look = looks.get(t.id) || looks.get((members.get(t.id) || [])[0]) || {};
+      const color = look.rgb_color ? `#${look.rgb_color.map((v) => v.toString(16).padStart(2, "0")).join("")}`
+        : look.color_temp_kelvin ? L.colorHex({ kelvin: look.color_temp_kelvin }) : "#ffd28a";
+      const level = look.brightness != null ? look.brightness / 255 : 0.8;
+      if (level <= 0.01) continue;
+      out.push({ x: t.world.x, y: t.world.y, z: t.world.z, floorZ: floorZ(t.item.floor), color, level });
+    }
+    return out;
+  }
+
   // ---- dimensions: each block's size, inside (as a tape reads in the room) or overall ----------
 
   const INT_WALL = 0.0889 + 2 * 0.0127; // 2x4 with drywall both sides: 4 1/2"
@@ -1047,6 +1082,7 @@
     yard: "M12 3a5 5 0 0 0-5 5c0 3 5 9 5 9s5-6 5-9a5 5 0 0 0-5-5zM4 21h16",
     fold: "M15 6l-6 6 6 6",
     dims: "M3 7v10M21 7v10M3 12h18M7 9l-4 3 4 3M17 9l4 3-4 3",
+    solid: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9",
     path: "M4 20c4-2 4-6 8-8s4-6 8-8",
     area: "M4 8l6-4 10 4v10l-10 2-6-4z",
     merge: "M4 6h6v6H4zM14 12h6v6h-6zM10 9h2a2 2 0 0 1 2 2v1",
@@ -1078,6 +1114,7 @@
         tool("Merge", I.merge, { disabled: !(ui.mode3d === "shape" && ui.yardPicks && ui.yardPicks.length > 1), title: "Ctrl+click two flat shapes, then merge them into one", click: () => mergeYard(ui.yardPicks) })),
       grp(tool("Aim", I.aim, { pressed: !!ui.aiming, disabled: !canAim, title: canAim ? "Click what the picked light should point at" : "Pick a flood or spot light first",
         click: () => { ui.aiming = !ui.aiming; paint(); } })),
+      grp(tool("Solid", I.solid, { pressed: !!ui.solid, title: "Solid walls and ground, lit by your lights as they are now", click: () => { ui.solid = !ui.solid; L.save("house.solid", ui.solid); if (ui.solid) refreshLooks(); paint(); } })),
       grp(tool("Dimensions", I.dims, { pressed: !!ui.dims, title: "Show each block's size", click: () => { ui.dims = !ui.dims; L.save("house.dims", ui.dims); paint(); } }),
         ui.dims ? el("div.seg", { role: "radiogroup", "aria-label": "Dimensions measured", style: { marginLeft: "4px" } },
           [[true, "Inside"], [false, "Overall"]].map(([v, label]) => el("button", { type: "button", role: "radio", "aria-checked": String(!!ui.dimsInside === v),
@@ -1241,7 +1278,8 @@
   let shownUnits = null;
   onData((d) => {
     status = d.status;
+    if (ui.solid && ui.view === "3d" && house) refreshLooks();
     if (house && L.units() !== shownUnits) { shownUnits = L.units(); if (!L.typing()) paint(); }
   });
-  load().then(() => { paint(); start(15000); }).catch((e) => L.set(page, el("div.empty", `Couldn't load the house map: ${e.message}`)));
+  load().then(() => { paint(); start(15000); if (ui.solid) refreshLooks(); }).catch((e) => L.set(page, el("div.empty", `Couldn't load the house map: ${e.message}`)));
 })();
