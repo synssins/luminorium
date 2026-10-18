@@ -52,7 +52,7 @@ Errors go to toasts, and names are typed inline.
 | **Light** (`light?id=…` or `light?fixture=…`) | What it can do; driver choice (Automatic or a pinned driver) and timing; **Test with options** (fade, effect, hold); its place on the house map and its fixture; Home Assistant ids; what each effect name becomes on it |
 | **Palettes & shows** | Playing now, with Stop; tabs for Palettes (a **Play on** target: every light, a level or a room; **Include white lights**), Animations (a sweep: colours from a palette or picked, wipe or band, direction, seconds per pass, band width, brightness, a moving preview; **Play** or **Save as a show**), Shows and Effects |
 | **House map** | Placing lights in 3D: **Things to check**, a volumetric view, the front photo and the top view with their drawing tools, in a CAD-style layout (a tool bar across the top for the view shown, a rail of panes on the left, the picked thing's settings on the right); the page fills the window on a big screen ([house.md](house.md)) |
-| **Views**, **Map with camera** | The photo views editor and the guided camera capture ([mapping.md](mapping.md)) |
+| **Map with camera** | The guided camera capture ([mapping.md](mapping.md)). The older photo views editor (**Views**) is off the menu since 0.3.0-dev.35 (the House map's Front photo and Top view do its job); it opens from the **Views** button here, to make the view a capture maps into |
 | **Drivers** | A card per driver: status, endpoint, counts, notes (Z-Wave nodes on unicast, Govee LAN Control) and how many lights use it |
 | **Activity** | The latest 30 events |
 | **Settings** | Version and mode, units (as in Home Assistant, feet and inches, metres), appearance (match the device, dark, light), the camera check, where files live |

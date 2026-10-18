@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0-dev.35
+
+- **Views** is off the left menu: the House map's Front photo and Top view do its job. It still
+  opens from the **Views** button on **Map with camera**, which maps into a view.
+
 ## 0.3.0-dev.34
 
 - **Pick several, copy and paste** (Top view): Ctrl+click picks several walls, rooms, stairs or

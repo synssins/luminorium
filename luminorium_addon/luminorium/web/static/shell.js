@@ -31,7 +31,6 @@
     ["lights", "Lights", "lights", "bulb"],
     ["palettes", "Palettes & shows", "palettes", "palette"],
     ["house", "House map", "house", "cube"],
-    ["views", "Views", "views", "views"],
     ["capture", "Map with camera", "capture", "camera"],
     ["drivers", "Drivers", "drivers", "chip"],
     "-",
