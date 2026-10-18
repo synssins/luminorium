@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0-dev.41
+
+- **Merge, fixed:** a path and an area merge whichever you pick first; the result is the area,
+  with the path as part of it. Before, picking the path first refused.
+
 ## 0.3.0-dev.40
 
 - **Join blocks** (3D, Shape): Ctrl+click two or more and **Join**: one shape, no wall between

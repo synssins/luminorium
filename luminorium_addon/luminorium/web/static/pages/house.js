@@ -904,8 +904,12 @@
   // into one walkway); otherwise the others become parts of the first, drawn and moved with it.
   function mergeYard(ids) {
     return saveSite((s) => {
-      const list = ids.map((id) => s.yard.find((q) => q.id === id)).filter((q) => q && q.pts);
-      if (list.length < 2) return false;
+      const picked = ids.map((id) => s.yard.find((q) => q.id === id)).filter((q) => q && q.pts);
+      if (picked.length < 2) return false;
+      // whichever was picked first: with an area among them the result is an area (the first
+      // area picked keeps its name and kind), and the paths become the strips they cover
+      const area = picked.find((q) => q.kind !== "path");
+      const list = area ? [area, ...picked.filter((q) => q !== area)] : picked;
       const [first, ...rest] = list;
       const tol = Math.max(0.3, first.width ?? 1.2);
       const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= tol;
@@ -922,9 +926,8 @@
           else if (near(a[0], b[0])) line = joinLines(rb, a);
           if (line) { first.pts = line; first.width = Math.max(first.width ?? 1.2, o.width ?? 1.2); continue; }
         }
-        // a path merged into an area (or the other way) becomes an outline: the strip it covers
-        const asFirst = (pts) => (first.kind === "path") === (o.kind === "path") ? pts : first.kind === "path" ? null : strip(pts, (o.width ?? 1.2) / 2);
-        if (first.kind === "path" && o.kind !== "path") { toast("Merge an area into a path the other way round: pick the area first"); return false; }
+        // a path merged into an area becomes an outline: the strip it covers
+        const asFirst = (pts) => (first.kind !== "path" && o.kind === "path" ? strip(pts, (o.width ?? 1.2) / 2) : pts);
         first.parts = [...(first.parts || []), ...pieces.map(asFirst)];
       }
       const drop = new Set(rest.map((q) => q.id));
@@ -1005,7 +1008,7 @@
     const names = ids.map((id) => yardShape(id)).filter(Boolean).map((y) => y.name || y.kind);
     return el("aside.card.accent.hm-insp", { "aria-label": "Picked yard shapes" },
       el("h2", `${ids.length} picked`), el("span.small", names.join(", ")),
-      el("span.small.muted", "Merge makes them one: paths whose ends meet become one walkway (an L), others one shape. The first one picked keeps its name and kind."),
+      el("span.small.muted", "Merge makes them one: paths whose ends meet become one walkway (an L), others one shape. An area keeps its name and kind (the first area picked); a path merged with an area becomes part of the area."),
       el("div.row", { style: { gap: "8px", flexWrap: "wrap" } },
         el("button.btn.primary", { type: "button", on: { click: () => mergeYard(ids) } }, "Merge"),
         el("button.btn", { type: "button", on: { click: () => { ui.yardPicks = []; paint(); } } }, "Cancel"),

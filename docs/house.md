@@ -400,9 +400,10 @@ CAD layout"):
     (orange): drag it to move it, drag its white corners to shape it (an inch at a time; Alt:
     free), or type its width and length (a path) or across and front to back (an area);
     **Delete** removes it. Ctrl+click (⌘) a second one and **Merge**: two paths whose ends meet
-    become one walkway, the corner where their lines cross (an L); otherwise the others become
-    `parts` of the first, filled and outlined as one shape and moved with it (a path merged into
-    an area becomes the strip it covers). **Split apart** undoes it. They're kept in the top
+    become one walkway, the corner where their lines cross (an L); otherwise they become one
+    shape, filled and outlined as one and moved together (`parts`). With an area among them it's
+    an area, whichever was picked first: the first area keeps its name and kind, and a path
+    becomes the strip it covers. **Split apart** undoes it. They're kept in the top
     view's drawing (`site.yard[].parts`).
   - Tap a light to pick it. A light (or part) not placed yet goes where you then tap the floor,
     on the level chosen at the right of the tool bar. Tapping off a placed light lets go of it: it only moves
