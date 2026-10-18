@@ -79,8 +79,11 @@
   // The icon on a light's orb: what it is (its form, its beam, else how it's mounted)
   function lightIcon(item) {
     if (item.form) return "bar";
+    // a type with its own look keeps it when aimed (an aimed can is still a can); else a spot
+    const own = { ceiling: "ceiling", fan: "fan", can: "can", flush: "flush", pendant: "pendant", wall: "wall", floor_lamp: "lamp", table: "lamp", soffit: "soffit", under_cabinet: "bar", strip: "bar" }[item.mount];
+    if (own) return own;
     if (item.aim) return "spot";
-    return { ceiling: "ceiling", fan: "fan", can: "can", flush: "flush", pendant: "pendant", wall: "wall", floor_lamp: "lamp", table: "lamp", soffit: "soffit", post: "post", ground: "post", under_cabinet: "bar", strip: "bar" }[item.mount] || "bulb";
+    return { post: "post", ground: "post" }[item.mount] || "bulb";
   }
   function scene3d() {
     const tops = house.floors.map((f) => f.elevation + f.ceiling);
@@ -882,6 +885,26 @@
       if (ui.view === "3d" && ui.solid && view3d) view3d.setScene(scene3d());
     } catch { /* the next refresh tries again */ }
   }
+  // Where a light's pattern lands on its floor: its aim if it's aimed, else its type's. A light
+  // pointing down lands a pool the width of its cone at that distance; a wide dome reaches the
+  // walls (they stop it); one pointing out from a wall lands in front of it; one pointing up only
+  // a soft bounce under it.
+  function landing(item, w, fz, floor, color, level) {
+    const a = item.aim || TYPE_LIGHT[item.mount] || null;
+    const h = Math.max(0.1, w.z - fz);
+    if (!a) return { x: w.x, y: w.y, z: w.z, floorZ: fz, floor, color, level };
+    const tilt = (a.tilt ?? 0) * Math.PI / 180, head = (a.heading ?? 0) * Math.PI / 180, half = Math.min(80, (a.beam ?? 90) / 2) * Math.PI / 180;
+    const dx = -Math.sin(head) * Math.cos(tilt), dy = -Math.cos(head) * Math.cos(tilt), dz = Math.sin(tilt);
+    if (dz < -0.2) {
+      const t = h / -dz;
+      return { x: w.x + dx * t, y: w.y + dy * t, z: w.z, floorZ: fz, floor, color, level, r: Math.min(8, Math.max(0.5, Math.tan(half) * h / Math.max(0.3, -dz))) };
+    }
+    if (a.kind === "wall" || dz <= 0.2) {
+      // out to the side (a wall light): a pool in front of it
+      return { x: w.x + dx * Math.max(0.6, h * 0.6), y: w.y + dy * Math.max(0.6, h * 0.6), z: w.z, floorZ: fz, floor, color, level: level * 0.8, r: Math.max(1, h * 0.9) };
+    }
+    return { x: w.x, y: w.y, z: w.z, floorZ: fz, floor, color, level: level * 0.35, r: 1.2 };
+  }
   function glows() {
     const out = [];
     const members = new Map((inventory.fixtures || []).map((f) => [f.id, f.members || []]));
@@ -910,9 +933,10 @@
         }
         continue;
       }
+      // several fixtures on one switch: each throws its own light
       const fx = t.fixtures > 0 ? t.parts.filter((p) => p.world) : [];
-      if (fx.length) { for (const p of fx) out.push({ x: p.world.x, y: p.world.y, z: p.world.z, floorZ: fz, floor: t.item.floor, color, level: level * 0.75, r: 0.7 + 0.9 * level }); continue; }
-      out.push({ x: t.world.x, y: t.world.y, z: t.world.z, floorZ: fz, floor: t.item.floor, color, level });
+      const from = fx.length ? fx.map((p) => p.world) : [t.world];
+      for (const w of from) out.push(landing(t.item, w, fz, t.item.floor, color, fx.length ? level * 0.8 : level));
     }
     return out;
   }
@@ -1254,6 +1278,25 @@
 
   const BEAM_KINDS = [["all", "All around"], ["flood", "Flood"], ["spot", "Spot"], ["wall", "Half"]];
   const BEAM_WIDTH = { flood: 90, spot: 25, wall: 180 };
+  // What each type of light does when it isn't aimed: how wide its light is (degrees) and which
+  // way it points (tilt: -90 straight down, 90 straight up). A flush mount is a wide dome down
+  // (it lights the whole room); a can a cone down; a wall light a half dome out from the wall; a
+  // floor lamp up; a table lamp all around (null).
+  const TYPE_LIGHT = {
+    ceiling: { beam: 160, tilt: -90 }, flush: { beam: 160, tilt: -90 }, fan: { beam: 150, tilt: -90 },
+    can: { beam: 60, tilt: -90 }, pendant: { beam: 120, tilt: -90 }, soffit: { beam: 70, tilt: -90 },
+    under_cabinet: { beam: 120, tilt: -90 }, strip: { beam: 120, tilt: -90 }, post: { beam: 140, tilt: -90 },
+    wall: { beam: 180, tilt: 0, kind: "wall" }, floor_lamp: { beam: 120, tilt: 90 }, ground: { beam: 40, tilt: 90 },
+    table: null, other: null,
+  };
+  // Flood, spot or half chosen: it starts pointing the way its type does (a can straight down)
+  const startTilt = (mount) => { const d = TYPE_LIGHT[mount]; return d ? d.tilt : 0; };
+  function lightText(mount) {
+    const d = TYPE_LIGHT[mount];
+    const what = !d ? "lights all around" : d.kind === "wall" ? "lights a half dome out from the wall"
+      : d.tilt < 0 ? (d.beam >= 140 ? "lights the room below it, a wide dome down" : `lights a ${Math.round(d.beam)}° cone down`) : "lights upward";
+    return `As its type, it ${what}. Choose Flood or Spot to point it somewhere else (a wall wash, an uplight on a tree), or Half for a wall light.`;
+  }
   function beamPanel(t) {
     const aim = t.item.aim || null;
     const kind = aim ? aim.kind : "all";
@@ -1271,9 +1314,9 @@
         el("div.seg", { role: "radiogroup", "aria-label": "Its light" }, BEAM_KINDS.map(([k, label]) =>
           el("button", { type: "button", role: "radio", "aria-checked": String(kind === k), on: { click: () => {
             if (k === "all") send(null);
-            else send({ ...(aim || { tilt: 0, heading: 0 }), kind: k, beam: aim && aim.kind === k ? aim.beam : BEAM_WIDTH[k] });
+            else send({ ...(aim || { tilt: k === "wall" ? 0 : startTilt(t.item.mount), heading: 0 }), kind: k, beam: aim && aim.kind === k ? aim.beam : BEAM_WIDTH[k] });
           } } }, label)))),
-      !aim ? el("span.small.muted", "Bulbs and ceiling lights light all around. Choose Flood or Spot for a light that points somewhere (a wall wash, an uplight on a tree), or Half for a wall light.") : [
+      !aim ? el("span.small.muted", lightText(t.item.mount)) : [
         el("div.row", { style: { gap: "8px", flexWrap: "wrap" } },
           el("button.btn.small.primary", { type: "button", "aria-pressed": String(!!ui.aiming), on: { click: () => { ui.aiming = !ui.aiming; ui.view = "3d"; L.save("house.view", "3d"); paint(); } } },
             ui.aiming ? "Cancel aiming" : "Aim at something in 3D"),

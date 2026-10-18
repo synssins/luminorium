@@ -603,6 +603,20 @@ async def test_a_light_as_a_bar_or_strip(client, lum):
     assert "form" not in lum.house.data["items"][PORCH]
 
 
+def test_never_aimed_ceiling_floods_point_down():
+    from luminorium.house import _migrate_aims
+
+    items = {
+        "can": {"mount": "can", "aim": {"kind": "flood", "beam": 90, "tilt": 0, "heading": 0}},
+        "aimed": {"mount": "can", "aim": {"kind": "spot", "beam": 25, "tilt": 0, "heading": 40}},
+        "porch": {"mount": "post", "aim": {"kind": "flood", "beam": 90, "tilt": 0, "heading": 0}},
+    }
+    _migrate_aims(items)
+    assert items["can"]["aim"]["tilt"] == -90  # how Flood used to start: now down
+    assert items["aimed"]["aim"]["tilt"] == 0  # turned on purpose: left alone
+    assert items["porch"]["aim"]["tilt"] == 0  # not a ceiling light
+
+
 async def test_aiming_a_light(client, lum):
     r = await client.put(f"/api/house/items/{PORCH}/aim", json={"kind": "flood"})
     assert r.status_code == 400  # not placed yet

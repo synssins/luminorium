@@ -246,8 +246,17 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
   bulb; kept as `item.form`. In 3D it's drawn its length with marks the way it shines, and in the
   solid view it lights the floor along its length (under it, out to its side, or a faint bounce
   when it shines up).
-- **Icons** on the 3D orbs say what each light is: a bar, a spot or flood (it's aimed), else by
-  its type (ceiling, flush mount, can, fan, pendant, wall, lamp, eaves, post), else a bulb.
+- **Icons** on the 3D orbs say what each light is: a bar or strip, else its type (ceiling, flush
+  mount, can, fan, pendant, wall, lamp, eaves; an aimed can is still a can), else a spot or flood
+  if it's aimed, else a post or a bulb.
+- **Each type's light** when it isn't aimed: a ceiling light or flush mount is a wide dome down
+  (it lights the room up to its walls), a can a 60° cone down, a pendant, fan, eaves light,
+  under-cabinet light or path light down, a wall light a half dome out from the wall, a floor
+  lamp up, an in-ground light a narrow uplight, a table lamp all around. The solid view lands
+  each one where its pattern meets the floor (an aimed light where its aim does), walls stopping
+  it. **Flood**, **Spot** or **Half** starts pointing the way the type does (a can straight down).
+  Ceiling lights' floods and spots that were never aimed (level, toward the street: how Flood
+  used to start) were turned to point down (`_migrate_aims`).
 - **Walls stop light:** a flood's or spot's beam, and the pools of light in the solid view, end at
   the first wall in their way: the interior walls of the light's level and the blocks' walls, or
   at the light's floor or ceiling (inside; an outside light has no ceiling).

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0-dev.49
+
+- **Each type of light lights like it:** a flush mount or ceiling light is a wide dome down that
+  fills its room, a can a cone down, a wall light a half dome out, a floor lamp up, and so on;
+  the solid view lands each one where it meets the floor.
+- **Flood and Spot start the right way:** on a can or other ceiling light they start pointing
+  straight down, not level toward the street. Ceiling floods that were never aimed now point
+  down.
+- **Icons:** the can is a recessed downlight and the flush mount a dome; an aimed can keeps its
+  can icon.
+
 ## 0.3.0-dev.48
 
 - **Groups are their lights' fixtures by themselves:** a placed group of lights is one fixture per

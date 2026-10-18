@@ -148,6 +148,7 @@ class HouseService:
         self.data.setdefault("items", {})
         self.data.setdefault("facade", None)
         _migrate_roofs(self.data.get("facade"))
+        _migrate_aims(self.data.get("items") or {})
 
     # ---- floors ---------------------------------------------------------------------------
 
@@ -1239,6 +1240,26 @@ def _ft(m: float) -> str:
     """A length as feet and inches, for the checks' wording."""
     inches = round(m / 0.0254)
     return f"{inches // 12}' {inches % 12}\""
+
+
+# Lights mounted where their light goes down: a flood or spot on one starts pointing down
+DOWN_MOUNTS = {"ceiling", "flush", "can", "fan", "pendant", "soffit", "under_cabinet"}
+
+
+def _migrate_aims(items: dict) -> None:
+    """A ceiling light's flood or spot that was never aimed (still level, toward the street, not
+    pointed at anything: how Flood used to start) points straight down, as it now starts."""
+    for item in items.values():
+        aim = item.get("aim")
+        if (
+            aim
+            and item.get("mount") in DOWN_MOUNTS
+            and aim.get("kind") in ("flood", "spot")
+            and not aim.get("at")
+            and aim.get("tilt", 0) == 0
+            and aim.get("heading", 0) == 0
+        ):
+            aim["tilt"] = -90.0
 
 
 def _migrate_roofs(facade: dict | None) -> None:

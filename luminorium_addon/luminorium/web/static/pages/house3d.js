@@ -1308,8 +1308,8 @@ const GLYPHS = {
   soffit: "M3 5h18M8 5v2a4 4 0 0 0 8 0V5M12 13v3M8 14l-1 2M16 14l1 2",
   bar: "M3 12h18M6 9v6M18 9v6",
   fan: "M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0M12 10V3M14 12l6 3M10 12l-6 3",
-  can: "M5 8h14M7 8v3a5 5 0 0 0 10 0V8M12 17v3",
-  flush: "M3 9h18M5 9a7 6 0 0 0 14 0M12 15v.01",
+  can: "M3 5h18M8 5v2a4 4 0 0 0 8 0V5M12 13v3M8 14l-1 2M16 14l1 2",
+  flush: "M5 8h14M7 8v3a5 5 0 0 0 10 0V8M12 17v3",
 };
 // Which faces of a block it shares with a block it's joined to (the same group)
 function joinedFaces(b, blocks) {
