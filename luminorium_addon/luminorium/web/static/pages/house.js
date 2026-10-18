@@ -745,6 +745,11 @@
         el("button.btn.danger", { type: "button", on: { click: () => deleteBlock(b) } }, "Delete")));
   }
 
+  // How many fixtures to start with: a group, one per light in it; else two
+  function startFixtures(t) {
+    const fx = t.kind === "fixture" && (inventory.fixtures || []).find((f) => f.id === t.id);
+    return Math.max(2, Math.min(50, fx ? fx.members.length : 2));
+  }
   async function setFixtures(t, count) {
     await run(() => api(`api/house/items/${encodeURIComponent(t.id)}/fixtures`, { method: "PUT", body: { count } }));
     ui.part = count ? 0 : null;
@@ -1171,9 +1176,10 @@
         } } }));
     const multi = t.fixtures > 0;
     // a light whose parts aren't its own segments can be several fixtures on one switch
-    const canMulti = t.kind === "light" && item && (multi || !t.parts.length);
+    // a light, or a group of lights (on the Lights page), whose parts aren't its own segments
+    const canMulti = (t.kind === "light" || t.kind === "fixture") && item && (multi || !t.parts.length);
     const fixturesBox = canMulti ? el("section", { "aria-label": "Fixtures", style: { display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
-      el("label.check", el("input", { type: "checkbox", checked: multi, on: { change: (e) => setFixtures(t, e.target.checked ? 2 : 0) } }),
+      el("label.check", el("input", { type: "checkbox", checked: multi, on: { change: (e) => setFixtures(t, e.target.checked ? startFixtures(t) : 0) } }),
         "Multiple fixtures on this switch"),
       multi ? el("label.field", el("span", "How many fixtures"),
         el("input.input", { type: "number", min: 2, max: 50, step: 1, value: t.fixtures, style: { width: "100px" },

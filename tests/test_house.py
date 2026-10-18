@@ -688,6 +688,17 @@ async def test_aiming_at_a_spot_and_keeping_it(client, lum):
     assert (await client.put(f"/api/house/items/{PORCH}/aim", json=bad)).status_code == 400
 
 
+async def test_a_group_of_lights_can_be_several_fixtures(client, lum):
+    members = ["light.office_fan_rgb1", "light.office_fan_rgb2"]
+    r = await client.post("/api/fixtures", json={"name": "Cabinets", "members": members})
+    gid = r.json()["id"]
+    await client.put(f"/api/house/items/{gid}", json={"floor": "main_level", "x": 4, "y": 3})
+    r = await client.put(f"/api/house/items/{gid}/fixtures", json={"count": 2})
+    assert r.status_code == 200 and r.json()["fixtures"] == 2
+    t = next(t for t in (await client.get("/api/house")).json()["targets"] if t["id"] == gid)
+    assert t["kind"] == "fixture" and [p["label"] for p in t["parts"]] == ["Fixture 1", "Fixture 2"]
+
+
 async def test_one_switch_several_fixtures(client, lum):
     kitchen = "light.kitchen_cabinet_light_switch"
     r = await client.put(f"/api/house/items/{kitchen}/fixtures", json={"count": 3})

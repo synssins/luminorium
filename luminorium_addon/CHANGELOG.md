@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.47
+
+- **A group of lights can be several fixtures:** a group made on the Lights page (two cabinet
+  lights grouped) gets **Multiple fixtures on this switch** too, starting with one fixture per
+  light, each placed on its own.
+
 ## 0.3.0-dev.46
 
 - **Ceilings stop light:** a beam aimed upward ends at its level's ceiling instead of rising

@@ -197,7 +197,8 @@ class HouseService:
                     fx.area_id,
                     fx.floor_id,
                     members[0] if members else None,
-                    [],
+                    # a group can be several fixtures too (two cabinet lights grouped)
+                    self._fixture_parts(fx.id),
                 )
             )
         for lt in inv.lights.values():
@@ -372,8 +373,8 @@ class HouseService:
         each placed on its own. New ones start in a row from the light, 4 ft apart; 0 makes it
         one fixture again."""
         target = self._check_target(tid)
-        if target["kind"] != "light":
-            raise HouseError("only a light can be several fixtures")
+        if target["kind"] not in ("light", "fixture"):
+            raise HouseError("only a light or a group of lights can be several fixtures")
         if any(p["entity_id"] or not p["label"].startswith("Fixture") for p in target["parts"]):
             raise HouseError("this light's parts are its own segments")
         item = self.data["items"].get(tid)
