@@ -232,6 +232,24 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
   heading}`: heading in degrees clockwise from above, 0 facing the street. Drawn as a wedge from
   above (a circle when it points straight up or down) and a cone in 3D.
 
+## What a light looks like
+
+- **Types** (the light's panel, **Type**): ceiling, flush mount, can (recessed), ceiling fan,
+  pendant, wall, floor lamp, tabletop, under cabinet, under the eaves, strip, path or post, in the
+  ground, other. Each sets its usual height.
+- **Bulb, bar lamp or strip** (**What it looks like**; one light, not several fixtures): a bar or
+  strip has a length, which way it **Lies** (across, front to back, or between) and which way it
+  **Shines**: down, up, or sideways (**Shine the other way** turns it round). `PUT
+  /api/house/items/{id}/form` `{form: bar|strip, length, rot, face: down|up|side}`, or null for a
+  bulb; kept as `item.form`. In 3D it's drawn its length with marks the way it shines, and in the
+  solid view it lights the floor along its length (under it, out to its side, or a faint bounce
+  when it shines up).
+- **Icons** on the 3D orbs say what each light is: a bar, a spot or flood (it's aimed), else by
+  its type (ceiling, flush mount, can, fan, pendant, wall, lamp, eaves, post), else a bulb.
+- **Walls stop light:** a flood's or spot's beam, and the pools of light in the solid view, end at
+  the first wall in their way: the interior walls of the light's level and the blocks' walls (a
+  beam aimed over a wall's top goes on).
+
 ## Floods and spots
 
 The light's panel has **Its light**: **All around** (no aim), **Flood** (90°), **Spot** (25°) or

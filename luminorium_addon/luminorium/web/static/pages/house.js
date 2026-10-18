@@ -76,6 +76,12 @@
 
   let canvas3d = null;
   let view3d = null;
+  // The icon on a light's orb: what it is (its form, its beam, else how it's mounted)
+  function lightIcon(item) {
+    if (item.form) return "bar";
+    if (item.aim) return "spot";
+    return { ceiling: "ceiling", fan: "fan", can: "can", flush: "flush", pendant: "pendant", wall: "wall", floor_lamp: "lamp", table: "lamp", soffit: "soffit", post: "post", ground: "post", under_cabinet: "bar", strip: "bar" }[item.mount] || "bulb";
+  }
   function scene3d() {
     const tops = house.floors.map((f) => f.elevation + f.ceiling);
     const bottoms = house.floors.map((f) => f.elevation);
@@ -84,6 +90,7 @@
       const here = t.item.floor === ui.floor || t.item.floor === house.outside;
       return {
         id: t.id, label: t.name, x: t.world.x, y: t.world.y, z: t.world.z, floorZ: floorZ(t.item.floor), aim: t.item.aim || null, floor: t.item.floor, linked: t.fixtures > 0,
+        form: t.item.form || null, icon: lightIcon(t.item),
         on: t.state === "on", sel, dim: !here && !sel,
         parts: t.parts.filter((p) => p.world).map((p) => ({ index: p.index, x: p.world.x, y: p.world.y, z: p.world.z, sel: sel && ui.part === p.index })),
       };
@@ -883,9 +890,24 @@
       // the solid view is cut at the level shown: light on the floors under it isn't seen
       if (t.item.floor !== ui.floor && t.item.floor !== house.outside) continue;
       // several fixtures on one switch: each throws its own light
+      const fz = floorZ(t.item.floor);
+      const f = t.item.form;
+      if (f) {
+        // a bar or strip: light along its length, under it (down), out to its side, or a faint
+        // bounce (up)
+        const th = (f.rot || 0) * Math.PI / 180, ux = Math.cos(th), uy = -Math.sin(th);
+        const off = f.face === "side" ? 0.9 : 0, sx = -Math.sin(th) * off, sy = -Math.cos(th) * off;
+        const n = Math.max(1, Math.round(f.length / 0.6));
+        for (let i = 0; i < n; i++) {
+          const k = -f.length / 2 + (f.length * (i + 0.5)) / n;
+          out.push({ x: t.world.x + ux * k + sx, y: t.world.y + uy * k + sy, z: t.world.z, floorZ: fz, floor: t.item.floor, color,
+            level: level * (f.face === "up" ? 0.3 : 0.7), r: f.face === "up" ? 1.6 : 0.8 + 0.6 * level });
+        }
+        continue;
+      }
       const fx = t.fixtures > 0 ? t.parts.filter((p) => p.world) : [];
-      if (fx.length) { for (const p of fx) out.push({ x: p.world.x, y: p.world.y, z: p.world.z, floorZ: floorZ(t.item.floor), color, level: level * 0.75, r: 0.7 + 0.9 * level }); continue; }
-      out.push({ x: t.world.x, y: t.world.y, z: t.world.z, floorZ: floorZ(t.item.floor), color, level });
+      if (fx.length) { for (const p of fx) out.push({ x: p.world.x, y: p.world.y, z: p.world.z, floorZ: fz, floor: t.item.floor, color, level: level * 0.75, r: 0.7 + 0.9 * level }); continue; }
+      out.push({ x: t.world.x, y: t.world.y, z: t.world.z, floorZ: fz, floor: t.item.floor, color, level });
     }
     return out;
   }
@@ -1185,12 +1207,41 @@
         el("input", { type: "range", min: 0, max: ceil, step: 0.05, value: item?.h ?? 0, disabled: !item,
           on: { change: (e) => placeItem({ h: Number(e.target.value) }) } })),
       item ? null : el("div.banner", { style: { fontSize: "14px" } }, "Tap where this light is in 3D, on the Front photo, or in the Top view to place it."),
+      item && !(t.fixtures > 0) && !t.parts.length ? formPanel(t) : null,
       item ? beamPanel(t) : null,
       el("div.row", { style: { gap: "8px" } },
         el("button.btn.primary", { type: "button", disabled: status?.read_only, style: { flex: "1" }, on: { click: () => identify(undefined) } }, "Flash it"),
         item ? el("button.btn", { type: "button", on: { click: removeItem } }, "Remove") : null),
       fixturesBox,
       parts);
+  }
+
+  // ---- what a light looks like: a bulb, or a bar or strip with a length, lie and facing ---------
+
+  async function setForm(t, form) {
+    await run(async () => { house = await api(`api/house/items/${encodeURIComponent(t.id)}/form`, { method: "PUT", body: form }); });
+    paint();
+  }
+  function formPanel(t) {
+    const f = t.item.form || null;
+    const kind = f ? f.form : "bulb";
+    const send = (change) => setForm(t, { ...(f || { length: 1.0, rot: 0, face: "down" }), ...change });
+    const lieText = (v) => { v = Math.round(v) % 180; return v === 0 ? "across" : v === 90 ? "front to back" : `${v}°`; };
+    const lie = el("span.mono", lieText(f ? f.rot : 0));
+    return el("section", { "aria-label": "What it looks like", style: { display: "flex", flexDirection: "column", gap: "10px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
+      el("div.field", el("span", "What it looks like"),
+        el("div.seg", { role: "radiogroup", "aria-label": "What it looks like" }, [["bulb", "Bulb"], ["bar", "Bar lamp"], ["strip", "Strip"]].map(([k, label]) =>
+          el("button", { type: "button", role: "radio", "aria-checked": String(kind === k), on: { click: () => (k === "bulb" ? setForm(t, null) : send({ form: k, length: f ? f.length : k === "bar" ? 1.0 : 2.0 })) } }, label)))),
+      f ? [
+        el("label.field", el("span", "Length"), el("input.input", { value: L.fmtLen(f.length), inputmode: "decimal", style: { width: "120px" },
+          on: { change: (e) => { const v = L.parseLen(e.target.value); if (!(v >= 0.05 && v <= 30)) { toast("2 in to 100 ft"); e.target.value = L.fmtLen(f.length); return; } send({ length: v }); } } })),
+        el("label.field", el("span", "Lies", lie), el("input", { type: "range", min: 0, max: 179, step: 1, value: Math.round(f.rot) % 180,
+          on: { input: (e) => { lie.textContent = lieText(Number(e.target.value)); }, change: (e) => send({ rot: Number(e.target.value) + (f.rot >= 180 ? 180 : 0) }) } })),
+        el("div.field", el("span", "Shines"),
+          el("div.seg", { role: "radiogroup", "aria-label": "Shines" }, [["down", "Down"], ["up", "Up"], ["side", "Sideways"]].map(([k, label]) =>
+            el("button", { type: "button", role: "radio", "aria-checked": String(f.face === k), on: { click: () => send({ face: k }) } }, label)))),
+        f.face === "side" ? el("button.btn.small", { type: "button", on: { click: () => send({ rot: (f.rot + 180) % 360 }) } }, "Shine the other way") : null,
+      ] : el("span.small.muted", "For a light bar, a lamp with a long shade, or an LED strip: give its length, which way it lies, and which way it shines."));
   }
 
   // ---- floods and spots ----------------------------------------------------------------------

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0-dev.45
+
+- **Light types:** flush mount, can (recessed) and ceiling fan join the types. A light can be a
+  **bar lamp** or **strip** with a length, which way it lies, and which way it shines (down, up,
+  sideways).
+- **Icons:** each light in 3D shows what it is (ceiling, flush, can, fan, pendant, wall, lamp,
+  spot, bar, post...) instead of a plain dot.
+- **Walls stop light:** spot and flood beams, and the solid view's pools of light, end at the
+  first wall in their way.
+
 ## 0.3.0-dev.44
 
 - **A refresh stays on your page:** refreshing (in Home Assistant, which reloads the add-on at the

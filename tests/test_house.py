@@ -589,6 +589,20 @@ async def test_top_view_walls_yard_and_plans(client, lum):
     assert (await client.delete("/api/house/site")).json()["site"] is None
 
 
+async def test_a_light_as_a_bar_or_strip(client, lum):
+    url = f"/api/house/items/{PORCH}/form"
+    assert (await client.put(url, json={"form": "bar"})).status_code == 400  # not placed yet
+    await client.put(f"/api/house/items/{PORCH}", json={"floor": OUTSIDE, "x": 3, "y": -2})
+    body = {"form": "bar", "length": 1.2, "rot": 450, "face": "up"}
+    view = (await client.put(url, json=body)).json()
+    item = next(t for t in view["targets"] if t["id"] == PORCH)["item"]
+    assert item["form"] == {"form": "bar", "length": 1.2, "rot": 90, "face": "up"}
+    for bad in ({"form": "blob"}, {"form": "strip", "length": 99}, {"form": "bar", "face": "in"}):
+        assert (await client.put(url, json=bad)).status_code == 400
+    await client.put(url, json=None)
+    assert "form" not in lum.house.data["items"][PORCH]
+
+
 async def test_aiming_a_light(client, lum):
     r = await client.put(f"/api/house/items/{PORCH}/aim", json={"kind": "flood"})
     assert r.status_code == 400  # not placed yet

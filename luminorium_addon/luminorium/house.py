@@ -47,6 +47,9 @@ BASEMENT_DEPTH_M = 2.4
 # Mount types and the height above the floor (m) each suggests; ceiling-hung ones follow the ceiling
 MOUNTS: dict[str, dict[str, Any]] = {
     "ceiling": {"label": "Ceiling", "below_ceiling": 0.05},
+    "flush": {"label": "Flush mount", "below_ceiling": 0.12},
+    "can": {"label": "Can (recessed)", "below_ceiling": 0.0},
+    "fan": {"label": "Ceiling fan", "below_ceiling": 0.45},
     "pendant": {"label": "Pendant", "below_ceiling": 0.6},
     "wall": {"label": "Wall", "h": 1.8},
     "floor_lamp": {"label": "Floor lamp", "h": 1.5},
@@ -334,6 +337,35 @@ class HouseService:
     def _fixture_parts(self, tid: str) -> list[Part]:
         n = (self.data["items"].get(tid) or {}).get("fixtures", 0)
         return [Part(i, f"Fixture {i + 1}") for i in range(n)]
+
+    def set_form(self, tid: str, form: dict | None) -> dict:
+        """What a light looks like: a bulb (the default), or a bar or strip with a length (m),
+        which way it lies (rot: degrees clockwise from above, 0 across the house) and which way it
+        shines (face: down, up, or side, toward rot + 90°). None: a bulb again."""
+        self._check_target(tid)
+        item = self.data["items"].get(tid)
+        if item is None:
+            raise HouseError("place the light first")
+        if not form or form.get("form", "bulb") == "bulb":
+            item.pop("form", None)
+        else:
+            kind = form.get("form")
+            if kind not in ("bar", "strip"):
+                raise HouseError(f"unknown light form {kind}")
+            length = _num(form.get("length", 1.0 if kind == "bar" else 2.0))
+            if not 0.05 <= length <= 30:
+                raise HouseError("a bar or strip is 2 in to 100 ft long")
+            face = form.get("face", "down")
+            if face not in ("down", "up", "side"):
+                raise HouseError(f"unknown facing {face}")
+            item["form"] = {
+                "form": kind,
+                "length": length,
+                "rot": _num(form.get("rot", 0)) % 360,
+                "face": face,
+            }
+        self._save()
+        return self.view()
 
     def set_fixtures(self, tid: str, count: int) -> dict:
         """A light that is several fixtures on one switch (cans on one dimmer): `count` parts,

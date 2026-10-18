@@ -504,6 +504,12 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         """How many fixtures one switch runs: {count: 2-50}, or 0 for one."""
         return _house_errors(lambda: lum.house.set_fixtures(target, body.get("count", 0)))
 
+    @app.put("/api/house/items/{target}/form")
+    async def house_form(target: str, body: dict | None = None):
+        """What a light looks like: {form: bar|strip, length, rot, face: down|up|side}, or
+        null for a bulb."""
+        return _house_errors(lambda: lum.house.set_form(target, body or None))
+
     @app.put("/api/house/items/{target}/aim")
     async def house_aim(target: str, body: dict | None = None):
         """Where a flood, spot or wall light points: {kind, beam, tilt, heading}, or null."""

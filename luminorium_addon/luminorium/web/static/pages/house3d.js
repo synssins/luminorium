@@ -182,7 +182,13 @@ window.House3D = class House3D {
     for (const gl of s.glows || []) {
       if (gl.floorZ >= cut - 0.05) continue;
       const r = gl.r ?? 1.2 + 2.2 * gl.level;
-      const ring = Array.from({ length: 28 }, (_, k) => P(gl.x + Math.cos((k / 28) * Math.PI * 2) * r, gl.y + Math.sin((k / 28) * Math.PI * 2) * r, gl.floorZ + 0.02));
+      // light stops at a wall: each way out from under the light, only as far as the first wall
+      const walls = this.obstacles(gl.floor, gl.floorZ);
+      const ring = Array.from({ length: 36 }, (_, k) => {
+        const a = (k / 36) * Math.PI * 2, dx = Math.cos(a), dy = Math.sin(a);
+        const t = Math.min(r, this.wallHit2d(gl.x, gl.y, dx, dy, r, walls, gl.floorZ + 0.1));
+        return P(gl.x + dx * t, gl.y + dy * t, gl.floorZ + 0.02);
+      });
       const c0 = P(gl.x, gl.y, gl.floorZ + 0.02);
       if (!c0 || ring.some((q) => !q)) continue;
       items.push({ depth: c0.depth - 0.05, below: gl.floorZ < -0.01, room: this.roomOf(gl.x, gl.y, gl.floorZ + 0.1), rank: 2, draw: () => {
@@ -236,10 +242,12 @@ window.House3D = class House3D {
           ctx.fillStyle = glow;
           ctx.beginPath(); ctx.arc(top.x, top.y, r * 3, 0, Math.PI * 2); ctx.fill();
         }
+        if (l.form) this.drawBar(l, P, col);
         ctx.beginPath(); ctx.arc(top.x, top.y, r, 0, Math.PI * 2);
         ctx.fillStyle = l.sel ? col.accent : l.on ? "#d9a441" : col.faint;
         ctx.fill();
         ctx.lineWidth = 2; ctx.strokeStyle = col.bg; ctx.stroke();
+        this.glyph(l.icon, top.x, top.y, r);
         if (l.sel || l.hover || (!l.dim && this.scene.labels)) this.text(l.label, top.x, top.y - r - 6, col.text, 12, "center", true);
         ctx.globalAlpha = 1;
         l._screen = { x: top.x, y: top.y, r: r + 6, ppm: base && l.z !== l.floorZ ? Math.abs(base.y - top.y) / Math.abs(l.z - l.floorZ) : null };
@@ -830,6 +838,7 @@ window.House3D = class House3D {
         ctx.beginPath(); ctx.arc(top.x, top.y, r, 0, Math.PI * 2);
         ctx.fillStyle = sel ? col.accent : l.sel ? "#e6a466" : l.on ? "#d9a441" : col.faint; ctx.fill();
         ctx.lineWidth = 2; ctx.strokeStyle = col.bg; ctx.stroke();
+        this.glyph(l.icon, top.x, top.y, r);
         ctx.globalAlpha = 1;
         l._parts.push({ index: q.p.index, x: top.x, y: top.y, r: r + 6 });
       } });
@@ -874,9 +883,13 @@ window.House3D = class House3D {
     const nrm = (v) => { const n = Math.hypot(...v) || 1; return v.map((c) => c / n); };
     const e1 = nrm(cr(dir, up)), e2 = nrm(cr(dir, e1));
     const len = 2.5, half = Math.min(75, a.beam / 2) * Math.PI / 180, r = Math.tan(half) * len;
+    // each line out of the light stops at the first wall (or the floor) in its way
+    const walls = this.obstacles(l.floor, l.floorZ);
+    const clip = (v, max) => { const n = Math.hypot(...v) || 1, u = v.map((c) => c / n); const t = Math.min(max, this.rayHit3d(l, u, max, walls, l.floorZ)); return P(l.x + u[0] * t, l.y + u[1] * t, l.z + u[2] * t); };
     const rim = Array.from({ length: 18 }, (_, i) => {
       const k = (i / 18) * Math.PI * 2, c = Math.cos(k) * r, s = Math.sin(k) * r;
-      return P(l.x + dir[0] * len + e1[0] * c + e2[0] * s, l.y + dir[1] * len + e1[1] * c + e2[1] * s, l.z + dir[2] * len + e1[2] * c + e2[2] * s);
+      const v = [dir[0] * len + e1[0] * c + e2[0] * s, dir[1] * len + e1[1] * c + e2[1] * s, dir[2] * len + e1[2] * c + e2[2] * s];
+      return clip(v, Math.hypot(...v));
     });
     const apex = P(l.x, l.y, l.z);
     if (!apex || rim.some((q) => !q)) return;
@@ -899,10 +912,81 @@ window.House3D = class House3D {
       ctx.globalAlpha = l.sel ? 0.8 : 0.4; ctx.strokeStyle = color; ctx.lineWidth = 1;
       ctx.beginPath(); rim.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.closePath(); ctx.stroke();
       // the middle of the beam
-      const mid = P(l.x + dir[0] * len, l.y + dir[1] * len, l.z + dir[2] * len);
+      const mid = clip(dir, len);
       if (mid) { ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(apex.x, apex.y); ctx.lineTo(mid.x, mid.y); ctx.stroke(); }
       ctx.restore();
     } });
+  }
+
+  // What light can't pass on a level: its interior walls (floor to ceiling) and every block's
+  // walls, as upright rectangles {a, b, z0, z1}
+  obstacles(level, floorZ) {
+    const out = [];
+    const t = this.scene.top, m = this.scene.massing;
+    const f = this.scene.floors.find((q) => q.id === level);
+    if (t && f) for (const w of t.walls || []) if (w.level === level) out.push({ a: w.a, b: w.b, z0: f.elevation, z1: f.elevation + f.ceiling });
+    if (m) for (const b of m.blocks) {
+      if (b.z1 <= floorZ + 0.05 || b.z0 > floorZ + 2.5) continue;
+      const y0 = b.y0 || 0, y1 = y0 + b.depth;
+      const c = [[b.x0, y0], [b.x1, y0], [b.x1, y1], [b.x0, y1]];
+      for (let i = 0; i < 4; i++) out.push({ a: c[i], b: c[(i + 1) % 4], z0: b.z0, z1: b.z1 });
+    }
+    return out;
+  }
+  // How far a flat ray from (x, y) goes before a wall at height z (up to max)
+  wallHit2d(x, y, dx, dy, max, walls, z) {
+    let best = max;
+    for (const w of walls) {
+      if (z < w.z0 || z > w.z1) continue;
+      const t = segT(x, y, dx, dy, w.a, w.b);
+      if (t > 0.02 && t < best) best = t;
+    }
+    return best;
+  }
+  // How far a ray from the light (unit u) goes before a wall it meets at a height the wall has,
+  // or the floor under it
+  rayHit3d(o, u, max, walls, floorZ) {
+    let best = max;
+    if (u[2] < -1e-6) best = Math.min(best, (floorZ - o.z) / u[2]);
+    const flat = Math.hypot(u[0], u[1]);
+    if (flat < 1e-6) return best;
+    for (const w of walls) {
+      const s = segT(o.x, o.y, u[0] / flat, u[1] / flat, w.a, w.b);
+      if (!(s > 0.02)) continue;
+      const t = s / flat, z = o.z + u[2] * t;
+      if (t < best && z >= w.z0 - 0.01 && z <= w.z1 + 0.01) best = t;
+    }
+    return best;
+  }
+  // A bar or strip light: drawn its length, the way it lies, with short marks the way it shines
+  drawBar(l, P, col) {
+    const f = l.form, th = (f.rot || 0) * Math.PI / 180;
+    const ux = Math.cos(th), uy = -Math.sin(th), h = f.length / 2;
+    const a = P(l.x - ux * h, l.y - uy * h, l.z), b = P(l.x + ux * h, l.y + uy * h, l.z);
+    if (!a || !b) return;
+    const ctx = this.ctx, color = l.sel ? col.accent : l.on ? "#ffd28a" : col.faint;
+    ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(4, 0.07 * (a.scale + b.scale) / 2);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    // which way it shines: down, up, or out to one side
+    const out = f.face === "up" ? [0, 0, 0.18] : f.face === "side" ? [-Math.sin(th) * 0.18, -Math.cos(th) * 0.18, 0] : [0, 0, -0.18];
+    ctx.lineWidth = 1.5; ctx.globalAlpha = 0.8;
+    const n = Math.max(2, Math.min(9, Math.round(f.length / 0.3)));
+    for (let i = 0; i <= n; i++) {
+      const k = -h + (2 * h * i) / n, p0 = P(l.x + ux * k, l.y + uy * k, l.z), p1 = P(l.x + ux * k + out[0], l.y + uy * k + out[1], l.z + out[2]);
+      if (p0 && p1) { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke(); }
+    }
+    ctx.restore();
+  }
+  // A small icon on a light's orb for what kind of light it is
+  glyph(name, x, y, r) {
+    const d = GLYPHS[name];
+    if (!d || r < 7) return;
+    const ctx = this.ctx, k = (r * 1.25) / 24;
+    ctx.save(); ctx.translate(x - 12 * k, y - 12 * k); ctx.scale(k, k);
+    ctx.strokeStyle = "#1b2027"; ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.stroke(new Path2D(d));
+    ctx.restore();
   }
 
   line(a, b, color, width = 1, dash = []) {
@@ -1199,6 +1283,30 @@ window.House3D = class House3D {
 };
 
 // Points along a smooth curve through pts (Catmull-Rom), in the ground's metres
+// Where a ray from (x, y) along (dx, dy) crosses the segment a-b: its distance, or -1
+function segT(x, y, dx, dy, a, b) {
+  const ex = b[0] - a[0], ey = b[1] - a[1];
+  const den = dx * ey - dy * ex;
+  if (Math.abs(den) < 1e-9) return -1;
+  const t = ((a[0] - x) * ey - (a[1] - y) * ex) / den;
+  const s = ((a[0] - x) * dy - (a[1] - y) * dx) / den;
+  return s >= 0 && s <= 1 ? t : -1;
+}
+// Light icons, drawn on the orbs (24-unit boxes)
+const GLYPHS = {
+  bulb: "M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z",
+  ceiling: "M4 7h16M7 7a5 5 0 0 0 10 0M12 15v3M8 14l-2 2M16 14l2 2",
+  pendant: "M12 2v7M6 15a6 6 0 0 1 12 0zM12 18v2",
+  wall: "M6 4v16M6 8h4l5 4-5 4H6",
+  lamp: "M8 3h8l3 7H5zM12 10v9M8 21h8",
+  spot: "M4 9v6l6-1v-4zM10 10l10-5v14l-10-5",
+  post: "M12 3v3M9 6h6l-1 4h-4zM12 10v10M9 21h6",
+  soffit: "M3 5h18M8 5v2a4 4 0 0 0 8 0V5M12 13v3M8 14l-1 2M16 14l1 2",
+  bar: "M3 12h18M6 9v6M18 9v6",
+  fan: "M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0M12 10V3M14 12l6 3M10 12l-6 3",
+  can: "M5 8h14M7 8v3a5 5 0 0 0 10 0V8M12 17v3",
+  flush: "M3 9h18M5 9a7 6 0 0 0 14 0M12 15v.01",
+};
 // Which faces of a block it shares with a block it's joined to (the same group)
 function joinedFaces(b, blocks) {
   const out = { x0: false, x1: false, y0: false, y1: false };
