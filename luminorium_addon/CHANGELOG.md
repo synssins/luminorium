@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.44
+
+- **A refresh stays on your page:** refreshing (in Home Assistant, which reloads the add-on at the
+  Overview) comes back to the page you were on, with what it showed. Clicking Overview still
+  goes to the Overview.
+
 ## 0.3.0-dev.43
 
 - **3D drawing order, fixed:** each room is drawn as a whole, the farthest first: its floor, the

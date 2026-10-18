@@ -188,9 +188,29 @@
     }
   }
 
+  // A refresh comes back to the page you were on. In Home Assistant a refresh reloads the add-on
+  // at its start (the Overview), so each page remembers itself for the browser tab, and the
+  // Overview opened by anything but a click (a link, the menu) goes back to it.
+  function backToLastPage(page) {
+    try {
+      const ss = sessionStorage;
+      const meant = ss.getItem("lum.nav");
+      ss.removeItem("lum.nav");
+      if (page === "overview" && !meant) {
+        const last = ss.getItem("lum.last");
+        if (last && last !== "./") { location.replace(last); return true; }
+      }
+      ss.setItem("lum.last", (location.pathname.split("/").pop() || "./") + location.search);
+    } catch { /* no storage (a private window): start at the Overview */ }
+    return false;
+  }
+  // a click on any link here is meant: that page is where to go, even the Overview
+  document.addEventListener("click", (e) => { if (e.target.closest && e.target.closest("a[href]")) { try { sessionStorage.setItem("lum.nav", "1"); } catch { /* none */ } } }, true);
+
   function build() {
     const body = document.body;
     const page = body.dataset.page || "overview";
+    if (backToLastPage(page)) return;
     const title = body.dataset.title || document.title.replace(/ · Luminorium$/, "");
     const kids = [...body.childNodes].filter((n) => n.nodeName !== "SCRIPT");
 
