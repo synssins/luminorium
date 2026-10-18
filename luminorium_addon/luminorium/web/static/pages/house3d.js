@@ -188,13 +188,48 @@ window.House3D = class House3D {
     }
     items.sort((a, b) => b.depth - a.depth);
     for (const it of items) it.draw();
-    if (this.mode === "shape") this.drawBlockHandles(col);
+    if (this.mode === "shape") { this.drawBlockHandles(col); this.drawYardHandles(); }
     this.drawCube(col, W);
     // a hint (the page shows it under the view on narrow screens)
     if (W >= 520) this.text(this.aimMode ? "Aim: click what the light should point at (a wall, the ground, a tree)"
       : this.mode === "shape" ? "Shape: drag a yellow handle to size · drag the block to move it, Shift+drag up and down, or drag an arrow · Alt: no snapping"
       : this.mode === "raise" ? "Raise: drag the picked light up or down" : "Drag to turn · right-drag or wheel-drag to slide · scroll or pinch to zoom · drag the picked light to move it",
       12, H - 12, col.muted, 12, "left");
+  }
+
+  // ---- flat yard shapes (paths, driveways, patios...): picked and edited in Shape -------------
+  // The flat shape under a screen point, the last drawn (on top) first
+  hitYard(sx, sy) {
+    const t = this.scene.top;
+    if (!t) return null;
+    const at = this.onPlane(sx, sy, 0.01);
+    if (!at) return null;
+    for (const y of [...t.yard].reverse()) {
+      if (y.c) continue;
+      if (flatPolys(y).some((poly) => inPoly(at.x, at.y, poly))) return y.id;
+    }
+    return null;
+  }
+  // The picked flat shape's corners: [{part, i, at}] (part -1 is its own line or outline)
+  yardCorners() {
+    const t = this.scene.top, id = this.scene.selYard;
+    const y = t && id && t.yard.find((q) => q.id === id);
+    if (!y || !y.pts) return [];
+    const out = y.pts.map((q, i) => ({ part: -1, i, at: q }));
+    (y.parts || []).forEach((pts, part) => pts.forEach((q, i) => out.push({ part, i, at: q })));
+    return out;
+  }
+  hitYardCorner(pt) {
+    for (const c of this.yardCorners()) { const q = this.project({ x: c.at[0], y: c.at[1], z: 0.01 }); if (q && Math.hypot(q.x - pt.x, q.y - pt.y) <= 10) return c; }
+    return null;
+  }
+  drawYardHandles() {
+    const ctx = this.ctx;
+    for (const c of this.yardCorners()) {
+      const q = this.project({ x: c.at[0], y: c.at[1], z: 0.01 });
+      if (!q) continue;
+      ctx.beginPath(); ctx.rect(q.x - 6, q.y - 6, 12, 12); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#ff8a3d"; ctx.stroke();
+    }
   }
 
   // ---- windows and doors: on the front wall of their block -----------------------------------
@@ -534,10 +569,11 @@ window.House3D = class House3D {
     for (const y of t.yard) {
       const c = COLORS[y.kind] || "#b0b8c4";
       if (y.c) continue;
-      // curves are followed in the ground's own metres, so they lie flat from any angle
-      const line = y.smooth ? curvePoints(y.pts, y.kind !== "path") : y.pts;
-      if (y.kind === "path") ground(stripAround(line, (y.width ?? 1.2) / 2), c, 0.55);
-      else ground(line, c, y.kind === "pool" ? 0.45 : 0.3);
+      const sel = this.scene.selYard === y.id || (this.scene.yardPicks || []).includes(y.id);
+      const polys = flatPolys(y).map((poly) => poly.map(([x, yy]) => P(x, yy, 0.01)));
+      if (polys.some((q) => !q.every(Boolean))) continue;
+      const alpha = (y.kind === "path" ? 0.55 : y.kind === "pool" ? 0.45 : 0.3) + (sel ? 0.2 : 0);
+      unionPolys(this.ctx, polys, hexA(c, alpha), sel ? "#ff8a3d" : hexA(c, 0.8), sel ? 2.5 : 1);
     }
     for (const y of t.yard) {
       if (!y.c) continue;
@@ -771,6 +807,13 @@ window.House3D = class House3D {
           this.drag = { kind: "face", face: h, start: pt, dir: { x: (q.x - p.x) / len, y: (q.y - p.y) / len }, ppm: len, block: this.scene.selBlock };
           return;
         }
+        // a corner of the picked flat shape, or the shape itself: across the ground
+        const yc = this.scene.selYard ? this.hitYardCorner(pt) : null;
+        if (yc) { this.drag = { kind: "yardPoint", start: pt, id: this.scene.selYard, part: yc.part, i: yc.i, moved: false }; return; }
+        if (this.scene.selYard && !e.ctrlKey && !e.metaKey && this.hitYard(pt.x, pt.y) === this.scene.selYard && !(sb && this.rayHitsBlock(pt.x, pt.y, sb))) {
+          const at = this.onPlane(pt.x, pt.y, 0.01);
+          if (at) { this.drag = { kind: "yardMove", start: pt, at0: at, id: this.scene.selYard, moved: false }; return; }
+        }
         // the picked window or door: along its wall
         const so = this.scene.selOpening && this.scene.massing && this.scene.massing.openings.find((o) => o.id === this.scene.selOpening);
         if (so && this.hitOpening(pt.x, pt.y) === so.id) {
@@ -809,7 +852,7 @@ window.House3D = class House3D {
         z: hit.part === null ? sel.z : sel.parts.find((p) => p.index === hit.part).z, h0: sel.z - sel.floorZ };
       return;
     }
-    this.drag = { kind: "orbit", start: pt, yaw: this.yaw, pitch: this.pitch, hit, moved: false };
+    this.drag = { kind: "orbit", start: pt, yaw: this.yaw, pitch: this.pitch, hit, moved: false, ctrl: e.ctrlKey || e.metaKey };
   }
 
   move(e) {
@@ -828,6 +871,15 @@ window.House3D = class House3D {
       if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 3) d.moved = true;
       const at = this.onPlane(pt.x, pt.y, d.z);
       if (at && d.moved) { d.dx = at.x - d.at0.x; d.dy = at.y - d.at0.y; d.dz = 0; this.h.onBlockMove && this.h.onBlockMove(d.block, d.dx, d.dy, 0, false, d.alt); }
+      return;
+    }
+    if (d.kind === "yardMove" || d.kind === "yardPoint") {
+      if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 3) d.moved = true;
+      const at = this.onPlane(pt.x, pt.y, 0.01);
+      if (!at || !d.moved) return;
+      d.at = at;
+      if (d.kind === "yardMove") this.h.onYardMove && this.h.onYardMove(d.id, at.x - d.at0.x, at.y - d.at0.y, false, d.alt);
+      else this.h.onYardPoint && this.h.onYardPoint(d.id, d.part, d.i, at.x, at.y, false, d.alt);
       return;
     }
     if (d.kind === "openingMove") {
@@ -918,6 +970,8 @@ window.House3D = class House3D {
       return this.lookFrom(d.dir);
     }
     if (d.kind === "face") { if (d.delta) this.h.onFace && this.h.onFace(d.block, d.face.face, d.delta, true, d.alt); return; }
+    if (d.kind === "yardMove" && d.moved && d.at) { this.h.onYardMove && this.h.onYardMove(d.id, d.at.x - d.at0.x, d.at.y - d.at0.y, true, d.alt); return; }
+    if (d.kind === "yardPoint" && d.moved && d.at) { this.h.onYardPoint && this.h.onYardPoint(d.id, d.part, d.i, d.at.x, d.at.y, true, d.alt); return; }
     if (d.kind === "openingMove") { if (d.moved && d.dx !== undefined && this.h.onOpeningMove) this.h.onOpeningMove(d.id, d.dx, d.dz, true, d.alt); return; }
     if (d.kind === "blockMove" || d.kind === "blockLift" || d.kind === "axisMove") {
       if (d.moved && d.dx !== undefined && this.h.onBlockMove) this.h.onBlockMove(d.block, d.dx, d.dy, d.dz || 0, true, d.alt);
@@ -927,9 +981,12 @@ window.House3D = class House3D {
     if (d.kind === "raise" && d.moved) return this.h.onRaise(d.light.id, d.h, true);
     if (d.kind === "orbit" && !d.moved) {
       if (this.mode === "shape") {
-        const op = this.hitOpening(d.start.x, d.start.y);
+        const ctrl = d.ctrl;
+        const op = ctrl ? null : this.hitOpening(d.start.x, d.start.y);
         if (op && this.h.onOpening) { this.h.onOpening(op); return; }
-        const id = this.hitBlock(d.start.x, d.start.y);
+        const id = ctrl ? null : this.hitBlock(d.start.x, d.start.y);
+        const yd = id ? null : this.hitYard(d.start.x, d.start.y);
+        if (yd && this.h.onYard) { this.h.onYard(yd, ctrl); return; }
         if (this.h.onBlock) this.h.onBlock(id);
         return;
       }
@@ -948,6 +1005,36 @@ window.House3D = class House3D {
 };
 
 // Points along a smooth curve through pts (Catmull-Rom), in the ground's metres
+// A flat yard shape as ground outlines: an area's outline (and any merged in), a path's strips
+function flatPolys(y) {
+  const pieces = [y.pts, ...(y.parts || [])];
+  if (y.kind === "path") return pieces.map((line) => stripAround(y.smooth && !y.parts ? curvePoints(line, false) : line, (y.width ?? 1.2) / 2));
+  return pieces.map((q) => (y.smooth && !y.parts ? curvePoints(q, true) : q));
+}
+function inPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+// Screen outlines filled as one shape (overlaps once), each stroked only outside the others
+function unionPolys(ctx, polys, fill, stroke, width) {
+  const area = (q) => q.reduce((a, p, i) => { const n = q[(i + 1) % q.length]; return a + p.x * n.y - n.x * p.y; }, 0);
+  const one = polys.map((q) => (area(q) < 0 ? [...q].reverse() : q));
+  const trace = (q) => q.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.save();
+  ctx.beginPath(); one.forEach(trace); ctx.fillStyle = fill; ctx.fill("nonzero");
+  ctx.lineWidth = width; ctx.strokeStyle = stroke;
+  one.forEach((q, i) => {
+    ctx.save();
+    if (one.length > 1) { ctx.beginPath(); ctx.rect(-1e5, -1e5, 2e5, 2e5); one.forEach((o, j) => { if (j !== i) trace(o); }); ctx.clip("evenodd"); }
+    ctx.beginPath(); trace(q); ctx.closePath(); ctx.stroke();
+    ctx.restore();
+  });
+  ctx.restore();
+}
 function curvePoints(pts, closed, steps = 8) {
   const n = pts.length;
   if (n < 3) return pts;

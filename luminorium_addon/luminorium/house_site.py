@@ -125,6 +125,13 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
         else:
             shape["pts"] = _pts(y.get("pts"), 2 if kind == "path" else 3, 200)
             shape["smooth"] = bool(y.get("smooth"))
+            # Shapes merged into this one: more lines (a path) or outlines (an area), drawn and
+            # moved with it as one
+            parts = y.get("parts")
+            if parts:
+                if not isinstance(parts, list) or len(parts) > 20:
+                    raise SiteError("a yard shape has at most 20 parts")
+                shape["parts"] = [_pts(q, 2 if kind == "path" else 3, 200) for q in parts]
             if kind == "path" and y.get("width") not in (None, ""):
                 shape["width"] = _num(y["width"], 0.1, 10)
         yard.append(shape)

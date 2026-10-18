@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.36
+
+- **Paths, driveways and patios in 3D** (Shape): add one from the tool bar, tap one to pick it,
+  drag it to move it or its corners to shape it, type its size, delete it. Ctrl+click two and
+  **Merge**: paths whose ends meet become one walkway with a square corner (an L); other shapes
+  become one shape with no seam. **Split apart** undoes a merge. The Top view draws merged
+  shapes the same way.
+
 ## 0.3.0-dev.35
 
 - **Views** is off the left menu: the House map's Front photo and Top view do its job. It still

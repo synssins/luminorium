@@ -53,6 +53,7 @@
   function ceilingOf(id) { return id === house.outside ? 6 : floorsById().get(id)?.ceiling ?? 2.4; }
 
   const r2 = (v) => L.snapLen(v); // a whole inch, or 5 cm
+  const r3 = (v) => Math.round(v * 1000) / 1000; // to the millimetre
 
   async function lineClick(at) {
     if (ui.mode === "line-start") { ui.lineStart = at; ui.mode = "line-end"; paint(); toast("Now tap where the last one is"); return; }
@@ -93,6 +94,8 @@
       top: house.top,
       selBlock: ui.mode3d === "shape" ? ui.block : null,
       selOpening: ui.mode3d === "shape" ? ui.opening : null,
+      selYard: ui.mode3d === "shape" ? ui.yard : null,
+      yardPicks: ui.mode3d === "shape" ? ui.yardPicks || [] : [],
       floors: house.floors.map((f) => ({ ...f, active: f.id === ui.floor, label: L.fmtLen(f.elevation, { signed: true }) })),
       lights, grid: L.units() === "imperial" ? L.FT : 1,
       placeZ: floorZ(ui.floor), selPart: ui.part, labels: false,
@@ -124,8 +127,40 @@
         view3d.setScene(scene3d());
         if (done) { if (part === null) await placeItem(at); else await placePart(part, at); }
       },
-      onBlock: (id) => { ui.block = id; ui.opening = null; paint(); },
-      onOpening: (id) => { ui.opening = id; ui.block = null; paint(); },
+      onBlock: (id) => { ui.block = id; ui.opening = null; ui.yard = null; ui.yardPicks = []; paint(); },
+      onOpening: (id) => { ui.opening = id; ui.block = null; ui.yard = null; ui.yardPicks = []; paint(); },
+      // a flat yard shape: tap to pick it; Ctrl (or ⌘) + tap to pick several, to merge them
+      onYard: (id, ctrl) => {
+        ui.block = null; ui.opening = null;
+        if (ctrl) {
+          const now = ui.yardPicks && ui.yardPicks.length ? [...ui.yardPicks] : ui.yard ? [ui.yard] : [];
+          const i = now.indexOf(id);
+          if (i >= 0) now.splice(i, 1); else now.push(id);
+          ui.yardPicks = now.length > 1 ? now : [];
+          ui.yard = now[now.length - 1] || null;
+        } else { ui.yard = id; ui.yardPicks = []; }
+        paint();
+      },
+      onYardMove: async (id, dx, dy, done, alt) => {
+        const y = yardShape(id);
+        if (!y) return;
+        if (!ui.yardBase || ui.yardBase.id !== id) ui.yardBase = JSON.parse(JSON.stringify(y));
+        const sx = alt ? dx : L.snapLen(dx), sy = alt ? dy : L.snapLen(dy);
+        const mv = ([a, b]) => [r3(a + sx), r3(b + sy)];
+        const shift = (q, o) => { q.pts = o.pts.map(mv); if (o.parts) q.parts = o.parts.map((pp) => pp.map(mv)); };
+        shift(y, ui.yardBase);
+        view3d.setScene(scene3d());
+        if (done) { const base = ui.yardBase; ui.yardBase = null; await changeYard(id, (q) => shift(q, base)); }
+      },
+      onYardPoint: async (id, part, i, x, y, done, alt) => {
+        const s = yardShape(id);
+        if (!s) return;
+        const at = alt ? [r3(x), r3(y)] : [r2(x), r2(y)];
+        const set = (q) => { if (part < 0) q.pts[i] = at; else q.parts[part][i] = at; };
+        set(s);
+        view3d.setScene(scene3d());
+        if (done) await changeYard(id, set);
+      },
       // a window or door dragged along its wall: an inch at a time (Alt: free)
       onOpeningMove: async (id, dx, dz, done, alt) => {
         const o = house.massing && house.massing.openings.find((q) => q.id === id);
@@ -547,6 +582,150 @@
       }));
   }
 
+  // ---- flat yard shapes in 3D --------------------------------------------------------------------
+
+  const AREA_KINDS = [["driveway", "Driveway"], ["patio", "Patio"], ["pool", "Pool"], ["bed", "Garden bed"], ["lawn", "Lawn"], ["other", "Other"]];
+  function yardShape(id) { return house.top && house.top.yard.find((q) => q.id === id) || null; }
+  // Change the top view's drawing (where the yard is kept) and save it
+  async function saveSite(fn) {
+    const s = JSON.parse(JSON.stringify(house.site));
+    if (fn(s) === false) return;
+    const ok = await run(async () => { house = await api("api/house/site", { method: "PUT", body: s }); return true; });
+    if (!ok) house = await api("api/house");
+    if (site) site.load(house.site);
+    paint();
+  }
+  function changeYard(id, fn) {
+    return saveSite((s) => { const y = s.yard.find((q) => q.id === id); if (!y) return false; if (fn(y) === false) s.yard = s.yard.filter((q) => q.id !== id); });
+  }
+  // A new path or area where the view is looking, picked so its corners can be dragged
+  async function addYard(kind) {
+    if (!house.site || !house.top) { toast("Set up the Top view first (its photo and scale): the yard is kept there"); return; }
+    const c = canvas3d.getBoundingClientRect();
+    const at = view3d.onPlane(c.width / 2, c.height * 0.6, 0) || { x: house.size.width / 2, y: -3 };
+    // not under the house, where the house would hide it: out in front of it instead
+    if (at.y > -1.6 && at.y < house.size.depth && at.x > -1.6 && at.x < house.size.width + 1.6) at.y = -3;
+    const x = r2(at.x), y = r2(at.y);
+    const id = Math.random().toString(36).slice(2, 10);
+    const shape = kind === "path"
+      ? { id, kind: "path", name: "", pts: [[r2(x - 1.524), y], [r2(x + 1.524), y]], width: 0.9144, smooth: false }
+      : { id, kind: "patio", name: "", pts: [[r2(x - 1.524), r2(y - 1.524)], [r2(x + 1.524), r2(y - 1.524)], [r2(x + 1.524), r2(y + 1.524)], [r2(x - 1.524), r2(y + 1.524)]], smooth: false };
+    ui.mode3d = "shape"; ui.block = null; ui.opening = null; ui.yard = id; ui.yardPicks = [];
+    await saveSite((s) => { s.yard.push(shape); });
+    toast(kind === "path" ? "Added a path. Drag it to move it, drag its ends to stretch it, and set its width in the panel." : "Added an area. Drag it to move it and its corners to shape it; pick what it is in the panel.");
+  }
+  // Two or more flat shapes as one. Paths whose ends meet join into one path (an L or a T turns
+  // into one walkway); otherwise the others become parts of the first, drawn and moved with it.
+  function mergeYard(ids) {
+    return saveSite((s) => {
+      const list = ids.map((id) => s.yard.find((q) => q.id === id)).filter((q) => q && q.pts);
+      if (list.length < 2) return false;
+      const [first, ...rest] = list;
+      const tol = Math.max(0.3, first.width ?? 1.2);
+      const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= tol;
+      for (const o of rest) {
+        const pieces = [o.pts, ...(o.parts || [])];
+        if (first.kind === "path" && o.kind === "path" && !first.parts && !o.parts) {
+          // end to end: one line through both
+          const a = first.pts, b = o.pts;
+          let line = null;
+          const rb = [...b].reverse();
+          if (near(a[a.length - 1], b[0])) line = joinLines(a, b);
+          else if (near(a[a.length - 1], b[b.length - 1])) line = joinLines(a, rb);
+          else if (near(a[0], b[b.length - 1])) line = joinLines(b, a);
+          else if (near(a[0], b[0])) line = joinLines(rb, a);
+          if (line) { first.pts = line; first.width = Math.max(first.width ?? 1.2, o.width ?? 1.2); continue; }
+        }
+        // a path merged into an area (or the other way) becomes an outline: the strip it covers
+        const asFirst = (pts) => (first.kind === "path") === (o.kind === "path") ? pts : first.kind === "path" ? null : strip(pts, (o.width ?? 1.2) / 2);
+        if (first.kind === "path" && o.kind !== "path") { toast("Merge an area into a path the other way round: pick the area first"); return false; }
+        first.parts = [...(first.parts || []), ...pieces.map(asFirst)];
+      }
+      const drop = new Set(rest.map((q) => q.id));
+      s.yard = s.yard.filter((q) => !drop.has(q.id));
+      ui.yard = first.id; ui.yardPicks = [];
+    });
+  }
+  // Two path lines, the end of one by the start of the other, as one line: the corner where their
+  // end segments' lines cross (an L meets square), else halfway between the two ends
+  function joinLines(a, b) {
+    const p = a[a.length - 2], q = a[a.length - 1], u = b[0], v = b[1];
+    const d1 = [q[0] - p[0], q[1] - p[1]], d2 = [v[0] - u[0], v[1] - u[1]];
+    const den = d1[0] * d2[1] - d1[1] * d2[0];
+    let corner = [(q[0] + u[0]) / 2, (q[1] + u[1]) / 2];
+    if (Math.abs(den) > 1e-9) {
+      const t = ((u[0] - p[0]) * d2[1] - (u[1] - p[1]) * d2[0]) / den;
+      const x = [p[0] + d1[0] * t, p[1] + d1[1] * t];
+      // only a crossing near where they meet (not far off for lines almost in line)
+      if (Math.hypot(x[0] - q[0], x[1] - q[1]) < 3 && Math.hypot(x[0] - u[0], x[1] - u[1]) < 3) corner = x;
+    }
+    return [...a.slice(0, -1), corner.map(r3), ...b.slice(1)];
+  }
+  // A path line as the outline of the strip it covers
+  function strip(line, half) {
+    const left = [], right = [];
+    line.forEach((p, i) => {
+      const a = line[Math.max(0, i - 1)], b = line[Math.min(line.length - 1, i + 1)];
+      const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+      left.push([r3(p[0] - (dy / l) * half), r3(p[1] + (dx / l) * half)]); right.push([r3(p[0] + (dy / l) * half), r3(p[1] - (dx / l) * half)]);
+    });
+    return [...left, ...right.reverse()];
+  }
+  // Undo a merge: each part its own shape again
+  function splitYard(id) {
+    return saveSite((s) => {
+      const y = s.yard.find((q) => q.id === id);
+      if (!y || !y.parts) return false;
+      for (const pts of y.parts) s.yard.push({ ...y, id: Math.random().toString(36).slice(2, 10), pts, parts: undefined, name: "" });
+      delete y.parts;
+    });
+  }
+  function yardPanel(y) {
+    const fmt = L.fmtLen;
+    const isPath = y.kind === "path";
+    const xs = [y.pts, ...(y.parts || [])].flat().map((q) => q[0]), ys = [y.pts, ...(y.parts || [])].flat().map((q) => q[1]);
+    const W = Math.max(...xs) - Math.min(...xs), D = Math.max(...ys) - Math.min(...ys), x0 = Math.min(...xs), y0 = Math.min(...ys);
+    const len = (label, value, set) => el("label.field", el("span", label),
+      el("input.input", { value: fmt(value), inputmode: "decimal", on: { change: (e) => {
+        const v = L.parseLen(e.target.value);
+        if (!(v > 0.05)) { toast("Give a length, like 3' 6\""); e.target.value = fmt(value); return; }
+        changeYard(y.id, (q) => set(q, v));
+      } } }));
+    // an area's size: stretch it from its front left corner
+    const scale = (q, kx, ky) => { const f = ([a, b]) => [r3(x0 + (a - x0) * kx), r3(y0 + (b - y0) * ky)]; q.pts = q.pts.map(f); if (q.parts) q.parts = q.parts.map((pp) => pp.map(f)); };
+    const runLen = isPath ? y.pts.reduce((a, q, i) => (i ? a + Math.hypot(q[0] - y.pts[i - 1][0], q[1] - y.pts[i - 1][1]) : 0), 0) : 0;
+    return el("aside.card.accent.hm-insp", { "aria-label": "Picked yard shape" },
+      el("div", el("h2", y.name || (isPath ? "Path" : (AREA_KINDS.find((k) => k[0] === y.kind) || [, "Area"])[1])),
+        el("span.small.muted", y.parts ? `Made of ${y.parts.length + 1} pieces, merged` : "Drag it to move it; drag its white corners to shape it.")),
+      el("label.field", el("span", "Name"), el("input.input", { value: y.name || "", placeholder: isPath ? "Front walk" : "Driveway", on: { change: (e) => changeYard(y.id, (q) => { q.name = e.target.value; }) } })),
+      isPath ? null : el("label.field", el("span", "What it is"), el("select", { on: { change: (e) => changeYard(y.id, (q) => { q.kind = e.target.value; }) } },
+        AREA_KINDS.map(([k, label]) => el("option", { value: k, selected: y.kind === k ? "" : null }, label)))),
+      isPath ? el("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" } },
+        len("Width", y.width ?? 1.2, (q, v) => { q.width = r3(v); }),
+        y.pts.length === 2 && !y.parts ? len("Length", runLen, (q, v) => {
+          const [a, b] = q.pts, l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+          q.pts = [a, [r3(a[0] + ((b[0] - a[0]) / l) * v), r3(a[1] + ((b[1] - a[1]) / l) * v)]];
+        }) : el("div.field", el("span", "Length"), el("span.mono", fmt(runLen))))
+        : el("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" } },
+          len("Across", W, (q, v) => scale(q, v / (W || 1), 1)), len("Front to back", D, (q, v) => scale(q, 1, v / (D || 1)))),
+      y.parts ? null : el("label.check.small", el("input", { type: "checkbox", checked: !!y.smooth, on: { change: (e) => changeYard(y.id, (q) => { q.smooth = e.target.checked; }) } }), "Curved"),
+      el("span.small.muted", "Ctrl+click another flat shape to pick both, then Merge: paths whose ends meet become one walkway; others become one shape."),
+      el("div.row", { style: { gap: "8px", flexWrap: "wrap" } },
+        el("button.btn", { type: "button", on: { click: () => { ui.yard = null; paint(); } } }, "Done"),
+        y.parts ? el("button.btn", { type: "button", on: { click: () => splitYard(y.id) } }, "Split apart") : null,
+        el("button.btn.danger", { type: "button", on: { click: () => { ui.yard = null; changeYard(y.id, () => false); } } }, "Delete")));
+  }
+  function yardManyPanel(ids) {
+    const names = ids.map((id) => yardShape(id)).filter(Boolean).map((y) => y.name || y.kind);
+    return el("aside.card.accent.hm-insp", { "aria-label": "Picked yard shapes" },
+      el("h2", `${ids.length} picked`), el("span.small", names.join(", ")),
+      el("span.small.muted", "Merge makes them one: paths whose ends meet become one walkway (an L), others one shape. The first one picked keeps its name and kind."),
+      el("div.row", { style: { gap: "8px", flexWrap: "wrap" } },
+        el("button.btn.primary", { type: "button", on: { click: () => mergeYard(ids) } }, "Merge"),
+        el("button.btn", { type: "button", on: { click: () => { ui.yardPicks = []; paint(); } } }, "Cancel"),
+        el("button.btn.danger", { type: "button", on: { click: () => { const drop = new Set(ids); ui.yard = null; ui.yardPicks = []; saveSite((s) => { s.yard = s.yard.filter((q) => !drop.has(q.id)); }); } } }, "Delete them")));
+  }
+
   // A window or door, changed on the front photo's drawing (its own metres there; the same
   // distances as in 3D)
   async function changeOpening(id, fn) {
@@ -582,6 +761,11 @@
         el("button.btn.danger", { type: "button", on: { click: () => { ui.opening = null; changeOpening(o.id, () => false); } } }, "Delete")));
   }
   function inspector() {
+    if (ui.view === "3d" && ui.mode3d === "shape" && ui.yardPicks && ui.yardPicks.length > 1) return yardManyPanel(ui.yardPicks);
+    if (ui.view === "3d" && ui.mode3d === "shape" && ui.yard) {
+      const y = yardShape(ui.yard);
+      if (y) return yardPanel(y);
+    }
     if (ui.view === "3d" && ui.mode3d === "shape" && ui.opening) {
       const o = house.massing && house.massing.openings.find((q) => q.id === ui.opening);
       if (o) return openingPanel(o);
@@ -730,6 +914,9 @@
     blocks: "M3 20V10h8v10M11 20V6h10v14M3 20h18",
     yard: "M12 3a5 5 0 0 0-5 5c0 3 5 9 5 9s5-6 5-9a5 5 0 0 0-5-5zM4 21h16",
     fold: "M15 6l-6 6 6 6",
+    path: "M4 20c4-2 4-6 8-8s4-6 8-8",
+    area: "M4 8l6-4 10 4v10l-10 2-6-4z",
+    merge: "M4 6h6v6H4zM14 12h6v6h-6zM10 9h2a2 2 0 0 1 2 2v1",
   };
   // One tool: an icon over a short name
   function tool(label, iconD, { pressed = null, disabled = false, title = null, click }) {
@@ -737,7 +924,7 @@
       disabled: disabled ? "" : null, on: { click } }, svgI(iconD), el("span", label));
   }
   function pickedBlock() { return ui.block && house.massing ? house.massing.blocks.find((q) => q.id === ui.block) || null : null; }
-  function setMode3d(k) { ui.mode3d = k; if (k !== "shape") { ui.block = null; ui.opening = null; } ui.aiming = false; paint(); }
+  function setMode3d(k) { ui.mode3d = k; if (k !== "shape") { ui.block = null; ui.opening = null; ui.yard = null; ui.yardPicks = []; } ui.aiming = false; paint(); }
   // The 3D view's tools, in groups, with the level shown at the right
   function tools3d() {
     const b = ui.mode3d === "shape" ? pickedBlock() : null;
@@ -753,6 +940,9 @@
         click: () => { ui.mode3d = "shape"; addBlock(b); } }),
         tool("Split", I.split, { disabled: !b, title: b ? "Split the picked block front to back, in half (set where in the panel)" : "Pick a block in Shape first",
           click: () => splitBlock(b.id, Math.round((b.depth / 2) / 0.0254) * 0.0254) })),
+      grp(tool("Add path", I.path, { title: "Add a path or walkway on the ground", click: () => addYard("path") }),
+        tool("Add area", I.area, { title: "Add a driveway, patio or other flat area", click: () => addYard("area") }),
+        tool("Merge", I.merge, { disabled: !(ui.mode3d === "shape" && ui.yardPicks && ui.yardPicks.length > 1), title: "Ctrl+click two flat shapes, then merge them into one", click: () => mergeYard(ui.yardPicks) })),
       grp(tool("Aim", I.aim, { pressed: !!ui.aiming, disabled: !canAim, title: canAim ? "Click what the picked light should point at" : "Pick a flood or spot light first",
         click: () => { ui.aiming = !ui.aiming; paint(); } })),
       grp(tool("Home", I.home, { click: () => view3d && view3d.animateTo(-0.55, 0.62, { x: 0, y: 0, z: 0 }) }),
@@ -873,8 +1063,10 @@
       ensure3d();
       const t = ui.sel && target(ui.sel);
       const lineBanner = ui.mode ? el("div.banner", { style: { fontSize: "14px" } }, ui.mode === "line-start" ? "Tap where the first part is." : "Now tap where the last part is.") : null;
-      const hint = ui.mode3d === "shape" && ui.opening ? "Drag the window or door along its wall, or type in the panel. Tap a house block to pick it instead."
-        : ui.mode3d === "shape" ? (ui.block ? "Drag a yellow handle to move that face, or drag the block to move it (Shift+drag: up and down; Alt: no snapping). Or type amounts in the panel." : "Tap a house block, or a window or door, to pick it. Or Add block in the tool bar.")
+      const hint = ui.mode3d === "shape" && ui.yardPicks && ui.yardPicks.length > 1 ? "Ctrl+click more to add them, then Merge in the tool bar or the panel."
+        : ui.mode3d === "shape" && ui.yard ? "Drag the shape to move it, its white corners to shape it (an inch at a time; Alt: free). Ctrl+click another to merge them."
+        : ui.mode3d === "shape" && ui.opening ? "Drag the window or door along its wall, or type in the panel. Tap a house block to pick it instead."
+        : ui.mode3d === "shape" ? (ui.block ? "Drag a yellow handle to move that face, or drag the block to move it (Shift+drag: up and down; Alt: no snapping). Or type amounts in the panel." : "Tap a house block, a window or door, or a path or driveway on the ground to pick it. Or add one from the tool bar.")
         : ui.aiming && t ? `Click what ${t.name} should point at: a wall, the ground, or a tree. Drag to turn the view first if you need to.`
         : !t ? "Pick a light: open Lights on the left, or tap one in the view."
         : !t.placed ? `Tap where ${t.name} is on the ${floorName(ui.floor)} floor.`

@@ -224,7 +224,7 @@ window.SiteEditor = class SiteEditor {
     const move = ([x, y]) => { const [u, v] = this.h2p(x, y, old || this.provisional()); return this.p2h(u, v, xf).map(round3); };
     if (old) {
       if (d.outline) d.outline = d.outline.map(move);
-      for (const y of d.yard) { if (y.pts) y.pts = y.pts.map(move); if (y.c) { y.c = move(y.c); y.r = round3(y.r * xf.s / old.s); } }
+      for (const y of d.yard) { if (y.pts) y.pts = y.pts.map(move); if (y.parts) y.parts = y.parts.map((q) => q.map(move)); if (y.c) { y.c = move(y.c); y.r = round3(y.r * xf.s / old.s); } }
     }
     d.xf = xf;
   }
@@ -761,10 +761,11 @@ window.SiteEditor = class SiteEditor {
     for (let x = Math.floor(x0 / step) * step; x <= x1; x += step) { const a = this.h2s(x, 0); ctx.strokeStyle = "rgba(128,140,160,0.12)"; ctx.beginPath(); ctx.moveTo(a.x, 0); ctx.lineTo(a.x, H); ctx.stroke(); }
     for (let y = Math.floor(y0 / step) * step; y <= y1; y += step) { const a = this.h2s(0, y); ctx.strokeStyle = "rgba(128,140,160,0.12)"; ctx.beginPath(); ctx.moveTo(0, a.y); ctx.lineTo(W, a.y); ctx.stroke(); }
   }
-  hpath(ctx, pts, close = true, smooth = false) {
+  hpath(ctx, pts, close = true, smooth = false, more = false) {
     const q = pts.map(([x, y]) => this.h2s(x, y));
-    if (smooth && q.length > 2) { smoothPath(ctx, q, close); return; }
-    ctx.beginPath(); q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); if (close) ctx.closePath();
+    if (smooth && q.length > 2 && !more) { smoothPath(ctx, q, close); return; }
+    if (!more) ctx.beginPath();
+    q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); if (close) ctx.closePath();
   }
   handles(ctx, pts, color) {
     for (const [x, y] of pts) { const p = this.h2s(x, y); ctx.beginPath(); ctx.rect(p.x - 6, p.y - 6, 12, 12); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = color; ctx.stroke(); }
@@ -788,14 +789,16 @@ window.SiteEditor = class SiteEditor {
         ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill();
         if (sel) this.handles(ctx, [[y.c[0] + y.r, y.c[1]]], c);
       } else if (y.kind === "path") {
-        this.hpath(ctx, y.pts, false, y.smooth);
+        // every line in one stroke, so where merged ones cross it isn't drawn twice
+        if (!y.parts) this.hpath(ctx, y.pts, false, y.smooth);
+        else { ctx.beginPath(); for (const line of yardPieces(y)) this.hpath(ctx, line, false, false, true); }
         ctx.lineCap = "round"; ctx.lineJoin = "round";
         ctx.lineWidth = Math.max(3, (y.width ?? 1.2) * this.view.k); ctx.strokeStyle = hexA(c, sel ? 0.75 : 0.55); ctx.stroke();
         ctx.lineCap = "butt";
         if (sel) this.handles(ctx, y.pts, c);
       } else {
-        this.hpath(ctx, y.pts, true, y.smooth);
-        ctx.fillStyle = hexA(c, sel ? 0.5 : 0.32); ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.5; ctx.strokeStyle = c; ctx.stroke();
+        if (!y.parts) { this.hpath(ctx, y.pts, true, y.smooth); ctx.fillStyle = hexA(c, sel ? 0.5 : 0.32); ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.5; ctx.strokeStyle = c; ctx.stroke(); }
+        else drawUnion(ctx, yardPieces(y).map((q) => q.map(([a, b]) => this.h2s(a, b))), hexA(c, sel ? 0.5 : 0.32), c, sel ? 2.5 : 1.5);
         if (sel) this.handles(ctx, y.pts, c);
       }
       if (y.name) { const at = y.c || centroid(y.pts); const p = this.h2s(at[0], at[1]); label(ctx, y.name, p.x, p.y - 6, "#fff", col, "center"); }
@@ -1326,8 +1329,8 @@ window.SiteEditor = class SiteEditor {
     for (const t of d.stairs) if ((t.level === this.level || t.to === this.level) && x >= t.x0 && x <= t.x1 && y >= t.y0 && y <= t.y1) return { kind: "stairs", id: t.id };
     for (const yd of [...d.yard].reverse()) {
       if (yd.c && Math.hypot(yd.c[0] - x, yd.c[1] - y) <= yd.r) return { kind: "yard", id: yd.id };
-      if (yd.kind === "path" && yd.pts.some((q, i) => i && segDist([x, y], yd.pts[i - 1], q) <= (yd.width ?? 1.2) / 2 + tol)) return { kind: "yard", id: yd.id };
-      if (yd.pts && yd.kind !== "path" && insidePoly({ x, y }, yd.pts)) return { kind: "yard", id: yd.id };
+      if (yd.kind === "path" && yardPieces(yd).some((line) => line.some((q, i) => i && segDist([x, y], line[i - 1], q) <= (yd.width ?? 1.2) / 2 + tol))) return { kind: "yard", id: yd.id };
+      if (yd.pts && yd.kind !== "path" && yardPieces(yd).some((poly) => insidePoly({ x, y }, poly))) return { kind: "yard", id: yd.id };
     }
     if (d.outline && insidePoly({ x, y }, d.outline)) return { kind: "outline" };
     return null;
@@ -1506,7 +1509,7 @@ window.SiteEditor = class SiteEditor {
     if (!s) return;
     const mv = ([px, py]) => [round3(px + dx), round3(py + dy)];
     if (d.hit.kind === "outline") { this.doc.outline = o.map(mv); return; }
-    if (d.hit.kind === "yard") { if (o.c) s.c = mv(o.c); else s.pts = o.pts.map(mv); return; }
+    if (d.hit.kind === "yard") { if (o.c) s.c = mv(o.c); else { s.pts = o.pts.map(mv); if (o.parts) s.parts = o.parts.map((q) => q.map(mv)); } return; }
     if (d.hit.kind === "wall") { const [a, b] = this.snapWallMove(s, mv(o.a), mv(o.b), this.altHeld); s.a = a; s.b = b; return; }
     if (d.hit.kind === "room") { s.at = mv(o.at); return; }
     if (d.hit.kind === "stairs") { s.x0 = round3(o.x0 + dx); s.x1 = round3(o.x1 + dx); s.y0 = round3(o.y0 + dy); s.y1 = round3(o.y1 + dy); return; }
@@ -1707,6 +1710,7 @@ window.SiteEditor = class SiteEditor {
     for (const y of CLIP.yard) {
       const id = uid(), yy = JSON.parse(JSON.stringify(y));
       if (yy.pts) yy.pts = yy.pts.map(([a, b]) => [round3(a + 0.3048), round3(b - 0.3048)]);
+      if (yy.parts) yy.parts = yy.parts.map((q) => q.map(([a, b]) => [round3(a + 0.3048), round3(b - 0.3048)]));
       if (yy.c) yy.c = [round3(yy.c[0] + 0.3048), round3(yy.c[1] - 0.3048)];
       d.yard.push({ ...yy, id });
       picks.push({ kind: "yard", id });
@@ -1900,6 +1904,28 @@ function setStair(s, { width, tread, steps }, floors) {
   const run = n * tr;
   if (s.dir[1] === "+") s[`${along}1`] = round3(s[`${along}0`] + run); else s[`${along}0`] = round3(s[`${along}1`] - run);
 }
+// A yard shape's pieces: its own line or outline, then any merged into it
+function yardPieces(y) { return y.pts ? [y.pts, ...(y.parts || [])] : []; }
+// Several outlines filled as one shape: overlaps filled once, and each outline stroked only where
+// it isn't inside another, so merged shapes show no seam
+function drawUnion(ctx, polys, fill, stroke, width) {
+  const area = (q) => q.reduce((a, p, i) => { const n = q[(i + 1) % q.length]; return a + p.x * n.y - n.x * p.y; }, 0);
+  const one = polys.map((q) => (area(q) < 0 ? [...q].reverse() : q)); // all the same way round
+  ctx.beginPath();
+  for (const q of one) q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.fillStyle = fill; ctx.fill("nonzero");
+  ctx.lineWidth = width; ctx.strokeStyle = stroke;
+  one.forEach((q, i) => {
+    ctx.save();
+    if (one.length > 1) {
+      ctx.beginPath(); ctx.rect(-1e5, -1e5, 2e5, 2e5);
+      one.forEach((o, j) => { if (j !== i) o.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); });
+      ctx.clip("evenodd");
+    }
+    ctx.beginPath(); q.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); ctx.stroke();
+    ctx.restore();
+  });
+}
 // What can be picked several at a time, copied and pasted, and where each kind is kept
 const COPYABLE = ["wall", "room", "stairs", "yard"];
 const LISTS = { yard: "yard", wall: "walls", door: "doors", room: "rooms", stairs: "stairs" };
@@ -1913,7 +1939,7 @@ function moveItem(kind, s, o, dx, dy) {
   if (kind === "wall") { s.a = mv(o.a); s.b = mv(o.b); }
   else if (kind === "room") s.at = mv(o.at);
   else if (kind === "stairs") { s.x0 = round3(o.x0 + dx); s.x1 = round3(o.x1 + dx); s.y0 = round3(o.y0 + dy); s.y1 = round3(o.y1 + dy); }
-  else if (kind === "yard") { if (o.c) s.c = mv(o.c); else s.pts = o.pts.map(mv); }
+  else if (kind === "yard") { if (o.c) s.c = mv(o.c); else { s.pts = o.pts.map(mv); if (o.parts) s.parts = o.parts.map((q) => q.map(mv)); } }
 }
 // Stairs as seen from the level they lead to: from there they go the other way
 function stairsSeenFrom(t) {

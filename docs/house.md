@@ -365,6 +365,16 @@ CAD layout"):
     `POST /api/house/blocks/{id}/split` `{front_depth}`, in house metres. Blocks behind others
     (`behind`) aren't on the front photo. The house's left edge is fixed (`facade.ox`) once there
     are blocks, so moving a block's left face doesn't shift what's placed by it.
+  - **Flat yard shapes in 3D** (Shape): **Add path** (a 10' walkway, 3' wide) and **Add area** (a
+    10' square patio; pick what it is: driveway, patio, pool, garden bed, lawn) go where the
+    view is looking, or out front when that's the house. Tap one on the ground to pick it
+    (orange): drag it to move it, drag its white corners to shape it (an inch at a time; Alt:
+    free), or type its width and length (a path) or across and front to back (an area);
+    **Delete** removes it. Ctrl+click (⌘) a second one and **Merge**: two paths whose ends meet
+    become one walkway, the corner where their lines cross (an L); otherwise the others become
+    `parts` of the first, filled and outlined as one shape and moved with it (a path merged into
+    an area becomes the strip it covers). **Split apart** undoes it. They're kept in the top
+    view's drawing (`site.yard[].parts`).
   - Tap a light to pick it. A light (or part) not placed yet goes where you then tap the floor,
     on the level chosen at the right of the tool bar. Tapping off a placed light lets go of it: it only moves
     when dragged.

@@ -568,8 +568,14 @@ async def test_top_view_walls_yard_and_plans(client, lum):
     assert top["walls"][0]["thick"] == pytest.approx(0.1842 + 2 * 0.01905, abs=1e-4)
     assert top["ext_thick"] == pytest.approx(0.1397 + 0.0127 + 0.0111 + 0.019, abs=1e-4)
     assert [y["kind"] for y in top["yard"]] == ["driveway", "tree", "path"]
+    # two shapes merged into one: the second is a part of the first
+    merged = {"kind": "patio", "pts": [[0, 0], [3, 0], [3, 3], [0, 3]]}
+    merged["parts"] = [[[3, 0], [6, 0], [6, 1], [3, 1]]]
+    view = (await client.put("/api/house/site", json={**body, "yard": [merged]})).json()
+    assert view["top"]["yard"][0]["parts"] == [[[3, 0], [6, 0], [6, 1], [3, 1]]]
     for broken in (
         {**body, "yard": [{"kind": "volcano", "pts": [[0, 0], [1, 0], [1, 1]]}]},
+        {**body, "yard": [{**merged, "parts": [[[0, 0], [1, 1]]]}]},  # an area part needs 3
         {**body, "walls": [{**body["walls"][0], "level": "attic"}]},
         {**body, "walls": [{**body["walls"][0], "studs": "2x12"}]},
         {**body, "doors": [{"wall": "nowhere", "at": 1}]},
