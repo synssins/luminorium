@@ -365,6 +365,14 @@ CAD layout"):
     `POST /api/house/blocks/{id}/split` `{front_depth}`, in house metres. Blocks behind others
     (`behind`) aren't on the front photo. The house's left edge is fixed (`facade.ox`) once there
     are blocks, so moving a block's left face doesn't shift what's placed by it.
+  - **Levels** are drawn only under the blocks in them (a block of that level, or one spanning its
+    height), not as a slab the size of the house; a level with no block shows just its name.
+    Picking a block in Shape hides everything above its top (blocks, roofs, floors, windows,
+    lights), to see into it, until it's let go.
+  - **Dimensions** (tool bar) labels each block with across × front to back and its height.
+    **Inside** takes off the walls, as a tape reads in the room: half an inside wall (2x4 with
+    drywall, 4 1/2") where a block meets another face to face, an outside wall (the Top view's
+    build) where it doesn't. **Overall** is to the outside faces. Both are remembered.
   - **Flat yard shapes in 3D** (Shape): **Add path** (a 10' walkway, 3' wide) and **Add area** (a
     10' square patio; pick what it is: driveway, patio, pool, garden bed, lawn) go where the
     view is looking, or out front when that's the house. Tap one on the ground to pick it

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.37
+
+- **3D, easier to read:** each level's floor lies only under its own blocks (no more basement
+  square sticking out in front of the house). Picking a block hides everything above it, so you
+  can see in. **Dimensions** in the tool bar labels every block's size, **Inside** (less the
+  walls, as a tape reads) or **Overall**.
+- The **Levels** pane shows names and how many of each level's lights are placed, not heights.
+
 ## 0.3.0-dev.36
 
 - **Paths, driveways and patios in 3D** (Shape): add one from the tool bar, tap one to pick it,

@@ -20,6 +20,8 @@
     mode3d: "move",                     // "move" | "raise" in the 3D view
     folded: new Set(L.store("house.folded", [])), // levels folded away in the list
     // the panel open on the left: lights, levels, rooms, blocks, yard, or "" for none
+    dims: !!L.store("house.dims", false),          // block dimensions shown in 3D
+    dimsInside: L.store("house.dimsInside", true) !== false, // inside (as taped) or overall
     panel: ["lights", "levels", "rooms", "blocks", "yard", ""].includes(L.store("house.panel", "lights")) ? L.store("house.panel", "lights") : "lights",
   };
   let house = null;
@@ -95,6 +97,9 @@
       selBlock: ui.mode3d === "shape" ? ui.block : null,
       selOpening: ui.mode3d === "shape" ? ui.opening : null,
       selYard: ui.mode3d === "shape" ? ui.yard : null,
+      // a block picked in Shape: everything above its top is hidden, to see into it
+      cutZ: (() => { const b = ui.mode3d === "shape" && ui.block && m && m.blocks.find((q) => q.id === ui.block); return b ? b.z1 : null; })(),
+      dims: ui.dims ? blockDims() : [],
       yardPicks: ui.mode3d === "shape" ? ui.yardPicks || [] : [],
       floors: house.floors.map((f) => ({ ...f, active: f.id === ui.floor, label: L.fmtLen(f.elevation, { signed: true }) })),
       lights, grid: L.units() === "imperial" ? L.FT : 1,
@@ -582,6 +587,44 @@
       }));
   }
 
+  // ---- dimensions: each block's size, inside (as a tape reads in the room) or overall ----------
+
+  const INT_WALL = 0.0889 + 2 * 0.0127; // 2x4 with drywall both sides: 4 1/2"
+  // A block's faces that another block's face meets (an inside wall between them), else outside
+  function sharedFaces(b) {
+    const out = { x0: false, x1: false, y0: false, y1: false };
+    const by0 = b.y0 || 0, by1 = by0 + b.depth;
+    for (const o of house.massing.blocks) {
+      if (o === b) continue;
+      const oy0 = o.y0 || 0, oy1 = oy0 + o.depth;
+      const zOver = Math.min(b.z1, o.z1) - Math.max(b.z0, o.z0) > 0.3;
+      const yOver = Math.min(by1, oy1) - Math.max(by0, oy0) > 0.3, xOver = Math.min(b.x1, o.x1) - Math.max(b.x0, o.x0) > 0.3;
+      if (!zOver) continue;
+      if (yOver && Math.abs(o.x1 - b.x0) < 0.03) out.x0 = true;
+      if (yOver && Math.abs(o.x0 - b.x1) < 0.03) out.x1 = true;
+      if (xOver && Math.abs(o.y1 - by0) < 0.03) out.y0 = true;
+      if (xOver && Math.abs(o.y0 - by1) < 0.03) out.y1 = true;
+    }
+    return out;
+  }
+  // Labels over each block: across × front to back, and its height. Inside takes off the walls:
+  // half an inside wall where a block meets another, an outside wall where it doesn't.
+  function blockDims() {
+    const m = house.massing;
+    if (!m) return [];
+    const ext = (house.top && house.top.ext_thick) || 0.1835;
+    const fmt = L.fmtLen;
+    return m.blocks.map((b) => {
+      const y0 = b.y0 || 0;
+      let w = b.x1 - b.x0, d = b.depth;
+      if (ui.dimsInside) {
+        const sh = sharedFaces(b), t = (k) => (sh[k] ? INT_WALL / 2 : ext);
+        w -= t("x0") + t("x1"); d -= t("y0") + t("y1");
+      }
+      return { at: { x: (b.x0 + b.x1) / 2, y: y0 + b.depth / 2, z: b.z1 }, top: true, text: `${fmt(w)} × ${fmt(d)}  ·  ${fmt(b.z1 - b.z0)} high` };
+    });
+  }
+
   // ---- flat yard shapes in 3D --------------------------------------------------------------------
 
   const AREA_KINDS = [["driveway", "Driveway"], ["patio", "Patio"], ["pool", "Pool"], ["bed", "Garden bed"], ["lawn", "Lawn"], ["other", "Other"]];
@@ -914,6 +957,7 @@
     blocks: "M3 20V10h8v10M11 20V6h10v14M3 20h18",
     yard: "M12 3a5 5 0 0 0-5 5c0 3 5 9 5 9s5-6 5-9a5 5 0 0 0-5-5zM4 21h16",
     fold: "M15 6l-6 6 6 6",
+    dims: "M3 7v10M21 7v10M3 12h18M7 9l-4 3 4 3M17 9l4 3-4 3",
     path: "M4 20c4-2 4-6 8-8s4-6 8-8",
     area: "M4 8l6-4 10 4v10l-10 2-6-4z",
     merge: "M4 6h6v6H4zM14 12h6v6h-6zM10 9h2a2 2 0 0 1 2 2v1",
@@ -945,6 +989,10 @@
         tool("Merge", I.merge, { disabled: !(ui.mode3d === "shape" && ui.yardPicks && ui.yardPicks.length > 1), title: "Ctrl+click two flat shapes, then merge them into one", click: () => mergeYard(ui.yardPicks) })),
       grp(tool("Aim", I.aim, { pressed: !!ui.aiming, disabled: !canAim, title: canAim ? "Click what the picked light should point at" : "Pick a flood or spot light first",
         click: () => { ui.aiming = !ui.aiming; paint(); } })),
+      grp(tool("Dimensions", I.dims, { pressed: !!ui.dims, title: "Show each block's size", click: () => { ui.dims = !ui.dims; L.save("house.dims", ui.dims); paint(); } }),
+        ui.dims ? el("div.seg", { role: "radiogroup", "aria-label": "Dimensions measured", style: { marginLeft: "4px" } },
+          [[true, "Inside"], [false, "Overall"]].map(([v, label]) => el("button", { type: "button", role: "radio", "aria-checked": String(!!ui.dimsInside === v),
+            title: v ? "As a tape reads inside the room: less the walls" : "To the outside faces", on: { click: () => { ui.dimsInside = v; L.save("house.dimsInside", v); paint(); } } }, label))) : null),
       grp(tool("Home", I.home, { click: () => view3d && view3d.animateTo(-0.55, 0.62, { x: 0, y: 0, z: 0 }) }),
         tool("Front", I.front, { title: "Look from the street", click: () => view3d && view3d.lookFrom({ x: 0, y: -1, z: 0 }) }),
         tool("Top", I.top, { title: "Look down from above", click: () => view3d && view3d.lookFrom({ x: 0, y: 0, z: 1 }) }),
@@ -970,13 +1018,16 @@
       el("button.hm-fold", { type: "button", title: "Fold away", "aria-label": `Fold the ${title.toLowerCase()} away`, on: { click: () => openPane(ui.panel) } }, svgI(I.fold, 18)));
   }
   const rowBtn = (on, click, ...kids) => el("button.hm-row", { type: "button", "aria-pressed": String(!!on), on: { click } }, ...kids);
+  function placedOn(id) {
+    const here = house.targets.filter((t) => (floorsById().has(t.floor_id) ? t.floor_id : house.outside) === id);
+    return here.length ? `${here.filter((t) => t.placed).length} of ${here.length} placed` : "";
+  }
   function levelsPane() {
-    const fmt = L.fmtLen;
     return el("div.hm-pane", { "aria-label": "Levels" }, paneHead("Levels"),
-      el("span.small.muted", "Your Home Assistant floors, bottom up from the ground outside. Tap one to show it in 3D and in the Top view."),
+      el("span.small.muted", "Your Home Assistant floors, top down. Tap one to show it in 3D and in the Top view."),
       [...house.floors].sort((a, b) => b.elevation - a.elevation).map((f) => rowBtn(ui.floor === f.id, () => { ui.floor = f.id; if (site) site.level = f.id; paint(); },
-        el("span", { style: { flex: "1" } }, f.name), el("span.small.muted.mono", `${fmt(f.elevation)} · ${fmt(f.ceiling)}`))),
-      rowBtn(ui.floor === house.outside, () => { ui.floor = house.outside; if (site) site.level = house.outside; paint(); }, el("span", { style: { flex: "1" } }, "Outside")),
+        el("span", { style: { flex: "1" } }, f.name), el("span.small.muted", placedOn(f.id)))),
+      rowBtn(ui.floor === house.outside, () => { ui.floor = house.outside; if (site) site.level = house.outside; paint(); }, el("span", { style: { flex: "1" } }, "Outside"), el("span.small.muted", placedOn(house.outside))),
       el("button.btn.small", { type: "button", on: { click: () => { ui.settings = true; paint(); } } }, "Floors & size"));
   }
   // Rooms and yard shapes are drawn in the Top view: a tap there shows and picks one

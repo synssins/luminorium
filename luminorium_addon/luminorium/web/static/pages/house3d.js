@@ -134,8 +134,31 @@ window.House3D = class House3D {
       items.push({ depth: depthOf(P(a[0], a[1], z), P(b[0], b[1], z)), draw: () => this.line(P(a[0], a[1], z), P(b[0], b[1], z), col.faint, 1) });
     }
     // floors: a slab at each elevation over its span, and a faint ceiling
+    const cut = s.cutZ ?? Infinity; // a block picked in Shape: what's above it is hidden
     for (const f of s.floors) {
+      if (f.elevation >= cut - 0.05) continue;
       const x0 = f.x0 ?? 0, x1 = f.x1 ?? s.W;
+      // a level's floor lies only under the blocks it's in (else the whole house, as before)
+      const spans = this.floorSpans(f, x0, x1);
+      if (spans.length > 1 || (spans.length === 1 && spans[0].own)) {
+        for (const r of spans) {
+          const q = [P(r.x0, r.y0, f.elevation), P(r.x1, r.y0, f.elevation), P(r.x1, r.y1, f.elevation), P(r.x0, r.y1, f.elevation)];
+          items.push({ depth: avgDepth(q) + 0.01, draw: () => {
+            if (f.set === false) this.ctx.setLineDash([5, 4]);
+            this.poly(q, f.active ? col.accent : col.card2, f.set === false ? 0 : f.active ? 0.18 : 0.55, f.active ? col.accent : col.line2);
+            this.ctx.setLineDash([]);
+          } });
+        }
+        const r0 = spans[0], lab = P(r0.x0 + 0.3, r0.y0 + 0.2, f.elevation);
+        if (lab) items.push({ depth: lab.depth, draw: () => this.text(`${f.name}  ${f.label}${f.set === false ? " (guessed)" : ""}`, lab.x, lab.y - 4, f.active ? col.accent : col.muted, 11, "left") });
+        continue;
+      }
+      // a house with blocks but none in this level: just its name, no floor the size of the house
+      if (s.massing && s.massing.blocks.length) {
+        const lab = P(x0 + 0.3, 0.2, f.elevation);
+        if (lab) items.push({ depth: lab.depth, draw: () => this.text(`${f.name}  ${f.label}${f.set === false ? " (guessed)" : ""}`, lab.x, lab.y - 4, f.active ? col.accent : col.muted, 11, "left") });
+        continue;
+      }
       const quad = (z) => [P(x0, 0, z), P(x1, 0, z), P(x1, s.D, z), P(x0, s.D, z)];
       const floorQ = quad(f.elevation), ceilQ = quad(f.elevation + f.ceiling);
       // a floor whose height is guessed from the others is only outlined, dashed
@@ -156,7 +179,7 @@ window.House3D = class House3D {
     // lights: a drop line to the floor, a shadow, the orb; parts as small dots
     for (const l of s.lights) {
       const top = P(l.x, l.y, l.z), base = P(l.x, l.y, l.floorZ);
-      if (!top) continue;
+      if (!top || l.floorZ >= cut - 0.05) continue;
       if (l.aim && !l.dim) this.beam(items, P, l);
       if (l.linked) { this.fixtures(items, P, l, col); continue; }
       for (const p of l.parts) {
@@ -189,12 +212,32 @@ window.House3D = class House3D {
     items.sort((a, b) => b.depth - a.depth);
     for (const it of items) it.draw();
     if (this.mode === "shape") { this.drawBlockHandles(col); this.drawYardHandles(); }
+    // dimensions, when shown: each block's width × depth over its top, and its height
+    for (const dm of s.dims || []) {
+      const p = P(dm.at.x, dm.at.y, dm.at.z);
+      if (p && dm.at.z <= cut + 0.05 + (dm.top ? 0.01 : 0)) this.text(dm.text, p.x, p.y, "#ffffff", 12, "center", true);
+    }
     this.drawCube(col, W);
     // a hint (the page shows it under the view on narrow screens)
     if (W >= 520) this.text(this.aimMode ? "Aim: click what the light should point at (a wall, the ground, a tree)"
       : this.mode === "shape" ? "Shape: drag a yellow handle to size · drag the block to move it, Shift+drag up and down, or drag an arrow · Alt: no snapping"
       : this.mode === "raise" ? "Raise: drag the picked light up or down" : "Drag to turn · right-drag or wheel-drag to slide · scroll or pinch to zoom · drag the picked light to move it",
       12, H - 12, col.muted, 12, "left");
+  }
+
+  // Where a level's floor lies: under each block in it (its own level, or one it spans), within
+  // its stretch across. {own: true} when there were blocks to go by.
+  floorSpans(f, x0, x1) {
+    const m = this.scene.massing;
+    const out = [];
+    if (m) for (const b of m.blocks) {
+      const inIt = b.level === f.id || (b.z0 <= f.elevation + 0.05 && b.z1 >= f.elevation + 0.3);
+      if (!inIt) continue;
+      const a = Math.max(b.x0, x0), c = Math.min(b.x1, x1);
+      if (c - a < 0.1) continue;
+      out.push({ x0: a, x1: c, y0: b.y0 || 0, y1: (b.y0 || 0) + b.depth, own: true });
+    }
+    return out;
   }
 
   // ---- flat yard shapes (paths, driveways, patios...): picked and edited in Shape -------------
@@ -504,8 +547,10 @@ window.House3D = class House3D {
       const hole = [P(b.x0, y0, 0), P(b.x1, y0, 0), P(b.x1, y1, 0), P(b.x0, y1, 0)];
       this.poly(hole, col.bg, 0.92, col.line2, 1);
     }
+    const cut = this.scene.cutZ ?? Infinity;
     for (const b of this.scene.massing.blocks) {
       const { x0, x1, z0, z1 } = b;
+      if (z0 >= cut - 0.05) continue;
       const y0 = b.y0 || 0, y1 = y0 + b.depth;
       if (b.id && b.id === this.scene.selBlock) {
         // the block picked in Shape: its outline in the accent colour
@@ -523,6 +568,7 @@ window.House3D = class House3D {
     // Roofs: the outline seen from the street, taken back as each one says
     for (const r of this.scene.massing.roofs || []) {
       const zs = r.pts.map((q) => q[1]);
+      if (Math.min(...zs) >= cut - 0.05) continue;
       const ze = Math.min(...zs), h = Math.max(...zs) - ze || 1;
       const y0 = r.y0 || 0, d = r.depth;
       const ry = r.back === "shed" ? d : r.ridge_y;
@@ -554,6 +600,7 @@ window.House3D = class House3D {
     }
     // windows and doors sit on the front wall of the block they're in
     for (const o of this.scene.massing.openings) {
+      if (o.z0 >= cut - 0.05) continue;
       const y = this.openingY(o) - 0.02;
       const sel = this.scene.selOpening && o.id === this.scene.selOpening;
       face([[o.x0, y, o.z0], [o.x1, y, o.z0], [o.x1, y, o.z1], [o.x0, y, o.z1]], sel ? "#ff8a3d" : GLASS, sel ? 0.4 : o.kind === "window" ? 0.22 : 0.14, 0.9);
