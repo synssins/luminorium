@@ -221,7 +221,12 @@
         Object.assign(b, change);
         for (const o of others) Object.assign(house.massing.blocks.find((q) => q.id === o.id), o.change);
         view3d.setScene(scene3d());
-        if (done) { ui.faceBase = null; for (const o of others) await changeBlock(o.id, o.change, true); await changeBlock(id, change); }
+        if (done) {
+          ui.faceBase = null;
+          for (const o of others) await changeBlock(o.id, o.change, true);
+          await changeBlock(id, change);
+          await carryPlan([{ base, change }, ...others.map((o) => ({ base: base.links.find((l) => l.id === o.id).base, change: o.change }))]);
+        }
       },
       onBlockMove: async (id, dx, dy, dz, done, alt) => {
         const b = house.massing && house.massing.blocks.find((q) => q.id === id);
@@ -238,7 +243,13 @@
         const moves = ui.groupBase.members.map((q) => ({ id: q.id, change: moveChange(q, m) }));
         for (const mm of moves) Object.assign(house.massing.blocks.find((q) => q.id === mm.id), mm.change);
         view3d.setScene(scene3d());
-        if (done) { ui.faceBase = null; ui.groupBase = null; for (const mm of moves) await changeBlock(mm.id, mm.change, true); await changeBlock(id, change); }
+        if (done) {
+          const members = ui.groupBase.members;
+          ui.faceBase = null; ui.groupBase = null;
+          for (const mm of moves) await changeBlock(mm.id, mm.change, true);
+          await changeBlock(id, change);
+          await carryPlan([{ base, change }, ...moves.map((mm) => ({ base: members.find((q) => q.id === mm.id), change: mm.change }))]);
+        }
       },
       onAimAt: async (point, what) => {
         const t = target(ui.sel);
@@ -539,7 +550,7 @@
       el("h3", "Move by"),
       el("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" } },
         box("across", "Across →"), box("back", "Back ↑"), box("up", "Up")),
-      el("button.btn.small", { type: "button", on: { click: () => changeBlock(b.id, moveChange(b, { dx: v.across, dy: v.back, dz: v.up })) } }, "Move"),
+      el("button.btn.small", { type: "button", on: { click: async () => { const base = { ...b }, change = moveChange(b, { dx: v.across, dy: v.back, dz: v.up }); await changeBlock(b.id, change); await carryPlan([{ base, change }]); } } }, "Move"),
       el("span.small.muted", "Less than 0 moves the other way (left, toward the street, down). In the view: drag the block across the ground, Shift+drag it up or down, or drag one of its arrows; hold Alt to stop snapping."));
   }
   // ---- joined blocks and stairs between their floors -------------------------------------------
@@ -635,6 +646,50 @@
     const { change, others } = faceEdit({ ...b }, face, delta, true, links);
     for (const o of others) await changeBlock(o.id, o.change, true);
     await changeBlock(b.id, change);
+    await carryPlan([{ base: { ...b }, change }, ...others.map((o) => ({ base: links.find((l) => l.id === o.id).base, change: o.change }))]);
+  }
+  // The Top view's plan follows the blocks: a block moved takes the walls, rooms and stairs inside
+  // it on its levels along; a face moved stretches the walls that end against it
+  async function carryPlan(edits) {
+    if (!house.site) return;
+    const jobs = edits.filter((e) => e.base).map(({ base, change }) => {
+      const A = box(base), B = box({ ...base, ...change });
+      const levels = new Set(house.floors.filter((f) => (base.level ? base.level === f.id : f.elevation >= A.z0 - 0.05 && f.elevation <= A.z1 - 0.3)).map((f) => f.id));
+      return { A, B, levels };
+    }).filter((j) => ["x0", "x1", "y0", "y1"].some((k) => Math.abs(j.A[k] - j.B[k]) > 1e-4));
+    if (!jobs.length) return;
+    await saveSite((s) => {
+      let changed = false;
+      for (const { A, B, levels } of jobs) {
+        const dx = B.x0 - A.x0, dy = B.y0 - A.y0;
+        const moved = Math.abs(B.x1 - A.x1 - dx) < 1e-4 && Math.abs(B.y1 - A.y1 - dy) < 1e-4;
+        const inside = ([x, y]) => x >= A.x0 - 0.05 && x <= A.x1 + 0.05 && y >= A.y0 - 0.05 && y <= A.y1 + 0.05;
+        const here = (q) => levels.has(q.level);
+        if (moved) {
+          const sh = ([x, y]) => [r3(x + dx), r3(y + dy)];
+          for (const w of s.walls) if (here(w) && inside(w.a) && inside(w.b)) { w.a = sh(w.a); w.b = sh(w.b); changed = true; }
+          for (const r of s.rooms) if (here(r) && inside(r.at)) { r.at = sh(r.at); changed = true; }
+          for (const t of s.stairs) if (here(t) && inside([t.x0, t.y0]) && inside([t.x1, t.y1])) { t.x0 = r3(t.x0 + dx); t.x1 = r3(t.x1 + dx); t.y0 = r3(t.y0 + dy); t.y1 = r3(t.y1 + dy); changed = true; }
+          continue;
+        }
+        // a face moved: wall ends on it (within an outside wall's thickness of it) go with it
+        const NEAR = 0.35;
+        for (const w of s.walls) {
+          if (!here(w)) continue;
+          for (const e of [w.a, w.b]) {
+            if (e[1] >= A.y0 - 0.05 && e[1] <= A.y1 + 0.05) {
+              if (A.x1 !== B.x1 && Math.abs(e[0] - A.x1) <= NEAR) { e[0] = r3(e[0] + B.x1 - A.x1); changed = true; }
+              else if (A.x0 !== B.x0 && Math.abs(e[0] - A.x0) <= NEAR) { e[0] = r3(e[0] + B.x0 - A.x0); changed = true; }
+            }
+            if (e[0] >= A.x0 - 0.05 && e[0] <= A.x1 + 0.05) {
+              if (A.y1 !== B.y1 && Math.abs(e[1] - A.y1) <= NEAR) { e[1] = r3(e[1] + B.y1 - A.y1); changed = true; }
+              else if (A.y0 !== B.y0 && Math.abs(e[1] - A.y0) <= NEAR) { e[1] = r3(e[1] + B.y0 - A.y0); changed = true; }
+            }
+          }
+        }
+      }
+      if (!changed) return false;
+    });
   }
   function blockPanel(b) {
     const fmt = L.fmtLen;

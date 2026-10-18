@@ -278,7 +278,8 @@ window.House3D = class House3D {
     const m = this.scene.massing;
     const out = [];
     if (m) for (const b of m.blocks) {
-      const inIt = b.level === f.id || (b.z0 <= f.elevation + 0.05 && b.z1 >= f.elevation + 0.3);
+      // its own blocks; a block set to another level isn't in this one, even if it's tall enough
+      const inIt = b.level ? b.level === f.id : b.z0 <= f.elevation + 0.05 && b.z1 >= f.elevation + 0.3;
       if (!inIt) continue;
       const a = Math.max(b.x0, x0), c = Math.min(b.x1, x1);
       if (c - a < 0.1) continue;

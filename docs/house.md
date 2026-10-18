@@ -356,7 +356,10 @@ CAD layout"):
     **Delete** removes it. Blocks don't go into one another: a moved block stops face to face
     against the next, and a dragged face stops at the next block's face. Where two blocks meet
     face to face they share that face: dragging it (or typing **Out**/**In**) moves both, one
-    growing as the other shrinks (neither below a foot). Alt drags freely.
+    growing as the other shrinks (neither below a foot). Alt drags freely. The Top view's plan
+    follows: a block moved (dragged, or **Move by**) takes the walls, rooms and stairs inside it
+    on its levels along, and a face moved stretches the walls that end against it (within an
+    outside wall's thickness of it).
     **Join** (Ctrl+click two or more blocks): one shape, with no wall between them, moved
     together; each keeps its own floor (`group` on each block). Only the blocks picked join, so a
     landing joins the back entry block, not the whole ground floor. **Unjoin** in its panel.
@@ -378,8 +381,8 @@ CAD layout"):
     `POST /api/house/blocks/{id}/split` `{front_depth}`, in house metres. Blocks behind others
     (`behind`) aren't on the front photo. The house's left edge is fixed (`facade.ox`) once there
     are blocks, so moving a block's left face doesn't shift what's placed by it.
-  - **Levels** are drawn only under the blocks in them (a block of that level, or one spanning its
-    height), not as a slab the size of the house; a level with no block shows just its name.
+  - **Levels** are drawn only under the blocks in them (a block set to that level, or one with no
+    level spanning its height), not as a slab the size of the house; a level with no block shows just its name.
     Picking a block in Shape hides everything above its top (blocks, roofs, floors, windows,
     lights), to see into it, until it's let go.
   - **Solid** (tool bar) makes it a dollhouse: each block a hollow room with solid walls and a

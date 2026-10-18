@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-dev.42
+
+- **The plan follows the blocks:** moving a block in 3D takes the walls, rooms and stairs inside
+  it along; dragging a face stretches the walls that end against it.
+- **Floors, fixed:** a level's floor no longer spreads under a taller block set to another level
+  (Main's floor drew to the basement block's outline).
+
 ## 0.3.0-dev.41
 
 - **Merge, fixed:** a path and an area merge whichever you pick first; the result is the area,
