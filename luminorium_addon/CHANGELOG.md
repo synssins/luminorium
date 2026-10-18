@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-dev.48
+
+- **Groups are their lights' fixtures by themselves:** a placed group of lights is one fixture per
+  light without ticking anything (groups placed before this get it on the next load), in a row
+  from where it is: drag each where it is. Unticking **Multiple fixtures** makes it one fixture,
+  and it stays one.
+
 ## 0.3.0-dev.47
 
 - **A group of lights can be several fixtures:** a group made on the Lights page (two cabinet

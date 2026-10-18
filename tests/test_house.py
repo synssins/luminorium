@@ -693,10 +693,21 @@ async def test_a_group_of_lights_can_be_several_fixtures(client, lum):
     r = await client.post("/api/fixtures", json={"name": "Cabinets", "members": members})
     gid = r.json()["id"]
     await client.put(f"/api/house/items/{gid}", json={"floor": "main_level", "x": 4, "y": 3})
-    r = await client.put(f"/api/house/items/{gid}/fixtures", json={"count": 2})
-    assert r.status_code == 200 and r.json()["fixtures"] == 2
-    t = next(t for t in (await client.get("/api/house")).json()["targets"] if t["id"] == gid)
-    assert t["kind"] == "fixture" and [p["label"] for p in t["parts"]] == ["Fixture 1", "Fixture 2"]
+
+    async def group():
+        targets = (await client.get("/api/house")).json()["targets"]
+        return next(t for t in targets if t["id"] == gid)
+
+    # placed, it's one fixture per light by itself, in a row from where it was put
+    t = await group()
+    assert t["kind"] == "fixture" and t["fixtures"] == 2
+    assert [p["label"] for p in t["parts"]] == ["Fixture 1", "Fixture 2"]
+    assert all(p["placed"] for p in t["parts"])
+    # made one fixture, it stays one
+    await client.put(f"/api/house/items/{gid}/fixtures", json={"count": 0})
+    assert (await group())["fixtures"] == 0
+    r = await client.put(f"/api/house/items/{gid}/fixtures", json={"count": 3})
+    assert r.status_code == 200 and (await group())["fixtures"] == 3
 
 
 async def test_one_switch_several_fixtures(client, lum):

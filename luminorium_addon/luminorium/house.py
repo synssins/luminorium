@@ -189,6 +189,7 @@ class HouseService:
         out = []
         for fx in inv.fixtures.values():
             members = [inv.lights[e] for e in fx.members if e in inv.lights]
+            self._group_fixtures(fx.id, len(members))
             out.append(
                 self._target(
                     fx.id,
@@ -383,25 +384,41 @@ class HouseService:
         count = int(_num(count))
         if count != 0 and not 2 <= count <= 50:
             raise HouseError("2 to 50 fixtures")
-        parts = item.setdefault("parts", {})
         if count == 0:
             item.pop("fixtures", None)
             item.pop("parts", None)
+            if target["kind"] == "fixture":
+                item["single"] = True  # a group made one fixture stays one
         else:
-            had = item.get("fixtures", 0)
-            for i in range(count):
-                if str(i) not in parts:
-                    # the first one where the light is, the rest in a row beside it
-                    parts[str(i)] = {
-                        "x": round(item["x"] + 1.2192 * i, 3),
-                        "y": item["y"],
-                        "h": item["h"],
-                    }
-            for i in range(count, max(had, count)):
-                parts.pop(str(i), None)
-            item["fixtures"] = count
+            self._make_fixtures(item, count)
+            item.pop("single", None)
         self._save()
         return item
+
+    @staticmethod
+    def _make_fixtures(item: dict, count: int) -> None:
+        """`count` fixture parts on a placed item; new ones in a row from it, 4 ft apart."""
+        parts = item.setdefault("parts", {})
+        had = item.get("fixtures", 0)
+        for i in range(count):
+            if str(i) not in parts:
+                # the first one where the light is, the rest in a row beside it
+                parts[str(i)] = {
+                    "x": round(item["x"] + 1.2192 * i, 3),
+                    "y": item["y"],
+                    "h": item["h"],
+                }
+        for i in range(count, max(had, count)):
+            parts.pop(str(i), None)
+        item["fixtures"] = count
+
+    def _group_fixtures(self, gid: str, lights: int) -> None:
+        """A placed group of lights is one fixture per light, unless it was made one fixture."""
+        item = self.data["items"].get(gid)
+        if item is None or lights < 2 or item.get("fixtures") or item.get("single"):
+            return
+        self._make_fixtures(item, min(50, lights))
+        self._save()
 
     def place_part(self, tid: str, index: int, x: float, y: float, h: float | None) -> None:
         target = self._check_target(tid)

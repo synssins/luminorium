@@ -54,8 +54,9 @@ Code: `luminorium/house.py` (`HouseService`), the API in `web/server.py`, the pa
 
   A light with parts sits at the middle of its parts.
 - **Several fixtures on one switch** (cans on one dimmer): tick **Multiple fixtures on this
-  switch** on a placed light, or a group of lights from the Lights page (it starts with one
-  fixture per light), and say **How many** (2-50). Each becomes a part, "Fixture 1"…,
+  switch** on a placed light and say **How many** (2-50). A group of lights from the Lights page
+  is one fixture per light by itself once placed (`_group_fixtures`); unticking makes it one
+  fixture, remembered as `single` on its item. Each becomes a part, "Fixture 1"…,
   starting in a row from the light, 4 ft apart; place or drag each where it is. The light sits in
   the middle of them. In 3D and from above they're joined by a dashed line: one switch. Stored as
   `fixtures` (the count) and `parts` on the item; `PUT /api/house/items/{target}/fixtures`
