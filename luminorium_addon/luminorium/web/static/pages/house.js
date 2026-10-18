@@ -880,6 +880,11 @@
         : look.color_temp_kelvin ? L.colorHex({ kelvin: look.color_temp_kelvin }) : "#ffd28a";
       const level = look.brightness != null ? look.brightness / 255 : 0.8;
       if (level <= 0.01) continue;
+      // the solid view is cut at the level shown: light on the floors under it isn't seen
+      if (t.item.floor !== ui.floor && t.item.floor !== house.outside) continue;
+      // several fixtures on one switch: each throws its own light
+      const fx = t.fixtures > 0 ? t.parts.filter((p) => p.world) : [];
+      if (fx.length) { for (const p of fx) out.push({ x: p.world.x, y: p.world.y, z: p.world.z, floorZ: floorZ(t.item.floor), color, level: level * 0.75, r: 0.7 + 0.9 * level }); continue; }
       out.push({ x: t.world.x, y: t.world.y, z: t.world.z, floorZ: floorZ(t.item.floor), color, level });
     }
     return out;

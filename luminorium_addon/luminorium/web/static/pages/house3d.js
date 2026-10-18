@@ -149,7 +149,7 @@ window.House3D = class House3D {
       if (spans.length > 1 || (spans.length === 1 && spans[0].own)) {
         for (const r of spans) {
           const q = [P(r.x0, r.y0, f.elevation), P(r.x1, r.y0, f.elevation), P(r.x1, r.y1, f.elevation), P(r.x0, r.y1, f.elevation)];
-          items.push({ depth: avgDepth(q) + 0.01, draw: () => {
+          items.push({ depth: avgDepth(q) + 0.01, room: r.room, rank: 0, draw: () => {
             if (f.set === false) this.ctx.setLineDash([5, 4]);
             this.poly(q, f.active ? col.accent : col.card2, f.set === false ? 0 : f.active ? 0.18 : 0.55, f.active ? col.accent : col.line2);
             this.ctx.setLineDash([]);
@@ -181,11 +181,11 @@ window.House3D = class House3D {
     // pools of each light's own colour on the floor under it (the solid view)
     for (const gl of s.glows || []) {
       if (gl.floorZ >= cut - 0.05) continue;
-      const r = 1.2 + 2.2 * gl.level;
+      const r = gl.r ?? 1.2 + 2.2 * gl.level;
       const ring = Array.from({ length: 28 }, (_, k) => P(gl.x + Math.cos((k / 28) * Math.PI * 2) * r, gl.y + Math.sin((k / 28) * Math.PI * 2) * r, gl.floorZ + 0.02));
       const c0 = P(gl.x, gl.y, gl.floorZ + 0.02);
       if (!c0 || ring.some((q) => !q)) continue;
-      items.push({ depth: c0.depth - 0.05, below: gl.floorZ < -0.01, draw: () => {
+      items.push({ depth: c0.depth - 0.05, below: gl.floorZ < -0.01, room: this.roomOf(gl.x, gl.y, gl.floorZ + 0.1), rank: 2, draw: () => {
         const rad = Math.max(...ring.map((q) => Math.hypot(q.x - c0.x, q.y - c0.y)));
         const grad = ctx.createRadialGradient(c0.x, c0.y, 0, c0.x, c0.y, rad);
         grad.addColorStop(0, hexA(gl.color, 0.55 * gl.level + 0.1)); grad.addColorStop(1, hexA(gl.color, 0));
@@ -194,8 +194,13 @@ window.House3D = class House3D {
         ctx.fillStyle = grad; ctx.fill(); ctx.restore();
       } });
     }
-    // The structure first (back to front), then the lights on top of it, so slabs never hide them
-    items.sort((a, b) => b.depth - a.depth);
+    // The structure first (back to front), then the lights on top of it, so slabs never hide them.
+    // Room by room, the farthest first; in a room its floor, the walls seen from inside, light on
+    // the floor, what's in it, then the walls seen from outside and their windows. (Sorting faces
+    // by their middles alone put long walls and the walls in a room in the wrong order.)
+    const rooms = (s.massing ? s.massing.blocks : []).map((b) => { const p = P((b.x0 + b.x1) / 2, (b.y0 || 0) + b.depth / 2, (b.z0 + b.z1) / 2); return p ? p.depth : 0; });
+    const key = (it) => (it.room != null && it.room >= 0 && it.depth > -1e8 ? rooms[it.room] : it.depth);
+    items.sort((a, b) => (key(b) - key(a)) || ((a.rank ?? 3) - (b.rank ?? 3)) || (b.depth - a.depth));
     if (s.solid) {
       // below the ground first (a basement's walls), then the ground with a hole where each block
       // goes into it, the grid and the yard on it, then the rest
@@ -272,6 +277,20 @@ window.House3D = class House3D {
     ctx.fillStyle = "#1f2a22"; ctx.fill("evenodd");
   }
 
+  // The block a point is in (the smallest, where blocks overlap), or -1
+  roomOf(x, y, z) {
+    const m = this.scene.massing;
+    if (!m) return -1;
+    let best = -1, vol = Infinity;
+    m.blocks.forEach((b, i) => {
+      const y0 = b.y0 || 0;
+      if (x < b.x0 - 0.02 || x > b.x1 + 0.02 || y < y0 - 0.02 || y > y0 + b.depth + 0.02 || z < b.z0 - 0.05 || z > b.z1) return;
+      const v = (b.x1 - b.x0) * b.depth * (b.z1 - b.z0);
+      if (v < vol) { vol = v; best = i; }
+    });
+    return best;
+  }
+
   // Where a level's floor lies: under each block in it (its own level, or one it spans), within
   // its stretch across. {own: true} when there were blocks to go by.
   floorSpans(f, x0, x1) {
@@ -283,7 +302,7 @@ window.House3D = class House3D {
       if (!inIt) continue;
       const a = Math.max(b.x0, x0), c = Math.min(b.x1, x1);
       if (c - a < 0.1) continue;
-      out.push({ x0: a, x1: c, y0: b.y0 || 0, y1: (b.y0 || 0) + b.depth, own: true });
+      out.push({ x0: a, x1: c, y0: b.y0 || 0, y1: (b.y0 || 0) + b.depth, own: true, room: m.blocks.indexOf(b) });
     }
     return out;
   }
@@ -602,22 +621,26 @@ window.House3D = class House3D {
   massing(items, P, col) {
     const WALL = "#5aa9e6", ROOF = "#8fb3d9", GLASS = "#9ad0f5";
     const solid = !!this.scene.solid;
-    const face = (pts, color, alpha, strokeAlpha = 0.7) => {
+    const face = (pts, color, alpha, strokeAlpha = 0.7, meta = {}) => {
       const q = pts.map(([x, y, z]) => P(x, y, z));
       const below = pts.every((p) => p[2] <= 0.001);
-      items.push({ depth: avgDepth(q), below, draw: () => this.poly(q, color, alpha, color, strokeAlpha) });
+      items.push({ depth: avgDepth(q), below, ...meta, draw: () => this.poly(q, color, alpha, color, strokeAlpha) });
     };
+    // a wall seen from inside its room (its outside faces away) is drawn before what's in the
+    // room; one seen from outside, after
+    const cam = this.cam;
+    const side = (room, n, c) => ({ room, rank: n[0] * (cam.pos.x - c[0]) + n[1] * (cam.pos.y - c[1]) < 0 ? 1 : 4 });
     // the solid view: a block is a hollow room, its sides solid walls and its bottom a solid floor
     const SOLID = { wall: "#3a4554", floor: "#2b333e", edge: "#7fa6cc" };
-    const solidFace = (pts, fill) => {
+    const solidFace = (pts, fill, meta = {}) => {
       const q = pts.map(([x, y, z]) => P(x, y, z));
       const below = pts.every((p) => p[2] <= 0.001);
-      items.push({ depth: avgDepth(q), below, draw: () => { this.poly(q, fill, 0.97, SOLID.edge, 0.55); } });
+      items.push({ depth: avgDepth(q), below, ...meta, draw: () => { this.poly(q, fill, 0.97, SOLID.edge, 0.55); } });
     };
     // an upright face from z0 to z1, in two where it goes into the ground
-    const wallFace = (a, b, z0, z1) => {
+    const wallFace = (a, b, z0, z1, meta) => {
       const parts = z0 < 0 && z1 > 0 ? [[z0, 0], [0, z1]] : [[z0, z1]];
-      for (const [lo, hi] of parts) solidFace([[a[0], a[1], lo], [b[0], b[1], lo], [b[0], b[1], hi], [a[0], a[1], hi]], SOLID.wall);
+      for (const [lo, hi] of parts) solidFace([[a[0], a[1], lo], [b[0], b[1], lo], [b[0], b[1], hi], [a[0], a[1], hi]], SOLID.wall, meta);
     };
     // A block that goes into the ground (a basement) leaves a hole in the grid where it goes in
     for (const b of this.scene.massing.blocks) {
@@ -629,10 +652,11 @@ window.House3D = class House3D {
     const cut = this.scene.cutZ ?? Infinity;
     const selB = this.scene.massing.blocks.find((q) => q.id === this.scene.selBlock);
     const picks = this.scene.blockPicks || [];
-    for (const b of this.scene.massing.blocks) {
+    this.scene.massing.blocks.forEach((b, bi) => {
       const { x0, x1, z0, z1 } = b;
-      if (z0 >= cut - 0.05) continue;
+      if (z0 >= cut - 0.05) return;
       const y0 = b.y0 || 0, y1 = y0 + b.depth;
+      const W = { y0: side(bi, [0, -1], [(x0 + x1) / 2, y0]), y1: side(bi, [0, 1], [(x0 + x1) / 2, y1]), x0: side(bi, [-1, 0], [x0, (y0 + y1) / 2]), x1: side(bi, [1, 0], [x1, (y0 + y1) / 2]) };
       // the faces it shares with a block it's joined to aren't walls
       const inner = joinedFaces(b, this.scene.massing.blocks);
       const inGroup = selB && b.id !== selB.id && b.group && b.group === selB.group;
@@ -650,20 +674,20 @@ window.House3D = class House3D {
       if (solid) {
         // walls cut off at the level shown, like a dollhouse with the floors above lifted off
         const top = Math.min(z1, cut);
-        if (!inner.y0) wallFace([x0, y0], [x1, y0], z0, top);
-        if (!inner.y1) wallFace([x1, y1], [x0, y1], z0, top);
-        if (!inner.x0) wallFace([x0, y1], [x0, y0], z0, top);
-        if (!inner.x1) wallFace([x1, y0], [x1, y1], z0, top);
-        solidFace([[x0, y0, z0 + 0.005], [x1, y0, z0 + 0.005], [x1, y1, z0 + 0.005], [x0, y1, z0 + 0.005]], SOLID.floor);
+        if (!inner.y0) wallFace([x0, y0], [x1, y0], z0, top, W.y0);
+        if (!inner.y1) wallFace([x1, y1], [x0, y1], z0, top, W.y1);
+        if (!inner.x0) wallFace([x0, y1], [x0, y0], z0, top, W.x0);
+        if (!inner.x1) wallFace([x1, y0], [x1, y1], z0, top, W.x1);
+        solidFace([[x0, y0, z0 + 0.005], [x1, y0, z0 + 0.005], [x1, y1, z0 + 0.005], [x0, y1, z0 + 0.005]], SOLID.floor, { room: bi, rank: 0 });
       } else {
-        if (!inner.y0) face([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], WALL, 0.08);
-        if (!inner.y1) face([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], WALL, 0.06, 0.45);
-        if (!inner.x0) face([[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], WALL, 0.06, 0.55);
-        if (!inner.x1) face([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], WALL, 0.06, 0.55);
+        if (!inner.y0) face([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], WALL, 0.08, 0.7, W.y0);
+        if (!inner.y1) face([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], WALL, 0.06, 0.45, W.y1);
+        if (!inner.x0) face([[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], WALL, 0.06, 0.55, W.x0);
+        if (!inner.x1) face([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], WALL, 0.06, 0.55, W.x1);
       }
       const lab = P(x0 + 0.2, y0, z1 + 0.15);
       if (lab && b.name) items.push({ depth: lab.depth - 0.01, draw: () => this.text(b.name, lab.x, lab.y, col.muted, 11, "left") });
-    }
+    });
     // Roofs: the outline seen from the street, taken back as each one says
     for (const r of this.scene.massing.roofs || []) {
       const zs = r.pts.map((q) => q[1]);
@@ -703,7 +727,8 @@ window.House3D = class House3D {
       if (o.z0 >= cut - 0.05) continue;
       const y = this.openingY(o) - 0.02;
       const sel = this.scene.selOpening && o.id === this.scene.selOpening;
-      face([[o.x0, y, o.z0], [o.x1, y, o.z0], [o.x1, y, o.z1], [o.x0, y, o.z1]], sel ? "#ff8a3d" : GLASS, sel ? 0.4 : o.kind === "window" ? 0.22 : 0.14, 0.9);
+      const room = this.roomOf((o.x0 + o.x1) / 2, y + 0.05, (o.z0 + o.z1) / 2);
+      face([[o.x0, y, o.z0], [o.x1, y, o.z0], [o.x1, y, o.z1], [o.x0, y, o.z1]], sel ? "#ff8a3d" : GLASS, sel ? 0.4 : o.kind === "window" ? 0.22 : 0.14, 0.9, { room, rank: 5 });
     }
   }
 
@@ -760,17 +785,21 @@ window.House3D = class House3D {
         const q = along === "x"
           ? [P(s0, st.y0, z), P(s1, st.y0, z), P(s1, st.y1, z), P(s0, st.y1, z)]
           : [P(st.x0, s0, z), P(st.x1, s0, z), P(st.x1, s1, z), P(st.x0, s1, z)];
-        if (q.every(Boolean)) items.push({ depth: avgDepth(q), draw: () => this.poly(q, pickedStair ? "#ff8a3d" : "#f0b429", pickedStair ? 0.5 : 0.22, pickedStair ? "#ff8a3d" : "#f0b429", 0.8) });
+        if (q.every(Boolean)) items.push({ depth: avgDepth(q), room: this.roomOf((st.x0 + st.x1) / 2, (st.y0 + st.y1) / 2, Math.min(z0, z1) + 0.1), rank: 3, draw: () => this.poly(q, pickedStair ? "#ff8a3d" : "#f0b429", pickedStair ? 0.5 : 0.22, pickedStair ? "#ff8a3d" : "#f0b429", 0.8) });
       }
     }
     // interior walls: a see-through panel from each level's floor to its ceiling
+    const cutW = this.scene.cutZ ?? Infinity;
     for (const w of t.walls) {
       const f = levels.get(w.level);
-      if (!f) continue;
-      const z0 = f.elevation, z1 = f.elevation + f.ceiling;
+      if (!f || f.elevation >= cutW - 0.05) continue;
+      // the solid view shows the plan of the level it's cut at, not those under its floor
+      if (this.scene.solid && !f.active && this.scene.cutZ != null) continue;
+      const z0 = f.elevation, z1 = Math.min(f.elevation + f.ceiling, cutW);
       const q = [P(w.a[0], w.a[1], z0), P(w.b[0], w.b[1], z0), P(w.b[0], w.b[1], z1), P(w.a[0], w.a[1], z1)];
       const active = f.active;
-      items.push({ depth: avgDepth(q), draw: () => this.poly(q, "#dce2ea", active ? 0.14 : 0.05, "#dce2ea", active ? 0.6 : 0.2) });
+      const room = this.roomOf((w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2, z0 + 0.1);
+      items.push({ depth: avgDepth(q), room, rank: 3, draw: () => this.poly(q, "#dce2ea", active ? 0.14 : 0.05, "#dce2ea", active ? 0.6 : 0.2) });
     }
   }
 

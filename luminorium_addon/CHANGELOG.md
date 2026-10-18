@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0-dev.43
+
+- **3D drawing order, fixed:** each room is drawn as a whole, the farthest first: its floor, the
+  walls seen from inside, light on the floor, what's in it (interior walls, stairs), then the
+  walls seen from outside. An interior wall no longer gets cut off by a wall behind it at some
+  tilts.
+- **Interior walls by level:** walls on levels above the one shown are hidden (and cut at its
+  ceiling); the solid view shows only the shown level's walls and light.
+- **A pool of light per fixture:** a light that's several fixtures on one switch lights a pool
+  under each fixture, not one big one in the middle.
+
 ## 0.3.0-dev.42
 
 - **The plan follows the blocks:** moving a block in 3D takes the walls, rooms and stairs inside

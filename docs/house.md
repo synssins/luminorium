@@ -390,9 +390,11 @@ CAD layout"):
     bar (so picking a level shows its rooms; picking a block in Shape cuts at its top instead).
     The ground is solid, with a hole where a block goes into it, so a basement is a pit lined
     by its own walls; paths and yard shapes lie on the ground. Each light that's on throws a
-    pool of its own colour on its floor, sized and brightened by its brightness, from the
+    pool of its own colour on its floor (one under each fixture of a light that's several), sized and brightened by its brightness, for the level shown, from the
     lights' live state (`look` in `/api/inventory`, refreshed with the page's status). No
-    shadows yet. Remembered.
+    shadows yet. Remembered. The view is drawn room by room, the farthest first (each room's
+    floor, the walls seen from inside, light on the floor, what's in it, the walls seen from
+    outside); interior walls of levels above the one shown are hidden.
   - **Dimensions** (tool bar) labels each block with across × front to back and its height.
     **Inside** takes off the walls, as a tape reads in the room: half an inside wall (2x4 with
     drywall, 4 1/2") where a block meets another face to face, an outside wall (the Top view's
