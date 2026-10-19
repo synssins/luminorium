@@ -889,10 +889,12 @@ window.House3D = class House3D {
     const lv = this.scene.floors.find((q) => q.id === l.floor);
     const ceilZ = lv ? lv.elevation + lv.ceiling : Infinity;
     const clip = (v, max) => { const n = Math.hypot(...v) || 1, u = v.map((c) => c / n); const t = Math.min(max, this.rayHit3d(l, u, max, walls, l.floorZ, ceilZ)); return P(l.x + u[0] * t, l.y + u[1] * t, l.z + u[2] * t); };
-    const rim = Array.from({ length: 18 }, (_, i) => {
-      const k = (i / 18) * Math.PI * 2, c = Math.cos(k) * r, s = Math.sin(k) * r;
+    // the same reach every way (a rounded end, not a flat one whose edges reach far out on a
+    // wide flood), and enough rays that one slipping through a gap can't draw a spike
+    const rim = Array.from({ length: 36 }, (_, i) => {
+      const k = (i / 36) * Math.PI * 2, c = Math.cos(k) * r, s = Math.sin(k) * r;
       const v = [dir[0] * len + e1[0] * c + e2[0] * s, dir[1] * len + e1[1] * c + e2[1] * s, dir[2] * len + e1[2] * c + e2[2] * s];
-      return clip(v, Math.hypot(...v));
+      return clip(v, len);
     });
     const apex = P(l.x, l.y, l.z);
     if (!apex || rim.some((q) => !q)) return;
@@ -928,8 +930,9 @@ window.House3D = class House3D {
     const t = this.scene.top, m = this.scene.massing;
     const f = this.scene.floors.find((q) => q.id === level);
     if (t && f) for (const w of t.walls || []) if (w.level === level) out.push({ a: w.a, b: w.b, z0: f.elevation, z1: f.elevation + f.ceiling });
+    // every block's walls, at whatever height (a light outside, or one set to the wrong level,
+    // still can't shine through the house); a ray only stops where it meets a wall's height
     if (m) for (const b of m.blocks) {
-      if (b.z1 <= floorZ + 0.05 || b.z0 > floorZ + 2.5) continue;
       const y0 = b.y0 || 0, y1 = y0 + b.depth;
       const c = [[b.x0, y0], [b.x1, y0], [b.x1, y1], [b.x0, y1]];
       for (let i = 0; i < 4; i++) out.push({ a: c[i], b: c[(i + 1) % 4], z0: b.z0, z1: b.z1 });
@@ -952,6 +955,16 @@ window.House3D = class House3D {
     let best = max;
     if (u[2] < -1e-6) best = Math.min(best, (floorZ - o.z) / u[2]);
     if (u[2] > 1e-6 && ceilZ > o.z) best = Math.min(best, (ceilZ - o.z) / u[2]);
+    // every block's floor and ceiling (its bottom and top) where the ray crosses them
+    if (Math.abs(u[2]) > 1e-6) for (const b of (this.scene.massing && this.scene.massing.blocks) || []) {
+      const y0 = b.y0 || 0, y1 = y0 + b.depth;
+      for (const z of [b.z0, b.z1]) {
+        const t = (z - o.z) / u[2];
+        if (!(t > 0.02 && t < best)) continue;
+        const x = o.x + u[0] * t, y = o.y + u[1] * t;
+        if (x > b.x0 - 0.01 && x < b.x1 + 0.01 && y > y0 - 0.01 && y < y1 + 0.01) best = t;
+      }
+    }
     const flat = Math.hypot(u[0], u[1]);
     if (flat < 1e-6) return best;
     for (const w of walls) {

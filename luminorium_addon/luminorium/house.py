@@ -1195,6 +1195,26 @@ class HouseService:
                     if not house_site.inside(house_site.inset(plan, -0.3), x, y):
                         add("warn", "top", "A wall on the floor plan goes outside the house.")
                         break
+        # a light set to Outside that's inside the house: most likely it's on the wrong level
+        m = self.massing()
+        if m:
+            names = {t["id"]: t["name"] for t in self.targets()}
+            for tid, item in self.data["items"].items():
+                if item["floor"] != OUTSIDE:
+                    continue
+                w = self.world(tid)
+                if w and any(
+                    b["x0"] < w["x"] < b["x1"]
+                    and b["y0"] < w["y"] < b["y0"] + b["depth"]
+                    and b["z0"] < w["z"] < b["z1"]
+                    for b in m["blocks"]
+                ):
+                    add(
+                        "warn",
+                        "3d",
+                        f"{names.get(tid, tid)} is set to Outside but it's inside the house: "
+                        "set its floor to the level it's on.",
+                    )
         return out
 
     def view(self) -> dict:

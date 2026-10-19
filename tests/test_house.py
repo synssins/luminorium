@@ -634,6 +634,17 @@ async def test_aiming_a_light(client, lum):
     assert "aim" not in r.json()
 
 
+async def test_an_outside_light_inside_the_house_is_flagged(client, lum, monkeypatch):
+    await client.put(f"/api/house/items/{PORCH}", json={"floor": OUTSIDE, "x": 3, "y": 2, "h": 1.5})
+    block = {"x0": 0, "x1": 10, "y0": 0, "depth": 8, "z0": 0, "z1": 3}
+    monkeypatch.setattr(lum.house, "massing", lambda: {"blocks": [block]})
+    texts = [c["text"] for c in lum.house.checks()]
+    assert any("is set to Outside but it's inside the house" in t for t in texts)
+    block["x0"] = 5  # now it's out in the yard
+    texts = [c["text"] for c in lum.house.checks()]
+    assert not any("is set to Outside" in t for t in texts)
+
+
 async def test_checks_point_out_numbers_that_disagree(client, lum):
     assert (await client.get("/api/house")).json()["checks"] == []
     await client.put("/api/house/photo?w=800&h=600", content=JPEG)

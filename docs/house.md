@@ -258,8 +258,10 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
   Ceiling lights' floods and spots that were never aimed (level, toward the street: how Flood
   used to start) were turned to point down (`_migrate_aims`).
 - **Walls stop light:** a flood's or spot's beam, and the pools of light in the solid view, end at
-  the first wall in their way: the interior walls of the light's level and the blocks' walls, or
-  at the light's floor or ceiling (inside; an outside light has no ceiling).
+  the first wall in their way: the interior walls of the light's level and every block's walls,
+  floor and ceiling (at whatever height), or the light's own floor and ceiling. A beam reaches
+  the same distance every way (a rounded end). A light set to Outside that's inside a block is
+  flagged in Things to check: it's most likely on the wrong level.
 
 ## Floods and spots
 

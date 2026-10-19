@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.50
+
+- **Beams stay in the house's rooms:** every block's walls, floor and ceiling stop light, at any
+  height, for any light (a light set to Outside used to shine through the floors above it). A
+  beam reaches the same distance every way, so a wide flood no longer throws long spikes.
+- **Things to check:** a light set to Outside that sits inside the house is flagged: set its
+  floor to the level it's on.
+
 ## 0.3.0-dev.49
 
 - **Each type of light lights like it:** a flush mount or ceiling light is a wide dome down that
