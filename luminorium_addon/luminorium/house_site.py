@@ -284,6 +284,7 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
                 "z0": z0,
                 "z1": z1,
                 "panes": int(_num(w.get("panes", 1), 1, 12)),
+                **({"kind": w["kind"]} if w.get("kind") in ("door", "garage") else {}),
             }
         )
     out["windows"] = windows

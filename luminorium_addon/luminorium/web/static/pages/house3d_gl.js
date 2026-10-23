@@ -34,6 +34,7 @@ window.HouseGL = class HouseGL {
     // a phone or tablet: fewer lights and a smaller shadow map
     this.small = Math.min(screen.width, screen.height) < 900 || /Android|iPad|iPhone|Mobile/i.test(navigator.userAgent);
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.autoUpdate = false; // redrawn only when the house or its lights change
     this.renderer.shadowMap.type = this.small ? T.PCFShadowMap : T.PCFSoftShadowMap;
     // if the GPU drops the context (out of memory on a tablet), go back to the 2D drawing
     this.canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); this.lost = true; HouseGL.why = "WebGL: the graphics chip dropped the view (out of memory?): drawing in 2D"; HouseGL._ok = false; this.hide(); if (this.onLost) this.onLost(); });
@@ -55,6 +56,7 @@ window.HouseGL = class HouseGL {
     this.textures = {};
     this.mats = {};
     this.key = null;
+    this.shadowsDirty = true;
   }
 
   // ---- materials ---------------------------------------------------------------------------
@@ -111,6 +113,7 @@ window.HouseGL = class HouseGL {
     const fl = s.floors.map((f) => `${f.id}:${f.elevation}:${f.ceiling}`).join("|");
     if (this.built && this.built.m === s.massing && this.built.t === s.top && this.built.cut === (s.cutZ ?? null) && this.built.fl === fl) return;
     this.built = { m: s.massing, t: s.top, cut: s.cutZ ?? null, fl };
+    this.shadowsDirty = true;
     for (const c of [...this.house.children]) { c.geometry && c.geometry.dispose(); this.house.remove(c); }
     const T = THREE;
     const cut = s.cutZ ?? Infinity;
@@ -148,11 +151,22 @@ window.HouseGL = class HouseGL {
         // these run round the block anticlockwise, so the left of a→c is inside: the box's
         // centre line is half the wall in from the face; its right side is the outside face
         const ia = [a[0] - uy * th / 2, a[1] + ux * th / 2], ic = [c[0] - uy * th / 2, c[1] + ux * th / 2];
-        for (const [s0, s1, open] of stretches(b, a, c, b.z0, top, blocks)) {
-          const p = (s) => [ia[0] + ux * s, ia[1] + uy * s];
-          for (const [lo, hi] of b.z0 < 0 && top > 0 ? [[b.z0, 0], [0, top]] : [[b.z0, top]]) {
-            const outside = hi <= 0.001 ? "foundation" : open ? "siding" : "plaster";
-            box(p(s0), p(s1), th / 2, lo, hi, "plaster", "plaster", outside);
+        // a block whose floor is just above the ground (the ground floor, an entry): its walls go
+        // on down into the ground as foundation, so the house sits on the ground
+        const bottom = b.z0 > 0 && b.z0 < 0.9 ? -0.2 : b.z0;
+        // in bands of height where the blocks beside it change, and only where it's out in the
+        // open: where it's against another block it isn't a wall at all (the plan's own walls are
+        // there, with their doorways)
+        const zs = new Set([bottom, b.z0, top, 0]);
+        for (const o of blocks) for (const z of [o.z0, o.z1]) if (z > bottom && z < top) zs.add(z);
+        const bands = [...zs].filter((z) => z >= bottom && z <= top).sort((p, q) => p - q);
+        for (let k = 0; k + 1 < bands.length; k++) {
+          const lo = bands[k], hi = bands[k + 1];
+          if (hi - lo < 0.01) continue;
+          for (const [s0, s1, open] of stretches(b, a, c, Math.max(lo, b.z0), hi, blocks)) {
+            if (!open) continue;
+            const p = (s) => [ia[0] + ux * s, ia[1] + uy * s];
+            box(p(s0), p(s1), th / 2, lo, hi, "plaster", "plaster", hi <= 0.001 ? "foundation" : "siding");
           }
         }
       }
@@ -221,7 +235,7 @@ window.HouseGL = class HouseGL {
       let n = [(w.b[1] - w.a[1]) / L, -(w.b[0] - w.a[0]) / L];
       const mx = (w.a[0] + w.b[0]) / 2, my = (w.a[1] + w.b[1]) / 2;
       if (n[0] * (mx - s.W / 2) + n[1] * (my - s.D / 2) < 0) n = [-n[0], -n[1]];
-      win(w.a, w.b, w.z0, w.z1, n, w.panes || 1, "window");
+      win(w.a, w.b, w.z0, w.z1, n, w.panes || 1, w.kind || "window");
     }
 
     // sloped and odd surfaces: a stairwell's sloped ceiling, a crawl space's floor
@@ -289,17 +303,25 @@ window.HouseGL = class HouseGL {
   // them. A fixed set of lights, only changed when the lights do (a different number of lights
   // makes the GPU rebuild its shaders: slow, and too much for a tablet every frame)
   lights(glows) {
-    const T = THREE, N = this.small ? 6 : 10;
+    const T = THREE, N = this.small ? 4 : 8;
     if (!this.pool) {
-      this.pool = Array.from({ length: N }, () => { const l = new T.PointLight(0xffffff, 0, 7, 2); this.lamps.add(l); return l; });
+      // each casts shadows, so walls stop its light (no light coming through a wall)
+      const ms = this.small ? 256 : 512;
+      this.pool = Array.from({ length: N }, () => {
+        const l = new T.PointLight(0xffffff, 0, 7, 2);
+        l.castShadow = true; l.shadow.mapSize.set(ms, ms); l.shadow.bias = -0.002; l.shadow.camera.near = 0.05; l.shadow.camera.far = 8;
+        this.lamps.add(l); return l;
+      });
     }
     const on = [...(glows || [])].sort((a, b) => (b.level || 0) - (a.level || 0)).slice(0, N);
     const key = JSON.stringify(on.map((g) => [g.x, g.y, g.z, g.floorZ, g.color, g.level]));
     if (key === this.lightKey) return;
     this.lightKey = key;
+    this.shadowsDirty = true;
     this.pool.forEach((l, i) => {
       const g = on[i];
-      if (!g) { l.intensity = 0; return; }
+      if (!g) { l.intensity = 0; l.castShadow = false; return; }
+      l.castShadow = true;
       l.color.set(g.color);
       l.intensity = 6 + 26 * (g.level || 0.5);
       l.position.set(g.x, g.y, g.z ?? g.floorZ + 2.1);
@@ -315,8 +337,9 @@ window.HouseGL = class HouseGL {
     const key = JSON.stringify(objs.map((o) => [o.id, o.x, o.y, o.z, o.w, o.h, o.rot, state.get(o.id)]));
     if (key === this.ambiKey) return;
     this.ambiKey = key;
+    this.shadowsDirty = true;
     if (!this.ambiGroup) { this.ambiGroup = new T.Group(); this.scene.add(this.ambiGroup); }
-    if (!this.ambiPool) this.ambiPool = Array.from({ length: 4 }, () => { const l = new T.PointLight(0xffffff, 0, 3.5, 2); this.scene.add(l); return l; });
+    if (!this.ambiPool) this.ambiPool = Array.from({ length: 4 }, () => { const l = new T.PointLight(0xffffff, 0, 3.5, 2); l.castShadow = !this.small; l.shadow.mapSize.set(256, 256); l.shadow.bias = -0.002; this.scene.add(l); return l; });
     for (const c of [...this.ambiGroup.children]) { c.geometry && c.geometry.dispose(); this.ambiGroup.remove(c); }
     this.ambiPool.forEach((l) => { l.intensity = 0; });
     let used = 0;
@@ -376,6 +399,7 @@ window.HouseGL = class HouseGL {
     camera.up.set(cam.u.x, cam.u.y, cam.u.z);
     camera.lookAt(cam.pos.x + cam.f.x, cam.pos.y + cam.f.y, cam.pos.z + cam.f.z);
     camera.updateProjectionMatrix();
+    if (this.shadowsDirty) { this.renderer.shadowMap.needsUpdate = true; this.shadowsDirty = false; }
     this.renderer.render(this.scene, camera);
     c.style.display = "";
   }

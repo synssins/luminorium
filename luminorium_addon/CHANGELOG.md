@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0-dev.59
+
+- **No walls where the house's parts meet:** a block's face that's against another block is no
+  longer drawn as a solid wall (it covered the plan's own walls, with their doorways and stair
+  openings). Faces are worked out in bands of height, so a stretch out in the open at one height
+  (a recessed front door's sides) gets its siding even where another block sits above it.
+- **The house sits on the ground:** walls of a floor just above the ground go on down into it as
+  foundation.
+- **Walls stop light:** the house's lights in the WebGL view cast shadows, so light no longer
+  comes through walls. Shadows are only redrawn when the house or its lights change.
+- **Doors on any wall:** a Top view window can be a `door` (a back door).
+
 ## 0.3.0-dev.58
 
 - **WebGL stays on:** the check for WebGL ran every frame and each run took one of the browser's
