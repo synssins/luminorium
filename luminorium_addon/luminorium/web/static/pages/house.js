@@ -116,7 +116,9 @@
         const b = ui.mode3d === "shape" && ui.block && m && m.blocks.find((q) => q.id === ui.block);
         if (b) return b.z1;
         const f = ui.solid && floorsById().get(ui.floor);
-        return f ? f.elevation + f.ceiling : null;
+        // a level outside the house (the yard, a shed) shows the whole house, not a cut
+        const inHouse = f && (((house.top && house.top.walls) || []).some((w) => w.level === f.id) || ((m && m.blocks) || []).some((b) => b.level === f.id || b.floor === f.id));
+        return f && inHouse ? f.elevation + f.ceiling : null;
       })(),
       dims: ui.dims ? blockDims() : [],
       solid: !!ui.solid,

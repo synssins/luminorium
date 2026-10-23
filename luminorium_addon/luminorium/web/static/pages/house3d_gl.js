@@ -172,7 +172,13 @@ window.HouseGL = class HouseGL {
       }
       // its floor, open where stairs come up through it, in what it's finished in
       const lv = (s.floors.find((f) => Math.abs(f.elevation - b.z0) < 0.06) || {}).id;
+      // the floor is open over stairs coming up through it, and where another part of the house
+      // runs up through this floor's height (an entry, its landing and the storage over it)
       const holes = stairHoles(t, levels, b.z0);
+      for (const o of blocks) {
+        if (o === b || !(o.z0 < b.z0 - 0.05 && o.z1 > b.z0 + 0.05)) continue;
+        holes.push({ x0: o.x0, x1: o.x1, y0: o.y0 || 0, y1: (o.y0 || 0) + o.depth });
+      }
       const rect = { x0: b.x0, x1: b.x1, y0, y1 };
       const fins = (t.finishes || []).filter((f) => f.level === lv);
       const whole = fins.find((f) => f.x0 == null);
@@ -194,17 +200,38 @@ window.HouseGL = class HouseGL {
       for (const pc of wallPieces(w, t.doors || [], z0, z1)) box(pc.a, pc.b, (w.thick || 0.12) / 2, pc.z0, pc.z1, "plaster", "plaster", "plaster", pc.header);
     }
 
-    // stairs: each step a solid block down to the bottom of the flight (so the sides are filled
-    // in); wood inside, concrete outside
+    // stairs: inside, each step is a tread on a slab that follows the flight's slope (head room
+    // under it, as a real stair has); outside, solid down to the ground (a stoop). Where a flight
+    // drops through a floor, the well's sides are walled from the floor below up to the floor above
+    // (unless a plan wall is already there)
+    const wallAlong = (along, c, s0, s1, z0, z1) => (t.walls || []).some((w) => {
+      const f = levels.get(w.level); if (!f) return false;
+      const wz0 = w.z0 ?? f.elevation, wz1 = w.z1 ?? f.elevation + f.ceiling + FLOOR_T;
+      if (wz1 < z0 + 0.1 || wz0 > z1 - 0.1) return false;
+      const ax = along === "x", wa = ax ? w.a[1] : w.a[0], wb = ax ? w.b[1] : w.b[0];
+      if (Math.abs(wa - wb) > 0.02 || Math.abs(wa - c) > 0.15) return false;
+      const p0 = Math.min(ax ? w.a[0] : w.a[1], ax ? w.b[0] : w.b[1]), p1 = Math.max(ax ? w.a[0] : w.a[1], ax ? w.b[0] : w.b[1]);
+      return Math.min(p1, s1) - Math.max(p0, s0) > (s1 - s0) * 0.6;
+    });
     for (const st of t.stairs || []) {
       const fl = flight(st, levels);
       if (!fl || Math.min(fl.z0, fl.z1) >= cut - 0.05) continue;
       const out = st.level === "outside" || st.to === "outside";
-      const base = Math.min(fl.z0, fl.z1);
+      const base = Math.min(fl.z0, fl.z1), topZ = Math.max(fl.z0, fl.z1);
       const [c0, c1] = fl.along === "x" ? [st.y0, st.y1] : [st.x0, st.x1];
+      const slab = 0.2; // the stair's own thickness under the nosings
       for (const step of fl.steps) {
         const r = fl.along === "x" ? { x0: Math.min(step.s0, step.s1), x1: Math.max(step.s0, step.s1), y0: c0, y1: c1 } : { x0: c0, x1: c1, y0: Math.min(step.s0, step.s1), y1: Math.max(step.s0, step.s1) };
-        B.block(out ? "stoop" : "wood", r, base, Math.min(step.z, cut));
+        const bottom = out ? base : Math.max(base, step.z - step.rise - slab);
+        B.block(out ? "stoop" : "wood", r, bottom, Math.min(step.z, cut));
+      }
+      if (out) continue;
+      const lo = Math.min(...fl.steps.map((q) => Math.min(q.s0, q.s1))), hi = Math.max(...fl.steps.map((q) => Math.max(q.s0, q.s1)));
+      const ztop = Math.min(topZ, cut);
+      for (const c of [c0, c1]) {
+        if (wallAlong(fl.along, c, lo, hi, base, ztop)) continue;
+        const a = fl.along === "x" ? [lo, c] : [c, lo], b2 = fl.along === "x" ? [hi, c] : [c, hi];
+        box(a, b2, 0.05, base, ztop, "plaster");
       }
     }
 
@@ -496,9 +523,20 @@ class QuadBuilder {
     const ring = (q) => [[q.x0, q.y0], [q.x1, q.y0], [q.x1, q.y1], [q.x0, q.y1]];
     const hs = holes
       .map((h) => ({ x0: Math.max(h.x0, r.x0 + 0.01), x1: Math.min(h.x1, r.x1 - 0.01), y0: Math.max(h.y0, r.y0 + 0.01), y1: Math.min(h.y1, r.y1 - 0.01) }))
-      .filter((h) => h.x1 - h.x0 > 0.05 && h.y1 - h.y0 > 0.05)
-      .map((h) => ring(h).reverse());
-    this.poly(key, ring(r), z, hs);
+      .filter((h) => h.x1 - h.x0 > 0.05 && h.y1 - h.y0 > 0.05);
+    // holes that touch or overlap become one (their bounding box): the triangulator needs them apart
+    for (let merged = true; merged;) {
+      merged = false;
+      for (let i = 0; i < hs.length && !merged; i++) for (let j = i + 1; j < hs.length && !merged; j++) {
+        const p = hs[i], q = hs[j];
+        if (p.x0 <= q.x1 + 0.01 && q.x0 <= p.x1 + 0.01 && p.y0 <= q.y1 + 0.01 && q.y0 <= p.y1 + 0.01) {
+          hs[i] = { x0: Math.min(p.x0, q.x0), x1: Math.max(p.x1, q.x1), y0: Math.min(p.y0, q.y0), y1: Math.max(p.y1, q.y1) };
+          hs.splice(j, 1); merged = true;
+        }
+      }
+    }
+    const rings = hs.map((h) => ring(h).reverse());
+    this.poly(key, ring(r), z, rings);
   }
   // a solid block over a rectangle from z0 to z1
   block(key, r, z0, z1) {

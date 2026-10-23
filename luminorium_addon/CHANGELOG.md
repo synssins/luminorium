@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0-dev.60
+
+- **Stairs with head room:** inside, each step sits on a slab that follows the flight's slope, so
+  there's room under a stair (a basement stair under the bedroom stair) instead of a solid block.
+  Steps outside stay solid down to the ground.
+- **Stairwells have sides:** where a flight drops through a floor, its sides are walled from the
+  floor below up to the floor above, unless a plan wall is already there.
+- **Floors open where the house's parts pass through them:** a floor is cut away where another block
+  runs up through its height (an entry and its landing under the bedroom level), so those keep
+  their own ceilings. Overlapping holes are merged.
+- **Outside and Wood Shop show the whole house:** levels with no walls or blocks in the house don't
+  cut the solid view.
+
 ## 0.3.0-dev.59
 
 - **No walls where the house's parts meet:** a block's face that's against another block is no
