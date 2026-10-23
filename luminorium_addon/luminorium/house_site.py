@@ -151,17 +151,24 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
         a, b = _pt(w.get("a")), _pt(w.get("b"))
         if math.dist(a, b) < 0.1:
             raise SiteError("a wall is too short")
-        walls.append(
-            {
-                "id": _id(w.get("id")),
-                "level": level,
-                "a": a,
-                "b": b,
-                "studs": studs,
-                "finish": finish,
-                **({"angled": True} if w.get("angled") else {}),  # not kept square to the house
-            }
-        )
+        wall = {
+            "id": _id(w.get("id")),
+            "level": level,
+            "a": a,
+            "b": b,
+            "studs": studs,
+            "finish": finish,
+            **({"angled": True} if w.get("angled") else {}),  # not kept square to the house
+        }
+        # A wall that runs through more than its level (a stairwell's sides, from the floor at
+        # the bottom of the stairs to the ceiling at the top): its own bottom and top, in metres
+        # above the ground
+        for key in ("z0", "z1"):
+            if w.get(key) not in (None, ""):
+                wall[key] = _num(w[key], -20, 40)
+        if "z0" in wall and "z1" in wall and wall["z1"] - wall["z0"] < 0.1:
+            raise SiteError("a wall is too low")
+        walls.append(wall)
     out["walls"] = walls
     wall_ids = {w["id"] for w in walls}
     doors = []

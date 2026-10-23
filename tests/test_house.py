@@ -598,6 +598,13 @@ async def test_top_view_walls_yard_and_plans(client, lum):
     for broken in ({**win, "b": [15, 2.05]}, {**win, "z1": 1.45}):
         bad = {**body, "windows": [broken]}
         assert (await client.put("/api/house/site", json=bad)).status_code == 400
+    # a stairwell's side runs through the levels: its own bottom and top
+    well = {**body["walls"][0], "id": "sw", "z0": -1.0, "z1": 5.2}
+    view = await client.put("/api/house/site", json={**body, "walls": [*body["walls"], well]})
+    sw = next(w for w in view.json()["top"]["walls"] if w["id"] == "sw")
+    assert (sw["z0"], sw["z1"]) == (-1.0, 5.2)
+    bad = {**body, "walls": [{**well, "z1": -0.95}]}
+    assert (await client.put("/api/house/site", json=bad)).status_code == 400
     # the walls are the eaves' depth (24") inside the roof outline
     assert top["plan"][0] == pytest.approx([0.6096, 0], abs=1e-3)
     assert top["plan"][2] == pytest.approx([14.3904, 9.1808], abs=1e-3)

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.53
+
+- **Stairwell walls:** a wall can run through more than its level (`z0`, `z1` on a Top view wall):
+  a stairwell's sides go from the floor at the bottom of the stairs to the ceiling at the top, one
+  continuous wall each side.
+
 ## 0.3.0-dev.52
 
 - **A real lawn and paving:** in the solid view the ground is grass (a photo texture from the

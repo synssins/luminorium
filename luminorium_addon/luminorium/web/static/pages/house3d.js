@@ -933,7 +933,8 @@ window.House3D = class House3D {
       // every level's walls show, cut off at the height the view is cut at. A wall carries on
       // past its ceiling through the floor framing above (joists, subfloor and flooring), up to
       // the next floor, so no gap shows between the floors
-      const z0 = f.elevation, z1 = Math.min(f.elevation + f.ceiling + (solid ? FLOOR_T : 0), cutW);
+      // (a stairwell's sides run through the levels: their own bottom and top)
+      const z0 = w.z0 ?? f.elevation, z1 = Math.min(w.z1 ?? f.elevation + f.ceiling + (solid ? FLOOR_T : 0), cutW);
       if (z1 - z0 < 0.05) continue;
       const active = f.active;
       const room = this.roomOf((w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2, z0 + 0.1);
@@ -1153,7 +1154,7 @@ window.House3D = class House3D {
     const t = this.scene.top, m = this.scene.massing;
     const f = this.scene.floors.find((q) => q.id === level);
     // (a doorway lets light through under its header)
-    if (t && f) for (const w of t.walls || []) if (w.level === level) out.push(...wallPieces(w, t.doors || [], f.elevation, f.elevation + f.ceiling));
+    if (t && f) for (const w of t.walls || []) if (w.level === level) out.push(...wallPieces(w, t.doors || [], w.z0 ?? f.elevation, w.z1 ?? f.elevation + f.ceiling));
     // every block's walls, at whatever height (a light outside, or one set to the wrong level,
     // still can't shine through the house); a ray only stops where it meets a wall's height
     if (m) for (const b of m.blocks) {
