@@ -413,8 +413,20 @@ window.HouseGL = class HouseGL {
       if (!g) { l.intensity = 0; return; }
       l.color.set(g.color);
       l.intensity = (6 + 26 * Math.min(1, g.level)) * (i < NS ? 1 : 0.7) * (this.nightBoost || 1);
-      l.position.set(g.x, g.y, g.z);
+      l.position.set(g.x, g.y, this.underCeiling(g));
     });
+  }
+
+  // A light's height, kept just under the first ceiling over it: a light set higher than the
+  // ceiling it's in (a recessed can in a soffit) would be shut inside it, throwing no light
+  underCeiling(g) {
+    const T = THREE, from = (g.floorZ ?? g.z - 2.2) + 0.3;
+    if (!(g.z > from)) return g.z;
+    const rc = this._up || (this._up = new T.Raycaster());
+    rc.set(new T.Vector3(g.x, g.y, from), new T.Vector3(0, 0, 1));
+    rc.far = g.z - from + 0.01;
+    const hit = rc.intersectObjects(this.house.children, false).find((h) => h.object.material !== this.mats.glass);
+    return hit ? Math.max(from, hit.point.z - 0.08) : g.z;
   }
 
   // Garage doors: down in the opening, or (open) up under the ceiling, run back into the garage

@@ -117,14 +117,7 @@
       blockPicks: ui.mode3d === "shape" ? ui.blockPicks || [] : [],
       // a block picked in Shape: everything above its top is hidden, to see into it
       // (the solid view: the level shown cuts at its ceiling, to look into its rooms)
-      cutZ: (() => {
-        const b = ui.mode3d === "shape" && ui.block && m && m.blocks.find((q) => q.id === ui.block);
-        if (b) return b.z1;
-        const f = ui.solid && floorsById().get(ui.floor);
-        // a level outside the house (the yard, a shed) shows the whole house, not a cut
-        const inHouse = f && (((house.top && house.top.walls) || []).some((w) => w.level === f.id) || ((m && m.blocks) || []).some((b) => b.level === f.id || b.floor === f.id));
-        return f && inHouse ? f.elevation + f.ceiling : null;
-      })(),
+      cutZ: cutZNow(),
       dims: ui.dims ? blockDims() : [],
       solid: !!ui.solid,
       glows: ui.solid ? glows() : [],
@@ -926,11 +919,21 @@
   }
   // Simulate: a light as set here (on, colour, brightness), not as it is in Home Assistant; nothing
   // is sent to the light
+  // Where the view is cut: a block picked in Shape at its top; the solid view at the ceiling of the
+  // level shown (a level outside the house, the yard or a shed, shows the whole house: no cut)
+  function cutZNow() {
+    const m = house.massing;
+    const b = ui.mode3d === "shape" && ui.block && m && m.blocks.find((q) => q.id === ui.block);
+    if (b) return b.z1;
+    const f = ui.solid && floorsById().get(ui.floor);
+    const inHouse = f && (((house.top && house.top.walls) || []).some((w) => w.level === f.id) || ((m && m.blocks) || []).some((q) => q.level === f.id || q.floor === f.id));
+    return f && inHouse ? f.elevation + f.ceiling : null;
+  }
   function simOf(id) { return ui.simStates[id] || { on: false, color: "#ffd28a", level: 0.8 }; }
   function lightOn(t) { return ui.sim ? !!simOf(t.id).on : t.state === "on"; }
   function setSim(id, change) { ui.simStates = { ...ui.simStates, [id]: { ...simOf(id), ...change } }; L.save("house.simStates", ui.simStates); paint(); }
   function glows() {
-    const out = [];
+    const out = [], cut = cutZNow();
     const members = new Map((inventory.fixtures || []).map((f) => [f.id, f.members || []]));
     for (const t of house.targets) {
       if (!t.world || !t.item || !lightOn(t)) continue;
@@ -940,8 +943,8 @@
         : look.color_temp_kelvin ? L.colorHex({ kelvin: look.color_temp_kelvin }) : "#ffd28a";
       const level = sim ? sim.level : look.brightness != null ? look.brightness / 255 : 0.8;
       if (level <= 0.01) continue;
-      // the solid view is cut at the level shown: the levels above it aren't drawn
-      if (t.item.floor !== house.outside && floorZ(t.item.floor) > floorZ(ui.floor) + 0.05) continue;
+      // a light on a level the cut takes away isn't drawn; every other one lights what's shown
+      if (cut != null && t.item.floor !== house.outside && floorZ(t.item.floor) >= cut - 0.05) continue;
       // several fixtures on one switch: each throws its own light
       const fz = floorZ(t.item.floor);
       const f = t.item.form;
@@ -967,7 +970,7 @@
     for (const o of (house.top && house.top.objects) || []) {
       if (o.kind !== "bar") continue;
       const st = objState(o);
-      if (!st.on || st.level <= 0.01 || o.z > floorZ(ui.floor) + 3.5) continue;
+      if (!st.on || st.level <= 0.01 || (cut != null && o.z >= cut)) continue;
       for (const p of barPoints(o, Math.max(1, Math.round(Math.max(o.w, o.d) / 1.2)))) {
         out.push({ x: p.x, y: p.y, z: o.z - 0.05, floorZ: o.z - 2.4, color: st.color, level: st.level * 0.8, r: 1.2 });
       }
@@ -1052,9 +1055,14 @@
   // What's under a right click: a light's orb, else the nearest light, TV or light bar to it on
   // the screen, else a garage door
   function menuTarget(at) {
-    const lightThing = (t) => ({ name: t.name, key: t.id, entity: t.id,
+    // a light that's one bulb of a fixture: the whole fixture
+    const whole = (t) => {
+      const fx = ((inventory && inventory.fixtures) || []).find((f) => (f.members || []).includes(t.id));
+      return (fx && target(fx.id)) || t;
+    };
+    const lightThing = (t0) => { const t = whole(t0); return { name: t.name, key: t.id, entity: t.id,
       state: () => (ui.sim ? simOf(t.id) : { on: t.state === "on", ...lookOf(t) }),
-      pick: () => { ui.sel = t.id; ui.part = null; ui.floor = floorOfTarget(t); paint(); } });
+      pick: () => { ui.sel = t.id; ui.part = null; ui.floor = floorOfTarget(t); paint(); } }; };
     if (at.light) { const t = target(at.light.id); if (t) return lightThing(t); }
     let best = null;
     const near = (p, r, make) => {
@@ -1063,7 +1071,12 @@
       const d = Math.hypot(q.x - at.pt.x, q.y - at.pt.y);
       if (d <= r && (!best || d < best.d)) best = { d, make };
     };
-    for (const t of house.targets) if (t.world && t.item) near(t.world, 28, () => lightThing(t));
+    // the light, or any fixture of it (each part of a light on one switch)
+    for (const t of house.targets) {
+      if (!t.world || !t.item) continue;
+      near(t.world, 28, () => lightThing(t));
+      for (const q of t.parts || []) if (q.world) near(q.world, 24, () => lightThing(t));
+    }
     for (const o of (house.top && house.top.objects) || []) {
       if (o.kind === "box") continue;
       const make = () => ({ name: o.name || (o.kind === "tv" ? "TV" : "Light bar"), key: objKey(o), entity: o.light || null, state: () => objState(o) });

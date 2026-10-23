@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0-dev.64
+
+- **Right-click any fixture of a light:** each bulb or fixture of a light on one switch (or a
+  fixture made of several lights) opens the menu for the whole of it, never one bulb.
+- **Lights stay lit wherever they're seen:** a light shows unless the view's cut takes its level
+  away; Outside (no cut) lights every level, not just the yard.
+- **Lights placed above a ceiling still shine:** a light is kept just under the first ceiling over
+  it (a recessed can in a soffit set too high was shut inside it, dark).
+
 ## 0.3.0-dev.63
 
 - **Top riser:** a flight now has its top riser, from the top tread up to the floor it reaches,
