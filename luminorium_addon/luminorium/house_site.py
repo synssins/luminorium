@@ -255,6 +255,27 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
             fin["y0"], fin["y1"] = sorted((_num(f["y0"]), _num(f["y1"])))
         finishes.append(fin)
     out["finishes"] = finishes
+    # Windows on any outside wall (the front photo has the front's): from a to b along the wall's
+    # outside face, sill to top above the ground, in panes across
+    windows = []
+    for w in _list(body.get("windows"), 200):
+        a, b = _pt(w.get("a")), _pt(w.get("b"))
+        if math.dist(a, b) < 0.1:
+            raise SiteError("a window is too narrow")
+        z0, z1 = sorted((_num(w.get("z0"), -20, 40), _num(w.get("z1"), -20, 40)))
+        if z1 - z0 < 0.1:
+            raise SiteError("a window is too short")
+        windows.append(
+            {
+                "id": _id(w.get("id")),
+                "a": a,
+                "b": b,
+                "z0": z0,
+                "z1": z1,
+                "panes": int(_num(w.get("panes", 1), 1, 12)),
+            }
+        )
+    out["windows"] = windows
     return out
 
 

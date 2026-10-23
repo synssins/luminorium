@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0-dev.52
+
+- **A real lawn and paving:** in the solid view the ground is grass (a photo texture from the
+  house's own front lawn) and walks, drives and patios are concrete; the grid is faint.
+- **Every level's walls show** in the solid view, cut off at the level shown, and run up through
+  the floor framing to the next floor (no gap between storeys).
+- **Solid outside walls:** each has its thickness (an inside face and a cut top), so interior walls
+  meet a wall, not a thin shell. Interior walls are one plaster surface: no outlines or end faces
+  between their pieces.
+- **Windows everywhere:** the front's windows and doors, and windows on any other outside wall
+  (`site.windows`: from a to b along the wall, sill to top, panes), drawn as glass with a white
+  frame and mullions, inside and out.
+
 ## 0.3.0-dev.51
 
 - **Doorways in 3D:** interior walls open where their doorways are, with the wall carried on over

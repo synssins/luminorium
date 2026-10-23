@@ -228,6 +228,8 @@ A photo from above (`pages/site.js`, `SiteEditor`; `house_site.py`). Kept as `si
     opening** above the floor (`top`; a door's 6' 8" if not given). An opening down a few steps
     (into a sunken entry) tops out at the lower level's ceiling, so the wall runs over it.
   - **Rooms:** a name tied to one of Home Assistant's areas.
+  - **Windows** on the sides and back (`site.windows`; the front photo has the front's): a and b
+    along a wall's outside face, sill `z0` and top `z1` above the ground, `panes` across.
   - **Floor finishes** (`site.finishes`): hardwood, vinyl, tile (the mosaic), carpet or concrete,
     for a whole level or a stretch of it (`x0..y1`, a room). The solid view lays the matching photo
     texture on the floor (`static/textures/`); a stretch is drawn over the level's own finish.
@@ -331,7 +333,7 @@ and a sentence. The page shows them as an alert triangle in the top bar with how
 | `DELETE /api/house/facade` | | the view; removes the photo and the drawing |
 | `PUT /api/house/photo?which=top&w=&h=` | the image bytes | the top view; it must be placed again |
 | `GET /api/house/photo?which=top` | | the image |
-| `PUT /api/house/site` | `{xf: {s, theta, tx, ty}, square: {a, b, runs: across\|depth}, turns, ref: {pts, length?}, check: {pts, length}, outline: [[x, y]…], ext_wall: 2x4\|2x6\|2x8, yard: [{id, kind, name, pts?, smooth?, width?, c?, r?, h?}], walls: [{id, level, a, b, studs, finish}], doors: [{id, wall, at, width, top?}], rooms: [{id, level, at, area, name}], stairs: [{id, level, to, dir, x0, x1, y0, y1, steps?, riser?, z0?, z1?, landing?}], finishes: [{id, level, kind, x0?, x1?, y0?, y1?}]}` | the view; `400` for an unknown level, area, build, wall, yard kind or finish |
+| `PUT /api/house/site` | `{xf: {s, theta, tx, ty}, square: {a, b, runs: across\|depth}, turns, ref: {pts, length?}, check: {pts, length}, outline: [[x, y]…], ext_wall: 2x4\|2x6\|2x8, yard: [{id, kind, name, pts?, smooth?, width?, c?, r?, h?}], walls: [{id, level, a, b, studs, finish}], doors: [{id, wall, at, width, top?}], rooms: [{id, level, at, area, name}], stairs: [{id, level, to, dir, x0, x1, y0, y1, steps?, riser?, z0?, z1?, landing?}], finishes: [{id, level, kind, x0?, x1?, y0?, y1?}], windows: [{id, a, b, z0, z1, panes}]}` | the view; `400` for an unknown level, area, build, wall, yard kind or finish |
 | `DELETE /api/house/site` | | the view; removes the top photo and its drawing |
 | `PUT /api/house/items/{target}/aim` | `{kind: flood\|spot\|wall, beam?, tilt?, heading?, at?: {x, y, z}, what?}` or `null` (with `at`, heading and tilt point at it) | the item; `400` before it's placed or out of range |
 

@@ -214,7 +214,7 @@ window.House3D = class House3D {
       // goes into it, the grid and the yard on it, then the rest
       for (const it of items) if (it.below) it.draw();
       this.solidGround(P, col, gx0, gx1, gy0, gy1);
-      grid(0.45);
+      grid(0.1);
       for (const f of this._flat) f();
       for (const it of items) if (!it.below) it.draw();
     } else for (const it of items) it.draw();
@@ -276,15 +276,19 @@ window.House3D = class House3D {
     const ctx = this.ctx;
     const outer = [P(gx0, gy0, 0), P(gx1, gy0, 0), P(gx1, gy1, 0), P(gx0, gy1, 0)];
     if (outer.some((q) => !q)) return;
-    ctx.beginPath(); outer.forEach((q, k) => (k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.closePath();
+    const rings = [outer];
     for (const b of (this.scene.massing && this.scene.massing.blocks) || []) {
       if (b.z0 > -0.01) continue;
       const y0 = b.y0 || 0, y1 = y0 + b.depth;
       const h = [P(b.x0, y0, 0), P(b.x1, y0, 0), P(b.x1, y1, 0), P(b.x0, y1, 0)];
       if (h.some((q) => !q)) continue;
-      h.forEach((q, k) => (k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.closePath();
+      rings.push(h);
     }
-    ctx.fillStyle = "#1f2a22"; ctx.fill("evenodd");
+    ctx.beginPath();
+    for (const r of rings) { r.forEach((q, k) => (k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.closePath(); }
+    ctx.fillStyle = "#3f5a2c"; ctx.fill("evenodd");
+    // the lawn, from a photo of the house's own (darker the way it faces from the sun: it's flat)
+    this.texture("grass", (s, t) => ({ x: gx0 + s, y: gy0 + t, z: 0 }), gx1 - gx0, gy1 - gy0, rings, { color: "#000", alpha: 0.08 });
   }
 
   // The block a point is in (the smallest, where blocks overlap), or -1
@@ -660,12 +664,21 @@ window.House3D = class House3D {
         const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
         const lit = 0.62 + 0.4 * Math.max(0, n[0] * SUN[0] + n[1] * SUN[1]);
         items.push({ depth: avgDepth(q), below: hi <= 0.001, ...meta, draw: () => {
-          this.poly(q, fill, 0.97, edge, 0.55);
+          this.poly(q, fill, 0.97, edge, 0.35);
           if (outside && q.every(Boolean)) {
             this.texture("siding", (s, t) => ({ x: a[0] + ux * s, y: a[1] + uy * s, z: hi - t }), L, hi - lo, [q], { color: "#000", alpha: Math.max(0, 1 - lit) * 0.8 });
-            this.poly(q, fill, 0, edge, 0.5);
+            this.poly(q, fill, 0, edge, 0.35);
           }
         } });
+        // the wall's thickness: its inside face (plaster, where the interior walls meet it) and
+        // its cut top, so it's a solid wall, not a shell
+        const th = (this.scene.top && this.scene.top.ext_thick) || 0.13;
+        const ia = [a[0] - n[0] * th, a[1] - n[1] * th], ib = [b[0] - n[0] * th, b[1] - n[1] * th];
+        const qi = [[ia[0], ia[1], lo], [ib[0], ib[1], lo], [ib[0], ib[1], hi], [ia[0], ia[1], hi]].map(([x, y, z]) => P(x, y, z));
+        const qt = [[a[0], a[1], hi], [b[0], b[1], hi], [ib[0], ib[1], hi], [ia[0], ia[1], hi]].map(([x, y, z]) => P(x, y, z));
+        const inFill = shade(BEIGE, [-n[0], -n[1], 0]), topFill = shade(BEIGE, [0, 0, 1], 0.95);
+        items.push({ depth: avgDepth(qi), below: hi <= 0.001, ...meta, draw: () => this.poly(qi, inFill, 1, inFill, 1) });
+        items.push({ depth: avgDepth(qt) - 0.01, below: hi <= 0.001, ...meta, draw: () => this.poly(qt, topFill, 1, edge, 0.4) });
       }
     };
     // A block that goes into the ground (a basement) leaves a hole in the grid where it goes in
@@ -776,7 +789,57 @@ window.House3D = class House3D {
       const y = this.openingY(o) - 0.02;
       const sel = this.scene.selOpening && o.id === this.scene.selOpening;
       const room = this.roomOf((o.x0 + o.x1) / 2, y + 0.05, (o.z0 + o.z1) / 2);
+      if (solid && !sel) {
+        this.windowItems(items, P, [o.x0, y], [o.x1, y], o.z0, Math.min(o.z1, cut), [0, -1], o.kind === "window" ? Math.max(1, Math.round((o.x1 - o.x0) / 1.1)) : 1, o.kind, room);
+        continue;
+      }
       face([[o.x0, y, o.z0], [o.x1, y, o.z0], [o.x1, y, o.z1], [o.x0, y, o.z1]], sel ? "#ff8a3d" : GLASS, sel ? 0.4 : o.kind === "window" ? 0.22 : 0.14, 0.9, { room, rank: 5 });
+    }
+    // windows on the other outside walls (the Top view's drawing): outward from the house's middle
+    const W2 = this.scene.W / 2, D2 = this.scene.D / 2;
+    for (const w of (this.scene.top && this.scene.top.windows) || []) {
+      if (w.z0 >= cut - 0.05) continue;
+      const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) || 1;
+      let n = [(w.b[1] - w.a[1]) / L, -(w.b[0] - w.a[0]) / L];
+      const mx = (w.a[0] + w.b[0]) / 2, my = (w.a[1] + w.b[1]) / 2;
+      if (n[0] * (mx - W2) + n[1] * (my - D2) < 0) n = [-n[0], -n[1]];
+      const off = (p) => [p[0] + n[0] * 0.02, p[1] + n[1] * 0.02];
+      const room = this.roomOf(mx - n[0] * 0.1, my - n[1] * 0.1, (w.z0 + w.z1) / 2);
+      if (solid) this.windowItems(items, P, off(w.a), off(w.b), w.z0, Math.min(w.z1, cut), n, w.panes || 1, "window", room);
+      else face([[...off(w.a), w.z0], [...off(w.b), w.z0], [...off(w.b), w.z1], [...off(w.a), w.z1]], GLASS, 0.22, 0.9, { room, rank: 5 });
+    }
+  }
+
+  // A window (or door) on an outside wall in the solid view: glass with the sky in it, a white
+  // frame and mullions, on the outside face and again on the inside face (n points out)
+  windowItems(items, P, a, b, z0, z1, n, panes, kind, room) {
+    if (z1 - z0 < 0.05) return;
+    const th = ((this.scene.top && this.scene.top.ext_thick) || 0.13) + 0.04;
+    for (const side of [0, 1]) {
+      const d = side ? -th : 0;
+      const A = [a[0] + n[0] * d, a[1] + n[1] * d], B = [b[0] + n[0] * d, b[1] + n[1] * d];
+      const q = [P(A[0], A[1], z0), P(B[0], B[1], z0), P(B[0], B[1], z1), P(A[0], A[1], z1)];
+      if (!q.every(Boolean)) continue;
+      const cam = this.cam, facing = n[0] * (cam.pos.x - (A[0] + B[0]) / 2) + n[1] * (cam.pos.y - (A[1] + B[1]) / 2);
+      // only the face seen from its own side: the outside from outside, the inside from in
+      if ((side === 0) !== (facing > 0)) continue;
+      items.push({ depth: avgDepth(q) - 0.02, room, rank: side ? 2 : 5, draw: () => {
+        const ctx = this.ctx;
+        const top = { x: (q[3].x + q[2].x) / 2, y: (q[3].y + q[2].y) / 2 }, bot = { x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 };
+        const g = ctx.createLinearGradient(top.x, top.y, bot.x, bot.y);
+        if (kind === "window") { g.addColorStop(0, "#9cc3e0"); g.addColorStop(0.55, "#4d6f8c"); g.addColorStop(1, "#2a3c4f"); }
+        else { g.addColorStop(0, "#7a5a3c"); g.addColorStop(1, "#5c4029"); }
+        ctx.beginPath(); q.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath();
+        ctx.fillStyle = g; ctx.fill();
+        const lw = Math.max(1.5, 0.05 * (q[0].scale + q[2].scale) / 2);
+        ctx.lineWidth = lw; ctx.strokeStyle = "#f4f1ea"; ctx.stroke();
+        // mullions between panes
+        ctx.lineWidth = Math.max(1, lw * 0.6);
+        for (let k = 1; k < panes; k++) {
+          const t = k / panes, p0 = { x: q[0].x + (q[1].x - q[0].x) * t, y: q[0].y + (q[1].y - q[0].y) * t }, p1 = { x: q[3].x + (q[2].x - q[3].x) * t, y: q[3].y + (q[2].y - q[3].y) * t };
+          ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+        }
+      } });
     }
   }
 
@@ -794,7 +857,18 @@ window.House3D = class House3D {
       const polys = flatPolys(y).map((poly) => poly.map(([x, yy]) => P(x, yy, 0.01)));
       if (polys.some((q) => !q.every(Boolean))) continue;
       const alpha = (y.kind === "path" ? 0.55 : y.kind === "pool" ? 0.45 : 0.3) + (sel ? 0.2 : 0);
-      later(() => unionPolys(this.ctx, polys, hexA(c, alpha), sel ? "#ff8a3d" : hexA(c, 0.8), sel ? 2.5 : 1));
+      const paved = this.scene.solid && PAVED[y.kind];
+      later(() => {
+        if (paved) {
+          // the solid view: walks and drives in concrete, beds in mulch, as photo textures
+          const all = flatPolys(y).flat(), xs = all.map((p) => p[0]), ys = all.map((p) => p[1]);
+          const x0 = Math.min(...xs), y0 = Math.min(...ys);
+          this.texture(paved, (s, t) => ({ x: x0 + s, y: y0 + t, z: 0.01 }), Math.max(...xs) - x0, Math.max(...ys) - y0, polys, null, "nonzero");
+          unionPolys(this.ctx, polys, hexA(c, 0), sel ? "#ff8a3d" : "rgba(0,0,0,0.25)", sel ? 2.5 : 1);
+          return;
+        }
+        unionPolys(this.ctx, polys, hexA(c, alpha), sel ? "#ff8a3d" : hexA(c, 0.8), sel ? 2.5 : 1);
+      });
     }
     for (const y of t.yard) {
       if (!y.c) continue;
@@ -856,9 +930,11 @@ window.House3D = class House3D {
     for (const w of t.walls) {
       const f = levels.get(w.level);
       if (!f || f.elevation >= cutW - 0.05) continue;
-      // the solid view shows the plan of the level it's cut at, not those under its floor
-      if (solid && !f.active && this.scene.cutZ != null) continue;
-      const z0 = f.elevation, z1 = Math.min(f.elevation + f.ceiling, cutW);
+      // every level's walls show, cut off at the height the view is cut at. A wall carries on
+      // past its ceiling through the floor framing above (joists, subfloor and flooring), up to
+      // the next floor, so no gap shows between the floors
+      const z0 = f.elevation, z1 = Math.min(f.elevation + f.ceiling + (solid ? FLOOR_T : 0), cutW);
+      if (z1 - z0 < 0.05) continue;
       const active = f.active;
       const room = this.roomOf((w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2, z0 + 0.1);
       for (const pc of wallPieces(w, t.doors || [], z0, z1)) {
@@ -867,11 +943,14 @@ window.House3D = class House3D {
           items.push({ depth: avgDepth(q), room, rank: 3, draw: () => this.poly(q, BEIGE_HEX, active ? 0.16 : 0.06, BEIGE_HEX, active ? 0.65 : 0.22) });
           continue;
         }
+        // one plaster surface: no outlines between pieces, and no end faces (a wall's end meets
+        // another wall), only its cut top and a header's underside
         for (const fc of boxFaces(pc, (w.thick || 0.12) / 2)) {
+          if (fc.end) continue;
           const q = fc.pts.map(([x, y, z]) => P(x, y, z));
           if (!q.every(Boolean)) continue;
           const fill = shade(BEIGE, fc.n);
-          items.push({ depth: avgDepth(q), room, rank: 3, draw: () => this.poly(q, fill, 1, shade(BEIGE, fc.n, 0.78), 0.5) });
+          items.push({ depth: avgDepth(q), room, rank: 3, draw: () => this.poly(q, fill, 1, fill, 1) });
         }
       }
     }
@@ -905,7 +984,7 @@ window.House3D = class House3D {
   // across it; s runs 0..S and t 0..T. Drawn in small cells, each mapped on its own (close
   // enough to perspective-correct), inside `clip` (screen polygons, even-odd) if given. Returns
   // false while the image loads.
-  texture(name, world, S, T, clip, tint) {
+  texture(name, world, S, T, clip, tint, rule = "evenodd") {
     // one redraw when it's loaded, however many faces asked for it meanwhile
     const img = textureImg(name, this._redraw || (this._redraw = () => requestAnimationFrame(() => this.render())));
     if (!img) return false;
@@ -916,7 +995,7 @@ window.House3D = class House3D {
     if (clip) {
       ctx.beginPath();
       for (const r of clip) { r.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); }
-      ctx.clip("evenodd");
+      ctx.clip(rule);
     }
     // cells: smaller up close, so the texture stays straight in perspective
     const mid = this.project(world(S / 2, T / 2));
@@ -1455,8 +1534,13 @@ const TEXTURES = {
   siding: { src: "static/textures/siding.jpg", m: 1.0 },
   // the upstairs bathroom's brown mosaic: 2x2, 1x2 and 1x1 tiles in an 8 in square repeat
   tile: { src: "static/textures/mosaic_bath.jpg", m: 0.4064 },
+  // the lawn from the daylight front photo, and broom-finished concrete for walks and the drive
+  grass: { src: "static/textures/grass.jpg", m: 1.6 },
+  concrete: { src: "static/textures/concrete.jpg", m: 2.0 },
 };
-const FINISH_TEX = { hardwood: "hardwood", vinyl: "vinyl", tile: "tile" };
+const FINISH_TEX = { hardwood: "hardwood", vinyl: "vinyl", tile: "tile", concrete: "concrete" };
+// Yard shapes drawn as a texture in the solid view
+const PAVED = { path: "concrete", driveway: "concrete", patio: "concrete" };
 const _tex = {};
 // The loaded image for a texture, or null while it loads (then `again` is called)
 function textureImg(name, again) {
@@ -1487,6 +1571,8 @@ function affineFrom(t, s) {
 // Warm beige walls, wood stairs inside, concrete steps outside (RGB)
 const BEIGE = [222, 205, 178], BEIGE_HEX = "#decdb2", WOOD = [158, 112, 72], CONCRETE = [188, 184, 176];
 const FLOOR = [150, 118, 86];
+// The floor framing between a ceiling and the floor above: 2x10 joists, subfloor and flooring
+const FLOOR_T = 0.27;
 // A colour lit from above and to the front left: how much a face of normal n catches the light
 const SUN = (() => { const v = [0.35, -0.55, 0.76], l = Math.hypot(...v); return v.map((c) => c / l); })();
 function shade(rgb, n, k = 1) {
@@ -1552,8 +1638,8 @@ function boxFaces(pc, half) {
   const faces = [
     { pts: [up(A[0], pc.z0), up(B[0], pc.z0), up(B[0], pc.z1), up(A[0], pc.z1)], n: [-uy, ux, 0] },
     { pts: [up(A[1], pc.z0), up(B[1], pc.z0), up(B[1], pc.z1), up(A[1], pc.z1)], n: [uy, -ux, 0] },
-    { pts: [up(A[0], pc.z0), up(A[1], pc.z0), up(A[1], pc.z1), up(A[0], pc.z1)], n: [-ux, -uy, 0] },
-    { pts: [up(B[0], pc.z0), up(B[1], pc.z0), up(B[1], pc.z1), up(B[0], pc.z1)], n: [ux, uy, 0] },
+    { pts: [up(A[0], pc.z0), up(A[1], pc.z0), up(A[1], pc.z1), up(A[0], pc.z1)], n: [-ux, -uy, 0], end: true },
+    { pts: [up(B[0], pc.z0), up(B[1], pc.z0), up(B[1], pc.z1), up(B[0], pc.z1)], n: [ux, uy, 0], end: true },
     { pts: [up(A[0], pc.z1), up(B[0], pc.z1), up(B[1], pc.z1), up(A[1], pc.z1)], n: [0, 0, 1] },
   ];
   if (pc.header) faces.push({ pts: [up(A[0], pc.z0), up(B[0], pc.z0), up(B[1], pc.z0), up(A[1], pc.z0)], n: [0, 0, -1] });

@@ -605,6 +605,7 @@ class HouseService:
             "rooms": site.get("rooms") or [],
             "stairs": site.get("stairs") or [],
             "finishes": site.get("finishes") or [],
+            "windows": site.get("windows") or [],
         }
 
     def clear_facade(self) -> None:
