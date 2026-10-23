@@ -600,8 +600,8 @@ async def test_top_view_walls_yard_and_plans(client, lum):
         assert (await client.put("/api/house/site", json=bad)).status_code == 400
     # a stairwell's side runs through the levels: its own bottom and top
     well = {**body["walls"][0], "id": "sw", "z0": -1.0, "z1": 5.2}
-    view = await client.put("/api/house/site", json={**body, "walls": [*body["walls"], well]})
-    sw = next(w for w in view.json()["top"]["walls"] if w["id"] == "sw")
+    res = await client.put("/api/house/site", json={**body, "walls": [*body["walls"], well]})
+    sw = next(w for w in res.json()["top"]["walls"] if w["id"] == "sw")
     assert (sw["z0"], sw["z1"]) == (-1.0, 5.2)
     bad = {**body, "walls": [{**well, "z1": -0.95}]}
     assert (await client.put("/api/house/site", json=bad)).status_code == 400
