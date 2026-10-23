@@ -594,6 +594,9 @@ window.SiteEditor = class SiteEditor {
       body = el("div.fc-sum", el("h3", "Doorway"),
         this.lenRow("Width", s.width, (v) => edit(() => { s.width = Math.max(0.4, Math.min(5, v)); })),
         this.lenRow("From the end of the wall", Math.max(0, s.at - s.width / 2), (v) => edit(() => { s.at = Math.max(s.width / 2, Math.min(len - s.width / 2, v + s.width / 2)); })),
+        // the wall carries on over it in 3D; an opening down a few steps can top out lower
+        this.lenRow("Top of the opening, above the floor", s.top ?? null, (v) => edit(() => { if (v == null) delete s.top; else s.top = Math.max(0.5, Math.min(10, v)); }), true),
+        el("span.small.muted", `Empty: a door's ${L.fmtLen(2.032)}. The wall is drawn over it up to the ceiling.`),
         del);
     } else if (this.sel.kind === "room") {
       const areas = this.ctx.areas().filter((a) => !this.level || a.floor_id === s.level || !a.floor_id);

@@ -554,13 +554,43 @@ async def test_top_view_walls_yard_and_plans(client, lum):
                 "finish": "plaster",
             }
         ],
-        "doors": [{"id": "dr", "wall": "w", "at": 3, "width": 0.8128}],
+        "doors": [
+            {"id": "dr", "wall": "w", "at": 3, "width": 0.8128},
+            # an opening down a few steps: it tops out at the lower level's ceiling
+            {"id": "op", "wall": "w", "at": 6, "width": 0.92, "top": 1.8},
+        ],
         "rooms": [
             {"id": "r", "level": "main_level", "at": [2.5, 4], "area": "kitchen", "name": "Kitchen"}
+        ],
+        "stairs": [
+            {
+                "id": "s",
+                "level": "main_level",
+                "to": "bedroom_level",
+                "dir": "x+",
+                "x0": 1,
+                "x1": 3,
+                "y0": 1,
+                "y1": 2,
+                "steps": 7,
+                "landing": 0.9,
+            },
         ],
     }
     view = (await client.put("/api/house/site", json=body)).json()
     top = view["top"]
+    assert "top" not in top["doors"][0] and top["doors"][1]["top"] == 1.8
+    assert top["stairs"][0]["landing"] == 0.9
+    # floor finishes: a whole level, or a stretch of one (a room)
+    fins = [
+        {"id": "a", "level": "main_level", "kind": "hardwood"},
+        {"id": "b", "level": "ground_level", "kind": "vinyl", "x0": 3, "x1": 1, "y0": 0, "y1": 2},
+    ]
+    top = (await client.put("/api/house/site", json={**body, "finishes": fins})).json()["top"]
+    assert top["finishes"][0] == {"id": "a", "level": "main_level", "kind": "hardwood"}
+    assert (top["finishes"][1]["x0"], top["finishes"][1]["x1"]) == (1, 3)
+    bad = {**body, "finishes": [{"level": "main_level", "kind": "shag"}]}
+    assert (await client.put("/api/house/site", json=bad)).status_code == 400
     # the walls are the eaves' depth (24") inside the roof outline
     assert top["plan"][0] == pytest.approx([0.6096, 0], abs=1e-3)
     assert top["plan"][2] == pytest.approx([14.3904, 9.1808], abs=1e-3)
@@ -579,6 +609,7 @@ async def test_top_view_walls_yard_and_plans(client, lum):
         {**body, "walls": [{**body["walls"][0], "level": "attic"}]},
         {**body, "walls": [{**body["walls"][0], "studs": "2x12"}]},
         {**body, "doors": [{"wall": "nowhere", "at": 1}]},
+        {**body, "doors": [{"wall": "w", "at": 1, "top": 0.1}]},  # a head under 0.5 m
         {**body, "rooms": [{**body["rooms"][0], "area": "mars"}]},
         {**body, "square": {**body["square"], "runs": "diagonal"}},
     ):

@@ -19,6 +19,8 @@ FINISH = {"drywall": 0.0127, "plaster": 0.01905}
 # Outside walls: studs, drywall inside, sheathing and siding outside
 SHEATHING_SIDING_M = 0.0111 + 0.019
 YARD_KINDS = ("path", "driveway", "patio", "pool", "bed", "lawn", "tree", "bush", "other")
+# Floor finishes the 3D view has a texture for
+FINISHES = ("hardwood", "vinyl", "carpet", "tile", "concrete")
 WALL_DEFAULT = {"studs": "2x4", "finish": "drywall"}
 
 
@@ -166,14 +168,17 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
     for d in _list(body.get("doors"), 400):
         if d.get("wall") not in wall_ids:
             raise SiteError("a door must be on a wall")
-        doors.append(
-            {
-                "id": _id(d.get("id")),
-                "wall": d["wall"],
-                "at": _num(d.get("at", 0), 0, 100),
-                "width": _num(d.get("width", 0.8128), 0.4, 5),
-            }
-        )
+        door = {
+            "id": _id(d.get("id")),
+            "wall": d["wall"],
+            "at": _num(d.get("at", 0), 0, 100),
+            "width": _num(d.get("width", 0.8128), 0.4, 5),
+        }
+        # The top of the opening above the wall's level floor (a door's head; an opening down a
+        # few steps can top out lower, at the next level's ceiling); none: a door's 80"
+        if d.get("top") not in (None, ""):
+            door["top"] = _num(d["top"], 0.5, 10)
+        doors.append(door)
     out["doors"] = doors
     rooms = []
     for r in _list(body.get("rooms"), 200):
@@ -229,8 +234,27 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
         for key in ("from_block", "to_block"):
             if t.get(key):
                 st[key] = _id(t.get(key))
+        # A flat landing at the top, past the last tread (a front stoop), inside x0..y1
+        if t.get("landing") not in (None, "", 0):
+            st["landing"] = _num(t.get("landing"), 0.1, 10)
         stairs.append(st)
     out["stairs"] = stairs
+    # What each floor is finished in, for the 3D view: a whole level, or a stretch of it (a
+    # room's x0..y1)
+    finishes = []
+    for f in _list(body.get("finishes"), 200):
+        level = str(f.get("level") or "")
+        if level not in floors:
+            raise SiteError(f"unknown level {level}")
+        kind = f.get("kind")
+        if kind not in FINISHES:
+            raise SiteError(f"unknown floor finish {kind}")
+        fin: dict[str, Any] = {"id": _id(f.get("id")), "level": level, "kind": kind}
+        if all(f.get(k) is not None for k in ("x0", "x1", "y0", "y1")):
+            fin["x0"], fin["x1"] = sorted((_num(f["x0"]), _num(f["x1"])))
+            fin["y0"], fin["y1"] = sorted((_num(f["y0"]), _num(f["y1"])))
+        finishes.append(fin)
+    out["finishes"] = finishes
     return out
 
 

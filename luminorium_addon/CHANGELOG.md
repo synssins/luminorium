@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0-dev.51
+
+- **Doorways in 3D:** interior walls open where their doorways are, with the wall carried on over
+  each one as a header. A doorway can say how high its opening goes (**Top of the opening** in
+  its panel; a door's 6' 8" if empty), so an opening down a few steps tops out at the lower
+  level's ceiling and the wall above runs over it. Light passes through a doorway and stops at the
+  wall around it.
+- **Stairs are real steps:** each tread has its riser, and in the solid view the sides are filled
+  in under them (wood inside, concrete outside). Stairs can end in a flat **landing** (a front
+  stoop). Where stairs come up through a floor, the floor has a hole over them.
+- **Walls and floors that look like the house:** in the solid view the walls are a warm beige, lit
+  by which way they face; outside walls show lap siding; floors show what they're finished in
+  (`site.finishes`: hardwood, vinyl tile, mosaic tile, for a whole level or a room's stretch), as
+  photo textures.
+
 ## 0.3.0-dev.50
 
 - **Beams stay in the house's rooms:** every block's walls, floor and ceiling stop light, at any

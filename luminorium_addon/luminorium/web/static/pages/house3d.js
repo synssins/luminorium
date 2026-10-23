@@ -147,11 +147,13 @@ window.House3D = class House3D {
       // a level's floor lies only under the blocks it's in (else the whole house, as before)
       const spans = this.floorSpans(f, x0, x1);
       if (spans.length > 1 || (spans.length === 1 && spans[0].own)) {
+        // with a hole where stairs come up through it
+        const holes = this.stairHoles(f.elevation);
         for (const r of spans) {
-          const q = [P(r.x0, r.y0, f.elevation), P(r.x1, r.y0, f.elevation), P(r.x1, r.y1, f.elevation), P(r.x0, r.y1, f.elevation)];
-          items.push({ depth: avgDepth(q) + 0.01, room: r.room, rank: 0, draw: () => {
+          const h = this.holed(P, r, f.elevation, holes);
+          items.push({ depth: avgDepth(h.outer) + 0.01, room: r.room, rank: 0, draw: () => {
             if (f.set === false) this.ctx.setLineDash([5, 4]);
-            this.poly(q, f.active ? col.accent : col.card2, f.set === false ? 0 : f.active ? 0.18 : 0.55, f.active ? col.accent : col.line2);
+            this.polyHoles(h, f.active ? col.accent : col.card2, f.set === false ? 0 : f.active ? 0.18 : 0.55, f.active ? col.accent : col.line2);
             this.ctx.setLineDash([]);
           } });
         }
@@ -645,10 +647,26 @@ window.House3D = class House3D {
       const below = pts.every((p) => p[2] <= 0.001);
       items.push({ depth: avgDepth(q), below, ...meta, draw: () => { this.poly(q, fill, 0.97, SOLID.edge, 0.55); } });
     };
-    // an upright face from z0 to z1, in two where it goes into the ground
+    // an upright face from z0 to z1, in two where it goes into the ground: warm beige, lit by
+    // which way it faces (n points out of the block)
     const wallFace = (a, b, z0, z1, meta) => {
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, n = [(b[1] - a[1]) / L, -(b[0] - a[0]) / L, 0];
       const parts = z0 < 0 && z1 > 0 ? [[z0, 0], [0, z1]] : [[z0, z1]];
-      for (const [lo, hi] of parts) solidFace([[a[0], a[1], lo], [b[0], b[1], lo], [b[0], b[1], hi], [a[0], a[1], hi]], SOLID.wall, meta);
+      for (const [lo, hi] of parts) {
+        const pts = [[a[0], a[1], lo], [b[0], b[1], lo], [b[0], b[1], hi], [a[0], a[1], hi]];
+        const q = pts.map(([x, y, z]) => P(x, y, z)), fill = shade(BEIGE, n, 0.92), edge = shade(BEIGE, n, 0.7);
+        // seen from outside, above the ground: the house's siding, lit by which way it faces
+        const outside = meta.rank === 4 && lo >= -0.001;
+        const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+        const lit = 0.62 + 0.4 * Math.max(0, n[0] * SUN[0] + n[1] * SUN[1]);
+        items.push({ depth: avgDepth(q), below: hi <= 0.001, ...meta, draw: () => {
+          this.poly(q, fill, 0.97, edge, 0.55);
+          if (outside && q.every(Boolean)) {
+            this.texture("siding", (s, t) => ({ x: a[0] + ux * s, y: a[1] + uy * s, z: hi - t }), L, hi - lo, [q], { color: "#000", alpha: Math.max(0, 1 - lit) * 0.8 });
+            this.poly(q, fill, 0, edge, 0.5);
+          }
+        } });
+      }
     };
     // A block that goes into the ground (a basement) leaves a hole in the grid where it goes in
     for (const b of this.scene.massing.blocks) {
@@ -686,7 +704,29 @@ window.House3D = class House3D {
         if (!inner.y1) wallFace([x1, y1], [x0, y1], z0, top, W.y1);
         if (!inner.x0) wallFace([x0, y1], [x0, y0], z0, top, W.x0);
         if (!inner.x1) wallFace([x1, y0], [x1, y1], z0, top, W.x1);
-        solidFace([[x0, y0, z0 + 0.005], [x1, y0, z0 + 0.005], [x1, y1, z0 + 0.005], [x0, y1, z0 + 0.005]], SOLID.floor, { room: bi, rank: 0 });
+        // its floor, open where stairs come up through it
+        const fh = this.holed(P, { x0, x1, y0, y1 }, z0 + 0.005, this.stairHoles(z0));
+        const ffill = shade(FLOOR, [0, 0, 1]), fedge = shade(FLOOR, [0, 0, 1], 0.7);
+        // the level this floor belongs to, for what it's finished in
+        const lv = (this.scene.floors.find((f) => Math.abs(f.elevation - z0) < 0.06) || {}).id;
+        items.push({ depth: avgDepth(fh.outer), below: z0 + 0.005 <= 0.001, room: bi, rank: 0, draw: () => {
+          this.polyHoles(fh, ffill, 0.98, fedge, 0.55);
+          if (!lv || !fh.ok) return;
+          const clip = [fh.outer, ...fh.inner];
+          const fins = ((this.scene.top && this.scene.top.finishes) || []).filter((f) => f.level === lv);
+          // the level's own finish over the whole floor, then the stretches set apart (a room)
+          for (const f of [...fins.filter((q) => q.x0 == null), ...fins.filter((q) => q.x0 != null)]) {
+            const tex = FINISH_TEX[f.kind];
+            if (!tex) continue;
+            const r = f.x0 == null ? { x0, x1, y0, y1 } : { x0: Math.max(x0, f.x0), x1: Math.min(x1, f.x1), y0: Math.max(y0, f.y0), y1: Math.min(y1, f.y1) };
+            if (r.x1 - r.x0 < 0.05 || r.y1 - r.y0 < 0.05) continue;
+            const zf = z0 + 0.006;
+            const part = f.x0 == null ? clip : [[P(r.x0, r.y0, zf), P(r.x1, r.y0, zf), P(r.x1, r.y1, zf), P(r.x0, r.y1, zf)], ...fh.inner];
+            if (part.some((ring) => ring.some((p) => !p))) continue;
+            this.texture(tex, (s, t) => ({ x: r.x0 + s, y: r.y0 + t, z: zf }), r.x1 - r.x0, r.y1 - r.y0, part, { color: "#000", alpha: 0.06 });
+          }
+          this.polyHoles(fh, ffill, 0, fedge, 0.55);
+        } });
       } else {
         if (!inner.y0) face([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], WALL, 0.08, 0.7, W.y0);
         if (!inner.y1) face([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], WALL, 0.06, 0.45, W.y1);
@@ -774,41 +814,145 @@ window.House3D = class House3D {
       if (q.every(Boolean)) items.push({ depth: avgDepth(q) + 0.05, draw: () => this.poly(q, col.card2, 0, "#dce2ea", 0.7) });
     }
     const levels = new Map(this.scene.floors.map((f) => [f.id, f]));
-    // stairs: a flight of steps from one level's floor to the other's
+    const solid = !!this.scene.solid;
+    // stairs: real steps from one level's floor to the other's, each a tread and its riser,
+    // with the sides filled in under them (and a flat landing at the top, a front stoop)
     for (const st of t.stairs || []) {
-      const f0 = st.z0 != null ? { elevation: st.z0 } : levels.get(st.level), f1 = st.z1 != null ? { elevation: st.z1 } : levels.get(st.to);
-      if (!f0 || !f1) continue;
-      if (Math.min(f0.elevation, f1.elevation) >= (this.scene.cutZ ?? Infinity) - 0.05) continue;
-      const pickedStair = this.scene.selStair && st.id === this.scene.selStair;
-      const along = st.dir[0], sign = st.dir[1] === "+" ? 1 : -1;
-      const lo = along === "x" ? st.x0 : st.y0, hi = along === "x" ? st.x1 : st.y1;
-      // as the Top view's panel has them: typed steps and step height, else from the levels
-      const z0 = f0.elevation, z1 = f1.elevation, rise = Math.abs(z1 - z0);
-      const n = st.steps || (rise ? Math.max(1, Math.round(rise / 0.19) - 1) : 1);
-      const riser = (st.riser || rise / (n + 1)) * Math.sign(z1 - z0 || 1);
-      const run = (hi - lo) / n;
-      for (let k = 0; k < n; k++) {
-        const s0 = sign > 0 ? lo + k * run : hi - (k + 1) * run, s1 = s0 + run;
-        const z = z0 + riser * (k + 1);
-        const q = along === "x"
-          ? [P(s0, st.y0, z), P(s1, st.y0, z), P(s1, st.y1, z), P(s0, st.y1, z)]
-          : [P(st.x0, s0, z), P(st.x1, s0, z), P(st.x1, s1, z), P(st.x0, s1, z)];
-        if (q.every(Boolean)) items.push({ depth: avgDepth(q), room: this.roomOf((st.x0 + st.x1) / 2, (st.y0 + st.y1) / 2, Math.min(z0, z1) + 0.1), rank: 3, draw: () => this.poly(q, pickedStair ? "#ff8a3d" : "#f0b429", pickedStair ? 0.5 : 0.22, pickedStair ? "#ff8a3d" : "#f0b429", 0.8) });
+      const fl = flight(st, levels);
+      if (!fl) continue;
+      if (Math.min(fl.z0, fl.z1) >= (this.scene.cutZ ?? Infinity) - 0.05) continue;
+      const picked = this.scene.selStair && st.id === this.scene.selStair;
+      const room = this.roomOf((st.x0 + st.x1) / 2, (st.y0 + st.y1) / 2, Math.min(fl.z0, fl.z1) + 0.1);
+      const out = st.level === "outside" || st.to === "outside";
+      const tone = picked ? [255, 138, 61] : out ? CONCRETE : WOOD;
+      const push = (pts, n, top = false) => {
+        const q = pts.map(([x, y, z]) => P(x, y, z));
+        if (!q.every(Boolean)) return;
+        const fill = shade(tone, n, top ? 1.08 : 1);
+        items.push({ depth: avgDepth(q), room, rank: 3, draw: () => (solid
+          ? this.poly(q, fill, 0.98, shade(tone, n, 0.7), 0.6)
+          : this.poly(q, picked ? "#ff8a3d" : "#f0b429", top ? 0.22 : 0.1, picked ? "#ff8a3d" : "#f0b429", 0.8)) });
+      };
+      const at = (s, c, z) => (fl.along === "x" ? [s, c, z] : [c, s, z]);
+      const [c0, c1] = fl.along === "x" ? [st.y0, st.y1] : [st.x0, st.x1];
+      const base = Math.min(fl.z0, fl.z1);
+      const profile = []; // the stepped side, from the bottom of the flight to its top
+      for (const s of fl.steps) {
+        push([at(s.s0, c0, s.z), at(s.s1, c0, s.z), at(s.s1, c1, s.z), at(s.s0, c1, s.z)], [0, 0, 1], true);
+        // the riser on the step's lower edge, from the step below up to this one
+        const e = s.lowEdge, zb = s.z - s.rise;
+        push([at(e, c0, zb), at(e, c1, zb), at(e, c1, s.z), at(e, c0, s.z)], fl.along === "x" ? [-fl.up, 0, 0] : [0, -fl.up, 0]);
+        profile.push([e, zb], [e, s.z], [s.highEdge, s.z]);
+      }
+      if (solid && profile.length) {
+        const last = profile[profile.length - 1], first = profile[0];
+        const side = [...profile, [last[0], base], [first[0], base]];
+        for (const c of [c0, c1]) push(side.map(([s, z]) => at(s, c, z)), fl.along === "x" ? [0, c === c0 ? -1 : 1, 0] : [c === c0 ? -1 : 1, 0, 0]);
       }
     }
-    // interior walls: a see-through panel from each level's floor to its ceiling
+    // interior walls: from each level's floor to its ceiling, open where a doorway is (the wall
+    // carries on over it as a header). See-through panels, or solid walls as thick as their build
     const cutW = this.scene.cutZ ?? Infinity;
     for (const w of t.walls) {
       const f = levels.get(w.level);
       if (!f || f.elevation >= cutW - 0.05) continue;
       // the solid view shows the plan of the level it's cut at, not those under its floor
-      if (this.scene.solid && !f.active && this.scene.cutZ != null) continue;
+      if (solid && !f.active && this.scene.cutZ != null) continue;
       const z0 = f.elevation, z1 = Math.min(f.elevation + f.ceiling, cutW);
-      const q = [P(w.a[0], w.a[1], z0), P(w.b[0], w.b[1], z0), P(w.b[0], w.b[1], z1), P(w.a[0], w.a[1], z1)];
       const active = f.active;
       const room = this.roomOf((w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2, z0 + 0.1);
-      items.push({ depth: avgDepth(q), room, rank: 3, draw: () => this.poly(q, "#dce2ea", active ? 0.14 : 0.05, "#dce2ea", active ? 0.6 : 0.2) });
+      for (const pc of wallPieces(w, t.doors || [], z0, z1)) {
+        if (!solid) {
+          const q = [P(pc.a[0], pc.a[1], pc.z0), P(pc.b[0], pc.b[1], pc.z0), P(pc.b[0], pc.b[1], pc.z1), P(pc.a[0], pc.a[1], pc.z1)];
+          items.push({ depth: avgDepth(q), room, rank: 3, draw: () => this.poly(q, BEIGE_HEX, active ? 0.16 : 0.06, BEIGE_HEX, active ? 0.65 : 0.22) });
+          continue;
+        }
+        for (const fc of boxFaces(pc, (w.thick || 0.12) / 2)) {
+          const q = fc.pts.map(([x, y, z]) => P(x, y, z));
+          if (!q.every(Boolean)) continue;
+          const fill = shade(BEIGE, fc.n);
+          items.push({ depth: avgDepth(q), room, rank: 3, draw: () => this.poly(q, fill, 1, shade(BEIGE, fc.n, 0.78), 0.5) });
+        }
+      }
     }
+  }
+
+  // Where stairs go up through a floor: the flight's footprint on the upper level, a hole in its
+  // floor. [{x0, x1, y0, y1}] for the floor at height z
+  stairHoles(z) {
+    const t = this.scene.top;
+    if (!t) return [];
+    const levels = new Map(this.scene.floors.map((f) => [f.id, f]));
+    const out = [];
+    for (const st of t.stairs || []) {
+      const fl = flight(st, levels);
+      if (!fl || Math.abs(Math.max(fl.z0, fl.z1) - z) > 0.06 || st.level === "outside" || st.to === "outside") continue;
+      out.push(fl.hole);
+    }
+    return out;
+  }
+  // A flat face with holes cut in it (a floor with its stairwells), from house corners
+  holed(P, rect, z, holes) {
+    const ring = (r) => [P(r.x0, r.y0, z), P(r.x1, r.y0, z), P(r.x1, r.y1, z), P(r.x0, r.y1, z)];
+    const outer = ring(rect);
+    const inner = holes
+      .map((h) => ({ x0: Math.max(h.x0, rect.x0), x1: Math.min(h.x1, rect.x1), y0: Math.max(h.y0, rect.y0), y1: Math.min(h.y1, rect.y1) }))
+      .filter((h) => h.x1 - h.x0 > 0.05 && h.y1 - h.y0 > 0.05)
+      .map(ring);
+    return { outer, inner, ok: outer.every(Boolean) && inner.every((r) => r.every(Boolean)) };
+  }
+  // A photo texture laid on a flat stretch: world(s, t) gives the 3D point at (s, t) metres
+  // across it; s runs 0..S and t 0..T. Drawn in small cells, each mapped on its own (close
+  // enough to perspective-correct), inside `clip` (screen polygons, even-odd) if given. Returns
+  // false while the image loads.
+  texture(name, world, S, T, clip, tint) {
+    // one redraw when it's loaded, however many faces asked for it meanwhile
+    const img = textureImg(name, this._redraw || (this._redraw = () => requestAnimationFrame(() => this.render())));
+    if (!img) return false;
+    const ctx = this.ctx, ppm = img.width / TEXTURES[name].m;
+    const key = "_pat_" + name;
+    const pat = this[key] || (this[key] = ctx.createPattern(img, "repeat"));
+    ctx.save();
+    if (clip) {
+      ctx.beginPath();
+      for (const r of clip) { r.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); }
+      ctx.clip("evenodd");
+    }
+    // cells: smaller up close, so the texture stays straight in perspective
+    const mid = this.project(world(S / 2, T / 2));
+    const cell = Math.max(0.35, Math.min(1.5, mid ? 90 / mid.scale : 1));
+    const ns = Math.max(1, Math.ceil(S / cell)), nt = Math.max(1, Math.ceil(T / cell));
+    const ds = S / ns, dt = T / nt;
+    ctx.fillStyle = pat;
+    for (let i = 0; i < ns; i++) for (let j = 0; j < nt; j++) {
+      const s0 = i * ds, t0 = j * dt;
+      const q = [this.project(world(s0, t0)), this.project(world(s0 + ds, t0)), this.project(world(s0 + ds, t0 + dt)), this.project(world(s0, t0 + dt))];
+      if (q.some((p) => !p)) continue;
+      const m = affineFrom([[s0 * ppm, t0 * ppm], [(s0 + ds) * ppm, t0 * ppm], [s0 * ppm, (t0 + dt) * ppm]], [q[0], q[1], q[3]]);
+      if (!m) continue;
+      // a hair bigger than the cell, so the cells meet without hairline gaps
+      const cx = (q[0].x + q[2].x) / 2, cy = (q[0].y + q[2].y) / 2, grow = 1.04;
+      ctx.beginPath(); q.forEach((p, k) => { const x = cx + (p.x - cx) * grow, y = cy + (p.y - cy) * grow; if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.closePath();
+      pat.setTransform(new DOMMatrix(m));
+      ctx.fill();
+    }
+    if (tint) { ctx.globalAlpha = tint.alpha; ctx.fillStyle = tint.color; ctx.fillRect(-1e4, -1e4, 2e4, 2e4); }
+    ctx.restore();
+    return true;
+  }
+  // The finish of a level's floor at a point: a stretch set for it, else the level's own
+  finishAt(level, x, y) {
+    const fins = ((this.scene.top && this.scene.top.finishes) || []).filter((f) => f.level === level);
+    const part = fins.find((f) => f.x0 != null && x >= f.x0 && x <= f.x1 && y >= f.y0 && y <= f.y1);
+    return part || fins.find((f) => f.x0 == null) || null;
+  }
+  polyHoles(h, fill, alpha, stroke, strokeAlpha = 1) {
+    if (!h.ok) return;
+    const ctx = this.ctx;
+    ctx.beginPath();
+    for (const r of [h.outer, ...h.inner]) { r.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); }
+    if (alpha > 0) { ctx.globalAlpha = alpha; ctx.fillStyle = fill; ctx.fill("evenodd"); }
+    ctx.globalAlpha = strokeAlpha; ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); ctx.globalAlpha = 1;
   }
 
   // A light that is several fixtures on one switch: each fixture an orb with its drop line, all
@@ -929,7 +1073,8 @@ window.House3D = class House3D {
     const out = [];
     const t = this.scene.top, m = this.scene.massing;
     const f = this.scene.floors.find((q) => q.id === level);
-    if (t && f) for (const w of t.walls || []) if (w.level === level) out.push({ a: w.a, b: w.b, z0: f.elevation, z1: f.elevation + f.ceiling });
+    // (a doorway lets light through under its header)
+    if (t && f) for (const w of t.walls || []) if (w.level === level) out.push(...wallPieces(w, t.doors || [], f.elevation, f.elevation + f.ceiling));
     // every block's walls, at whatever height (a light outside, or one set to the wrong level,
     // still can't shine through the house); a ray only stops where it meets a wall's height
     if (m) for (const b of m.blocks) {
@@ -1301,6 +1446,120 @@ window.House3D = class House3D {
 
 // Points along a smooth curve through pts (Catmull-Rom), in the ground's metres
 // Where a ray from (x, y) along (dx, dy) crosses the segment a-b: its distance, or -1
+// Photo textures: each image covers `m` metres square on the ground or a wall. The hardwood is
+// the house's own floor (its boards run across, east to west); the laundry's vinyl tile is LifeProof
+// Night Orb; the siding is the house's beige lap siding
+const TEXTURES = {
+  hardwood: { src: "static/textures/hardwood.jpg", m: 2.0 },
+  vinyl: { src: "static/textures/vinyl_night_orb.jpg", m: 0.4572 },
+  siding: { src: "static/textures/siding.jpg", m: 1.0 },
+  // the upstairs bathroom's brown mosaic: 2x2, 1x2 and 1x1 tiles in an 8 in square repeat
+  tile: { src: "static/textures/mosaic_bath.jpg", m: 0.4064 },
+};
+const FINISH_TEX = { hardwood: "hardwood", vinyl: "vinyl", tile: "tile" };
+const _tex = {};
+// The loaded image for a texture, or null while it loads (then `again` is called)
+function textureImg(name, again) {
+  let t = _tex[name];
+  if (!t) {
+    const img = new Image();
+    t = _tex[name] = { img, ready: false, waiting: [] };
+    img.onload = () => { t.ready = true; for (const f of t.waiting.splice(0)) f(); };
+    img.src = TEXTURES[name].src;
+  }
+  if (!t.ready && again && !t.waiting.includes(again)) t.waiting.push(again);
+  return t.ready ? t.img : null;
+}
+// The affine map taking texture points (u, v) to three screen points: [a, b, c, d, e, f]
+function affineFrom(t, s) {
+  const [[u0, v0], [u1, v1], [u2, v2]] = t, [p0, p1, p2] = s;
+  const den = u0 * (v1 - v2) + u1 * (v2 - v0) + u2 * (v0 - v1);
+  if (Math.abs(den) < 1e-9) return null;
+  const k = (q0, q1, q2) => [
+    (q0 * (v1 - v2) + q1 * (v2 - v0) + q2 * (v0 - v1)) / den,
+    (q0 * (u2 - u1) + q1 * (u0 - u2) + q2 * (u1 - u0)) / den,
+    (q0 * (u1 * v2 - u2 * v1) + q1 * (u2 * v0 - u0 * v2) + q2 * (u0 * v1 - u1 * v0)) / den,
+  ];
+  const [a, c, e] = k(p0.x, p1.x, p2.x), [b, d, f] = k(p0.y, p1.y, p2.y);
+  return [a, b, c, d, e, f];
+}
+
+// Warm beige walls, wood stairs inside, concrete steps outside (RGB)
+const BEIGE = [222, 205, 178], BEIGE_HEX = "#decdb2", WOOD = [158, 112, 72], CONCRETE = [188, 184, 176];
+const FLOOR = [150, 118, 86];
+// A colour lit from above and to the front left: how much a face of normal n catches the light
+const SUN = (() => { const v = [0.35, -0.55, 0.76], l = Math.hypot(...v); return v.map((c) => c / l); })();
+function shade(rgb, n, k = 1) {
+  const l = Math.hypot(...n) || 1;
+  const lam = Math.max(0, (n[0] * SUN[0] + n[1] * SUN[1] + n[2] * SUN[2]) / l);
+  const f = (0.62 + 0.4 * lam) * k;
+  return `rgb(${rgb.map((c) => Math.max(0, Math.min(255, Math.round(c * f)))).join(",")})`;
+}
+// A flight of stairs worked out: its steps from the bottom up ({s0, s1, z, rise, lowEdge,
+// highEdge} along its axis), which way along the axis it climbs (up: +1 or -1), the heights it
+// runs between, and the hole it leaves in the floor at its top
+function flight(st, levels) {
+  const f0 = st.z0 != null ? st.z0 : (levels.get(st.level) || {}).elevation;
+  const f1 = st.z1 != null ? st.z1 : (levels.get(st.to) || {}).elevation;
+  if (f0 == null || f1 == null) return null;
+  const along = st.dir[0], sign = st.dir[1] === "+" ? 1 : -1;
+  const lo = along === "x" ? st.x0 : st.y0, hi = along === "x" ? st.x1 : st.y1;
+  const rise = Math.abs(f1 - f0);
+  const n = st.steps || (rise ? Math.max(1, Math.round(rise / 0.19) - 1) : 1);
+  const r = st.riser || rise / (n + 1);
+  const up = f1 >= f0 ? sign : -sign; // the stairs go from `level` toward `to`
+  const landing = Math.min(st.landing || 0, (hi - lo) * 0.8);
+  const fl0 = up > 0 ? lo : lo + landing, fl1 = up > 0 ? hi - landing : hi;
+  const run = (fl1 - fl0) / n, zb = Math.min(f0, f1);
+  const steps = [];
+  for (let k = 0; k < n; k++) {
+    const s0 = up > 0 ? fl0 + k * run : fl1 - (k + 1) * run, s1 = s0 + run;
+    steps.push({ s0, s1, z: zb + r * (k + 1), rise: r, lowEdge: up > 0 ? s0 : s1, highEdge: up > 0 ? s1 : s0 });
+  }
+  if (landing > 0) {
+    const s0 = up > 0 ? hi - landing : lo, s1 = s0 + landing;
+    steps.push({ s0, s1, z: zb + r * (n + 1), rise: r, lowEdge: up > 0 ? s0 : s1, highEdge: up > 0 ? s1 : s0 });
+  }
+  const hole = along === "x" ? { x0: fl0, x1: fl1, y0: st.y0, y1: st.y1 } : { x0: st.x0, x1: st.x1, y0: fl0, y1: fl1 };
+  return { z0: f0, z1: f1, along, up, steps, hole };
+}
+// A wall cut where its doorways are: the solid stretches between them full height, and over
+// each doorway a header from the opening's top (`top` above the floor; a door's 80" if not
+// given) up to the ceiling. [{a, b, z0, z1, header}]
+function wallPieces(w, doors, z0, z1) {
+  const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) || 1;
+  const ux = (w.b[0] - w.a[0]) / L, uy = (w.b[1] - w.a[1]) / L;
+  const at = (s) => [w.a[0] + ux * s, w.a[1] + uy * s];
+  const gaps = doors.filter((d) => d.wall === w.id)
+    .map((d) => ({ s0: Math.max(0, d.at - d.width / 2), s1: Math.min(L, d.at + d.width / 2), top: Math.min(z1, z0 + (d.top ?? 2.032)) }))
+    .sort((p, q) => p.s0 - q.s0);
+  const out = [];
+  let s = 0;
+  for (const g of gaps) {
+    if (g.s0 > s + 0.01) out.push({ a: at(s), b: at(g.s0), z0, z1 });
+    if (g.top < z1 - 0.01) out.push({ a: at(g.s0), b: at(g.s1), z0: g.top, z1, header: true });
+    s = Math.max(s, g.s1);
+  }
+  if (L > s + 0.01) out.push({ a: at(s), b: at(L), z0, z1 });
+  return out;
+}
+// The faces of a wall piece as a solid box `half` its thickness each side: {pts, n}
+function boxFaces(pc, half) {
+  const L = Math.hypot(pc.b[0] - pc.a[0], pc.b[1] - pc.a[1]) || 1;
+  const ux = (pc.b[0] - pc.a[0]) / L, uy = (pc.b[1] - pc.a[1]) / L, nx = -uy * half, ny = ux * half;
+  const A = [[pc.a[0] + nx, pc.a[1] + ny], [pc.a[0] - nx, pc.a[1] - ny]], B = [[pc.b[0] + nx, pc.b[1] + ny], [pc.b[0] - nx, pc.b[1] - ny]];
+  const up = (p, z) => [p[0], p[1], z];
+  const faces = [
+    { pts: [up(A[0], pc.z0), up(B[0], pc.z0), up(B[0], pc.z1), up(A[0], pc.z1)], n: [-uy, ux, 0] },
+    { pts: [up(A[1], pc.z0), up(B[1], pc.z0), up(B[1], pc.z1), up(A[1], pc.z1)], n: [uy, -ux, 0] },
+    { pts: [up(A[0], pc.z0), up(A[1], pc.z0), up(A[1], pc.z1), up(A[0], pc.z1)], n: [-ux, -uy, 0] },
+    { pts: [up(B[0], pc.z0), up(B[1], pc.z0), up(B[1], pc.z1), up(B[0], pc.z1)], n: [ux, uy, 0] },
+    { pts: [up(A[0], pc.z1), up(B[0], pc.z1), up(B[1], pc.z1), up(A[1], pc.z1)], n: [0, 0, 1] },
+  ];
+  if (pc.header) faces.push({ pts: [up(A[0], pc.z0), up(B[0], pc.z0), up(B[1], pc.z0), up(A[1], pc.z0)], n: [0, 0, -1] });
+  return faces;
+}
+
 function segT(x, y, dx, dy, a, b) {
   const ex = b[0] - a[0], ey = b[1] - a[1];
   const den = dx * ey - dy * ex;
