@@ -256,6 +256,11 @@ window.HouseGL = class HouseGL {
         B.block(out ? "stoop" : "wood", r, bottom, Math.min(step.z, cut));
       }
       if (out) continue;
+      // the top riser: from the top tread up to the floor it reaches, at the edge of that floor's hole
+      { const top = fl.steps.reduce((p, q) => (q.z > p.z ? q : p));
+        const k = Math.sign(top.highEdge - top.lowEdge) || 1, e0 = Math.min(top.highEdge, top.highEdge + k * 0.03), e1 = Math.max(top.highEdge, top.highEdge + k * 0.03);
+        const r = fl.along === "x" ? { x0: e0, x1: e1, y0: c0, y1: c1 } : { x0: c0, x1: c1, y0: e0, y1: e1 };
+        if (topZ - top.z > 0.02 && top.z < cut) B.block("wood", r, top.z - 0.02, Math.min(topZ - 0.004, cut)); }
       const lo = Math.min(...fl.steps.map((q) => Math.min(q.s0, q.s1))), hi = Math.max(...fl.steps.map((q) => Math.max(q.s0, q.s1)));
       const ztop = Math.min(topZ, cut);
       for (const c of [c0, c1]) {

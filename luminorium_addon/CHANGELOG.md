@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0-dev.63
+
+- **Top riser:** a flight now has its top riser, from the top tread up to the floor it reaches,
+  instead of a gap at the edge of that floor's hole.
+
 ## 0.3.0-dev.62
 
 - **Right-click menu in the 3D view:** right-click a light (its icon, or near where it's placed), a
