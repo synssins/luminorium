@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.57
+
+- **The WebGL view on tablets:** the house's lights are a fixed set that only changes when the
+  lights do (rebuilding them every frame made the GPU recompile its shaders: slow, and errors on a
+  tablet); fewer lights and a smaller shadow map on phones and tablets; the house is only rebuilt
+  when it changes. If the GPU drops the WebGL context the view goes back to the 2D drawing. The
+  2D canvas (lights, labels, the cube) stays on top of the WebGL one.
+
 ## 0.3.0-dev.56
 
 - **The solid view in WebGL:** the house is drawn with three.js (bundled in the add-on, works

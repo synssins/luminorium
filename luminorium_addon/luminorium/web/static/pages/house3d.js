@@ -115,7 +115,7 @@ window.House3D = class House3D {
     const glOn = !!(s.solid && window.HouseGL && HouseGL.ok());
     if (glOn) {
       try {
-        if (!this.gl) this.gl = new HouseGL(this.canvas);
+        if (!this.gl) { this.gl = new HouseGL(this.canvas); this.gl.onLost = () => { this.gl = null; this.render(); }; }
         this.gl.draw(s, cam, W, H, dpr, col.bg, this._redraw || (this._redraw = () => requestAnimationFrame(() => this.render())));
         ctx.clearRect(0, 0, W, H);
       } catch (err) {

@@ -21,8 +21,12 @@ window.HouseGL = class HouseGL {
     this.renderer.outputColorSpace = T.SRGBColorSpace;
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
+    // a phone or tablet: fewer lights and a smaller shadow map
+    this.small = Math.min(screen.width, screen.height) < 900 || /Android|iPad|iPhone|Mobile/i.test(navigator.userAgent);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = T.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = this.small ? T.PCFShadowMap : T.PCFSoftShadowMap;
+    // if the GPU drops the context (out of memory on a tablet), go back to the 2D drawing
+    this.canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); this.lost = true; HouseGL.ok = () => false; this.hide(); if (this.onLost) this.onLost(); });
     this.scene = new T.Scene();
     this.camera = new T.PerspectiveCamera(40, 1, 0.05, 600);
     this.camera.up.set(0, 0, 1);
@@ -34,7 +38,7 @@ window.HouseGL = class HouseGL {
     this.scene.add(new T.HemisphereLight(0xe6eef8, 0x5a4a35, 1.1));
     const sun = (this.sun = new T.DirectionalLight(0xfff3e0, 1.7));
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(this.small ? 1024 : 2048, this.small ? 1024 : 2048);
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.02;
     this.scene.add(sun, sun.target);
@@ -91,9 +95,10 @@ window.HouseGL = class HouseGL {
   // ---- building the house ------------------------------------------------------------------
 
   build(s, redraw) {
-    const key = JSON.stringify([s.massing, s.top, s.floors.map((f) => [f.id, f.elevation, f.ceiling]), s.cutZ ?? null, s.W, s.D]);
-    if (key === this.key) return;
-    this.key = key;
+    // rebuilt only when the house changes: the same drawing (by reference) and cut skip the work
+    const fl = s.floors.map((f) => `${f.id}:${f.elevation}:${f.ceiling}`).join("|");
+    if (this.built && this.built.m === s.massing && this.built.t === s.top && this.built.cut === (s.cutZ ?? null) && this.built.fl === fl) return;
+    this.built = { m: s.massing, t: s.top, cut: s.cutZ ?? null, fl };
     for (const c of [...this.house.children]) { c.geometry && c.geometry.dispose(); this.house.remove(c); }
     const T = THREE;
     const cut = s.cutZ ?? Infinity;
@@ -243,16 +248,25 @@ window.HouseGL = class HouseGL {
     sc.updateProjectionMatrix();
   }
 
-  // the house's lights that are on: a light of their colour at each, lighting the walls round them
+  // the house's lights that are on: a light of their colour at each, lighting the walls round
+  // them. A fixed set of lights, only changed when the lights do (a different number of lights
+  // makes the GPU rebuild its shaders: slow, and too much for a tablet every frame)
   lights(glows) {
-    const T = THREE;
-    for (const c of [...this.lamps.children]) { c.dispose && c.dispose(); this.lamps.remove(c); }
-    const on = [...(glows || [])].sort((a, b) => (b.level || 0) - (a.level || 0)).slice(0, 12);
-    for (const g of on) {
-      const l = new T.PointLight(new T.Color(g.color), 6 + 26 * (g.level || 0.5), 7, 2);
-      l.position.set(g.x, g.y, (g.z ?? g.floorZ + 2.1));
-      this.lamps.add(l);
+    const T = THREE, N = this.small ? 6 : 10;
+    if (!this.pool) {
+      this.pool = Array.from({ length: N }, () => { const l = new T.PointLight(0xffffff, 0, 7, 2); this.lamps.add(l); return l; });
     }
+    const on = [...(glows || [])].sort((a, b) => (b.level || 0) - (a.level || 0)).slice(0, N);
+    const key = JSON.stringify(on.map((g) => [g.x, g.y, g.z, g.floorZ, g.color, g.level]));
+    if (key === this.lightKey) return;
+    this.lightKey = key;
+    this.pool.forEach((l, i) => {
+      const g = on[i];
+      if (!g) { l.intensity = 0; return; }
+      l.color.set(g.color);
+      l.intensity = 6 + 26 * (g.level || 0.5);
+      l.position.set(g.x, g.y, g.z ?? g.floorZ + 2.1);
+    });
   }
 
   draw(s, cam, W, H, dpr, bg, redraw) {
@@ -263,6 +277,9 @@ window.HouseGL = class HouseGL {
       if (getComputedStyle(parent).position === "static") parent.style.position = "relative";
       parent.insertBefore(c, this.host);
     }
+    // the 2D canvas (lights, labels, handles) stays on top of this one
+    if (this.host.style.zIndex !== "1") Object.assign(this.host.style, { position: "relative", zIndex: "1" });
+    c.style.zIndex = "0";
     Object.assign(c.style, { width: W + "px", height: H + "px", left: this.host.offsetLeft + "px", top: this.host.offsetTop + "px" });
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(W, H, false);
