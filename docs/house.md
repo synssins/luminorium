@@ -429,7 +429,9 @@ CAD layout"):
     level spanning its height), not as a slab the size of the house; a level with no block shows just its name.
     Picking a block in Shape hides everything above its top (blocks, roofs, floors, windows,
     lights), to see into it, until it's let go.
-  - **Solid** (tool bar) makes it a dollhouse: each block a hollow room with solid walls and a
+  - **Solid** (tool bar) makes it a dollhouse, drawn with WebGL (`pages/house3d_gl.js`, three.js r158
+    bundled as `static/vendor/three.min.js`) under the 2D canvas, which keeps the camera, picking and
+    the overlays; without WebGL it falls back to the 2D drawing below: each block a hollow room with solid walls and a
     solid floor, no roofs, cut off at the ceiling of the level chosen at the right of the tool
     bar (so picking a level shows its rooms; picking a block in Shape cuts at its top instead).
     The ground is solid, with a hole where a block goes into it, so a basement is a pit lined

@@ -108,10 +108,29 @@ window.House3D = class House3D {
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const col = this.colors();
-    ctx.fillStyle = col.bg;
-    ctx.fillRect(0, 0, W, H);
     const cam = (this.cam = this.camera());
     const P = (x, y, z) => this.project({ x, y, z }, cam);
+    // the solid view in WebGL (house3d_gl.js): the house drawn under this canvas with a depth
+    // buffer; this canvas then only draws what goes on top (lights, labels, handles, the cube)
+    const glOn = !!(s.solid && window.HouseGL && HouseGL.ok());
+    if (glOn) {
+      try {
+        if (!this.gl) this.gl = new HouseGL(this.canvas);
+        this.gl.draw(s, cam, W, H, dpr, col.bg, this._redraw || (this._redraw = () => requestAnimationFrame(() => this.render())));
+        ctx.clearRect(0, 0, W, H);
+      } catch (err) {
+        console.error("WebGL view failed, drawing in 2D", err);
+        HouseGL.ok = () => false;
+        return this.render();
+      }
+    } else {
+      if (this.gl) this.gl.hide();
+      ctx.fillStyle = col.bg;
+      ctx.fillRect(0, 0, W, H);
+    }
+    const items = [];
+    const cut = s.cutZ ?? Infinity; // a block picked in Shape: what's above it is hidden
+    if (!glOn) {
 
     // ground grid
     const g = s.grid;
@@ -128,7 +147,6 @@ window.House3D = class House3D {
     this._flat = s.solid ? [] : null;
 
     // things to draw back to front
-    const items = [];
     // the house drawn on the front photo: see-through walls and roofs, windows on the front
     if (s.top) this.topView(items, P, col);
     if (s.massing) this.massing(items, P, col);
@@ -140,7 +158,6 @@ window.House3D = class House3D {
       items.push({ depth: depthOf(P(a[0], a[1], z), P(b[0], b[1], z)), draw: () => this.line(P(a[0], a[1], z), P(b[0], b[1], z), col.faint, 1) });
     }
     // floors: a slab at each elevation over its span, and a faint ceiling
-    const cut = s.cutZ ?? Infinity; // a block picked in Shape: what's above it is hidden
     for (const f of s.floors) {
       if (f.elevation >= cut - 0.05) continue;
       const x0 = f.x0 ?? 0, x1 = f.x1 ?? s.W;
@@ -220,6 +237,7 @@ window.House3D = class House3D {
     } else for (const it of items) it.draw();
     this._flat = null;
     items.length = 0;
+    }
     // lights: a drop line to the floor, a shadow, the orb; parts as small dots
     for (const l of s.lights) {
       const top = P(l.x, l.y, l.z), base = P(l.x, l.y, l.floorZ);

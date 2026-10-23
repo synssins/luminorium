@@ -1,0 +1,391 @@
+// The solid view drawn with WebGL (three.js, bundled in static/vendor): real solids with a depth
+// buffer, so walls, floors, stairs and windows hide each other properly from any angle, lit by the
+// sun and by the house's lights that are on. The 2D canvas (house3d.js) keeps the camera, the
+// picking and everything drawn on top (lights, labels, handles, the view cube); this draws the
+// house under it with the same camera. Uses house3d.js's helpers (wallPieces, flight, flatPolys,
+// TEXTURES, BEIGE...), which are globals of that script.
+"use strict";
+
+window.HouseGL = class HouseGL {
+  static ok() {
+    if (!window.THREE) return false;
+    try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; }
+  }
+
+  constructor(host) {
+    const T = THREE;
+    this.host = host; // the 2D canvas: this canvas sits right under it
+    this.canvas = document.createElement("canvas");
+    Object.assign(this.canvas.style, { position: "absolute", pointerEvents: "none", left: "0", top: "0" });
+    this.renderer = new T.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
+    this.renderer.outputColorSpace = T.SRGBColorSpace;
+    this.renderer.toneMapping = T.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = T.PCFSoftShadowMap;
+    this.scene = new T.Scene();
+    this.camera = new T.PerspectiveCamera(40, 1, 0.05, 600);
+    this.camera.up.set(0, 0, 1);
+    this.house = new T.Group();
+    this.scene.add(this.house);
+    this.lamps = new T.Group();
+    this.scene.add(this.lamps);
+    // daylight: a soft sky and the sun (from above, front left: as the 2D view shades)
+    this.scene.add(new T.HemisphereLight(0xe6eef8, 0x5a4a35, 1.1));
+    const sun = (this.sun = new T.DirectionalLight(0xfff3e0, 1.7));
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.02;
+    this.scene.add(sun, sun.target);
+    this.textures = {};
+    this.mats = {};
+    this.key = null;
+  }
+
+  // ---- materials ---------------------------------------------------------------------------
+
+  tex(name, redraw) {
+    if (!this.textures[name]) {
+      const t = new THREE.TextureLoader().load(TEXTURES[name].src, () => redraw && redraw());
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+      const m = TEXTURES[name].m;
+      t.repeat.set(1 / m, 1 / m); // geometry UVs are in metres
+      this.textures[name] = t;
+    }
+    return this.textures[name];
+  }
+  mat(key, redraw) {
+    if (this.mats[key]) return this.mats[key];
+    const T = THREE, rgb = (c) => new T.Color(`rgb(${c.join(",")})`);
+    const std = (o) => new T.MeshStandardMaterial({ side: T.DoubleSide, ...o });
+    const make = {
+      plaster: () => std({ color: rgb(BEIGE), roughness: 0.92 }),
+      foundation: () => std({ color: 0x9a958c, roughness: 1 }),
+      siding: () => std({ map: this.tex("siding", redraw), roughness: 0.75 }),
+      floor: () => std({ color: rgb(FLOOR), roughness: 0.8 }),
+      hardwood: () => std({ map: this.tex("hardwood", redraw), roughness: 0.38, metalness: 0.02 }),
+      vinyl: () => std({ map: this.tex("vinyl", redraw), roughness: 0.45 }),
+      tile: () => std({ map: this.tex("tile", redraw), roughness: 0.35 }),
+      concrete: () => std({ map: this.tex("concrete", redraw), roughness: 0.95 }),
+      grass: () => std({ map: this.tex("grass", redraw), roughness: 1 }),
+      wood: () => std({ color: rgb(WOOD), roughness: 0.6 }),
+      stoop: () => std({ map: this.tex("concrete", redraw), roughness: 0.95 }),
+      mulch: () => std({ color: 0x5a3d26, roughness: 1 }),
+      pool: () => std({ color: 0x3fa7d6, roughness: 0.1, metalness: 0.1 }),
+      lawn: () => std({ color: 0x5c8a3a, roughness: 1 }),
+      other: () => std({ color: 0xb0b8c4, roughness: 1 }),
+      glass: () => std({ color: 0x5d7f9c, roughness: 0.08, metalness: 0.3, emissive: 0x1a2a3a }),
+      frame: () => std({ color: 0xf4f1ea, roughness: 0.6 }),
+      door: () => std({ color: 0x6b4a2e, roughness: 0.6 }),
+      garage: () => std({ color: 0xf0eee8, roughness: 0.7 }),
+      trunk: () => std({ color: 0x6b4c30, roughness: 1 }),
+      leaves: () => std({ color: 0x2f6b34, roughness: 1 }),
+    };
+    this.mats[key] = (make[key] || make.other)();
+    return this.mats[key];
+  }
+
+  // ---- building the house ------------------------------------------------------------------
+
+  build(s, redraw) {
+    const key = JSON.stringify([s.massing, s.top, s.floors.map((f) => [f.id, f.elevation, f.ceiling]), s.cutZ ?? null, s.W, s.D]);
+    if (key === this.key) return;
+    this.key = key;
+    for (const c of [...this.house.children]) { c.geometry && c.geometry.dispose(); this.house.remove(c); }
+    const T = THREE;
+    const cut = s.cutZ ?? Infinity;
+    const levels = new Map(s.floors.map((f) => [f.id, f]));
+    const t = s.top || { walls: [], doors: [], stairs: [], yard: [], finishes: [], windows: [] };
+    const blocks = (s.massing && s.massing.blocks) || [];
+    const B = new QuadBuilder();
+    const th = t.ext_thick || 0.13;
+
+    // a closed box along a→b: half thickness each side of the line, z0..z1; the face on the left
+    // of a→b gets `sideL`, the right `sideR`, the rest `rest`
+    const box = (a, b, half, z0, z1, rest, sideL = rest, sideR = rest, bottom = false) => {
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (L < 0.005 || z1 - z0 < 0.005) return;
+      const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L, nx = -uy, ny = ux;
+      const A = (k) => [a[0] + nx * half * k, a[1] + ny * half * k], Bp = (k) => [b[0] + nx * half * k, b[1] + ny * half * k];
+      const al = A(1), ar = A(-1), bl = Bp(1), br = Bp(-1);
+      B.wall(sideL, al, bl, z0, z1, [nx, ny, 0]);
+      B.wall(sideR, br, ar, z0, z1, [-nx, -ny, 0]);
+      B.wall(rest, ar, al, z0, z1, [-ux, -uy, 0]);
+      B.wall(rest, bl, br, z0, z1, [ux, uy, 0]);
+      B.flat(rest, [al, bl, br, ar], z1, 1);
+      if (bottom) B.flat(rest, [al, bl, br, ar], z0, -1);
+    };
+
+    // outside walls: each block's faces as solid walls `th` thick, inward from the face; siding
+    // outside where the face is out in the open, plaster against another part of the house,
+    // foundation below the ground
+    for (const b of blocks) {
+      if (b.z0 >= cut - 0.05) continue;
+      const y0 = b.y0 || 0, y1 = y0 + b.depth, top = Math.min(b.z1, cut);
+      const faces = [[[b.x0, y0], [b.x1, y0]], [[b.x1, y0], [b.x1, y1]], [[b.x1, y1], [b.x0, y1]], [[b.x0, y1], [b.x0, y0]]];
+      for (const [a, c] of faces) {
+        const L = Math.hypot(c[0] - a[0], c[1] - a[1]), ux = (c[0] - a[0]) / L, uy = (c[1] - a[1]) / L;
+        // these run round the block anticlockwise, so the left of a→c is inside: the box's
+        // centre line is half the wall in from the face; its right side is the outside face
+        const ia = [a[0] - uy * th / 2, a[1] + ux * th / 2], ic = [c[0] - uy * th / 2, c[1] + ux * th / 2];
+        for (const [s0, s1, open] of stretches(b, a, c, b.z0, top, blocks)) {
+          const p = (s) => [ia[0] + ux * s, ia[1] + uy * s];
+          for (const [lo, hi] of b.z0 < 0 && top > 0 ? [[b.z0, 0], [0, top]] : [[b.z0, top]]) {
+            const outside = hi <= 0.001 ? "foundation" : open ? "siding" : "plaster";
+            box(p(s0), p(s1), th / 2, lo, hi, "plaster", "plaster", outside);
+          }
+        }
+      }
+      // its floor, open where stairs come up through it, in what it's finished in
+      const lv = (s.floors.find((f) => Math.abs(f.elevation - b.z0) < 0.06) || {}).id;
+      const holes = stairHoles(t, levels, b.z0);
+      const rect = { x0: b.x0, x1: b.x1, y0, y1 };
+      const fins = (t.finishes || []).filter((f) => f.level === lv);
+      const whole = fins.find((f) => f.x0 == null);
+      B.slab(whole ? FINISH_KEY[whole.kind] || "floor" : "floor", rect, holes, b.z0 + 0.004);
+      for (const f of fins.filter((q) => q.x0 != null)) {
+        const r = { x0: Math.max(rect.x0, f.x0), x1: Math.min(rect.x1, f.x1), y0: Math.max(rect.y0, f.y0), y1: Math.min(rect.y1, f.y1) };
+        if (r.x1 - r.x0 > 0.05 && r.y1 - r.y0 > 0.05) B.slab(FINISH_KEY[f.kind] || "floor", r, holes, b.z0 + 0.008);
+      }
+    }
+
+    // interior walls: solid, open under each doorway with a header over it; a wall carries on
+    // through the floor framing above (no gap between storeys); a stairwell's sides run their
+    // own height
+    for (const w of t.walls || []) {
+      const f = levels.get(w.level);
+      if (!f) continue;
+      const z0 = w.z0 ?? f.elevation, z1 = Math.min(w.z1 ?? f.elevation + f.ceiling + FLOOR_T, cut);
+      if (z1 - z0 < 0.05 || z0 >= cut - 0.05) continue;
+      for (const pc of wallPieces(w, t.doors || [], z0, z1)) box(pc.a, pc.b, (w.thick || 0.12) / 2, pc.z0, pc.z1, "plaster", "plaster", "plaster", pc.header);
+    }
+
+    // stairs: each step a solid block down to the bottom of the flight (so the sides are filled
+    // in); wood inside, concrete outside
+    for (const st of t.stairs || []) {
+      const fl = flight(st, levels);
+      if (!fl || Math.min(fl.z0, fl.z1) >= cut - 0.05) continue;
+      const out = st.level === "outside" || st.to === "outside";
+      const base = Math.min(fl.z0, fl.z1);
+      const [c0, c1] = fl.along === "x" ? [st.y0, st.y1] : [st.x0, st.x1];
+      for (const step of fl.steps) {
+        const r = fl.along === "x" ? { x0: Math.min(step.s0, step.s1), x1: Math.max(step.s0, step.s1), y0: c0, y1: c1 } : { x0: c0, x1: c1, y0: Math.min(step.s0, step.s1), y1: Math.max(step.s0, step.s1) };
+        B.block(out ? "stoop" : "wood", r, base, Math.min(step.z, cut));
+      }
+    }
+
+    // windows and doors: glass (or a door) set in the wall with a white frame, outside and in
+    const win = (a, b, z0, z1, n, panes, kind) => {
+      if (z0 >= cut - 0.05) return;
+      z1 = Math.min(z1, cut);
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+      const fill = kind === "window" ? "glass" : kind === "garage" ? "garage" : "door";
+      for (const d of [0.012, -(th + 0.012)]) {
+        const A = [a[0] + n[0] * d, a[1] + n[1] * d], C = [b[0] + n[0] * d, b[1] + n[1] * d];
+        B.wall(fill, A, C, z0, z1, [n[0] * Math.sign(d || 1), n[1] * Math.sign(d || 1), 0]);
+        if (d < 0 && kind !== "window") continue;
+        // the frame: four sides and the mullions, a little proud of the glass
+        const fw = 0.05, off = d + Math.sign(d) * 0.012;
+        const at = (s) => [a[0] + ux * s + n[0] * off, a[1] + uy * s + n[1] * off];
+        box(at(0), at(L), 0.012, z0, z0 + fw, "frame"); box(at(0), at(L), 0.012, z1 - fw, z1, "frame");
+        box(at(0), at(fw), 0.012, z0, z1, "frame"); box(at(L - fw), at(L), 0.012, z0, z1, "frame");
+        for (let k = 1; k < panes; k++) box(at(L * k / panes - fw / 2), at(L * k / panes + fw / 2), 0.012, z0, z1, "frame");
+      }
+    };
+    for (const o of (s.massing && s.massing.openings) || []) {
+      const y = o.y !== undefined ? o.y : (blocks.find((b) => (o.x0 + o.x1) / 2 >= b.x0 && (o.x0 + o.x1) / 2 <= b.x1) || {}).y0 || 0;
+      win([o.x0, y], [o.x1, y], o.z0, o.z1, [0, -1], o.kind === "window" ? Math.max(1, Math.round((o.x1 - o.x0) / 1.1)) : 1, o.kind);
+    }
+    for (const w of t.windows || []) {
+      const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) || 1;
+      let n = [(w.b[1] - w.a[1]) / L, -(w.b[0] - w.a[0]) / L];
+      const mx = (w.a[0] + w.b[0]) / 2, my = (w.a[1] + w.b[1]) / 2;
+      if (n[0] * (mx - s.W / 2) + n[1] * (my - s.D / 2) < 0) n = [-n[0], -n[1]];
+      win(w.a, w.b, w.z0, w.z1, n, w.panes || 1, "window");
+    }
+
+    // the ground: the lawn, with a hole where a block goes into it; the yard on it
+    const gx0 = -8, gx1 = s.W + 8, gy0 = -14, gy1 = s.D + 6;
+    const pits = blocks.filter((b) => b.z0 < -0.01).map((b) => ({ x0: b.x0, x1: b.x1, y0: b.y0 || 0, y1: (b.y0 || 0) + b.depth }));
+    B.slab("grass", { x0: gx0, x1: gx1, y0: gy0, y1: gy1 }, pits, 0);
+    const YARD = { path: "concrete", driveway: "concrete", patio: "concrete", bed: "mulch", pool: "pool", lawn: "lawn", other: "other" };
+    for (const y of t.yard || []) {
+      if (y.c) continue;
+      for (const poly of flatPolys(y)) B.poly(YARD[y.kind] || "other", poly, y.kind === "path" ? 0.012 : 0.01);
+    }
+    const meshes = B.meshes((k) => this.mat(k, redraw));
+    for (const m of meshes) { m.castShadow = true; m.receiveShadow = true; this.house.add(m); }
+    // trees and bushes
+    for (const y of t.yard || []) {
+      if (!y.c) continue;
+      const h = y.h ?? (y.kind === "tree" ? Math.max(3, y.r * 1.6) : Math.max(0.6, y.r));
+      if (y.kind === "tree") {
+        const trunk = new T.Mesh(new T.CylinderGeometry(0.12, 0.16, h * 0.25, 8), this.mat("trunk"));
+        trunk.rotation.x = Math.PI / 2; trunk.position.set(y.c[0], y.c[1], h * 0.125);
+        const crown = new T.Mesh(new T.ConeGeometry(y.r, h * 0.85, 14), this.mat("leaves"));
+        crown.rotation.x = Math.PI / 2; crown.position.set(y.c[0], y.c[1], h * 0.15 + h * 0.425);
+        for (const m of [trunk, crown]) { m.castShadow = m.receiveShadow = true; this.house.add(m); }
+      } else {
+        const bush = new T.Mesh(new T.SphereGeometry(y.r, 14, 10), this.mat("leaves"));
+        bush.scale.set(1, 1, h / (2 * y.r)); bush.position.set(y.c[0], y.c[1], h / 2);
+        bush.castShadow = bush.receiveShadow = true; this.house.add(bush);
+      }
+    }
+    // the sun's shadow box: round the house
+    const cx = s.W / 2, cy = s.D / 2, span = Math.max(s.W, s.D) + 16;
+    this.sun.position.set(cx + SUN[0] * 40, cy + SUN[1] * 40, SUN[2] * 40);
+    this.sun.target.position.set(cx, cy, 0);
+    const sc = this.sun.shadow.camera;
+    sc.left = -span / 2; sc.right = span / 2; sc.top = span / 2; sc.bottom = -span / 2; sc.near = 1; sc.far = 120;
+    sc.updateProjectionMatrix();
+  }
+
+  // the house's lights that are on: a light of their colour at each, lighting the walls round them
+  lights(glows) {
+    const T = THREE;
+    for (const c of [...this.lamps.children]) { c.dispose && c.dispose(); this.lamps.remove(c); }
+    const on = [...(glows || [])].sort((a, b) => (b.level || 0) - (a.level || 0)).slice(0, 12);
+    for (const g of on) {
+      const l = new T.PointLight(new T.Color(g.color), 6 + 26 * (g.level || 0.5), 7, 2);
+      l.position.set(g.x, g.y, (g.z ?? g.floorZ + 2.1));
+      this.lamps.add(l);
+    }
+  }
+
+  draw(s, cam, W, H, dpr, bg, redraw) {
+    const c = this.canvas;
+    // the page rebuilds the stage round the 2D canvas: keep this one right under it
+    const parent = this.host.parentElement;
+    if (parent && (c.parentElement !== parent || c.nextSibling !== this.host)) {
+      if (getComputedStyle(parent).position === "static") parent.style.position = "relative";
+      parent.insertBefore(c, this.host);
+    }
+    Object.assign(c.style, { width: W + "px", height: H + "px", left: this.host.offsetLeft + "px", top: this.host.offsetTop + "px" });
+    this.renderer.setPixelRatio(dpr);
+    this.renderer.setSize(W, H, false);
+    this.build(s, redraw);
+    this.lights(s.glows);
+    this.scene.background = new THREE.Color(bg || "#10151d");
+    const camera = this.camera;
+    camera.fov = (2 * Math.atan(H / 2 / cam.focal) * 180) / Math.PI;
+    camera.aspect = W / H;
+    camera.position.set(cam.pos.x, cam.pos.y, cam.pos.z);
+    camera.up.set(cam.u.x, cam.u.y, cam.u.z);
+    camera.lookAt(cam.pos.x + cam.f.x, cam.pos.y + cam.f.y, cam.pos.z + cam.f.z);
+    camera.updateProjectionMatrix();
+    this.renderer.render(this.scene, camera);
+    c.style.display = "";
+  }
+  hide() { this.canvas.style.display = "none"; }
+};
+
+// Floors' finishes as material keys
+const FINISH_KEY = { hardwood: "hardwood", vinyl: "vinyl", tile: "tile", concrete: "concrete", carpet: "floor" };
+
+// The stretches of a block's face from a to c: [s0, s1, open] (open: out in the open, not against
+// another block)
+function stretches(blk, a, c, lo, hi, blocks) {
+  const L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, ux = (c[0] - a[0]) / L, uy = (c[1] - a[1]) / L;
+  const alongX = Math.abs(uy) < 1e-6, cov = [];
+  for (const o of blocks) {
+    if (o === blk || o.z0 >= hi - 0.05 || o.z1 <= lo + 0.05) continue;
+    const oy0 = o.y0 || 0, oy1 = oy0 + o.depth;
+    let s0, s1;
+    if (alongX) {
+      if (Math.abs(oy0 - a[1]) > 0.03 && Math.abs(oy1 - a[1]) > 0.03) continue;
+      s0 = (o.x0 - a[0]) * ux; s1 = (o.x1 - a[0]) * ux;
+    } else {
+      if (Math.abs(o.x0 - a[0]) > 0.03 && Math.abs(o.x1 - a[0]) > 0.03) continue;
+      s0 = (oy0 - a[1]) * uy; s1 = (oy1 - a[1]) * uy;
+    }
+    const p = Math.max(0, Math.min(s0, s1)), q = Math.min(L, Math.max(s0, s1));
+    if (q - p > 0.02) cov.push([p, q]);
+  }
+  cov.sort((p, q) => p[0] - q[0]);
+  const out = [];
+  let s = 0;
+  for (const [p, q] of cov) {
+    if (p > s + 0.02) out.push([s, p, true]);
+    if (q > s) { out.push([Math.max(s, p), q, false]); s = q; }
+  }
+  if (L > s + 0.02) out.push([s, L, true]);
+  return out;
+}
+
+// The holes stairs leave in the floor at their top (the floor at height z)
+function stairHoles(t, levels, z) {
+  const out = [];
+  for (const st of t.stairs || []) {
+    if (st.level === "outside" || st.to === "outside") continue;
+    const fl = flight(st, levels);
+    if (fl && Math.abs(Math.max(fl.z0, fl.z1) - z) < 0.06) out.push(fl.hole);
+  }
+  return out;
+}
+
+// Gathers quads and flat polygons by material, then makes one mesh per material. UVs are in
+// metres (along a wall and up it; across and back on the flat), so textures keep their real size
+class QuadBuilder {
+  constructor() { this.parts = new Map(); }
+  _p(key) { if (!this.parts.has(key)) this.parts.set(key, { pos: [], nor: [], uv: [] }); return this.parts.get(key); }
+  tri(key, a, b, c, n, ua, ub, uc) {
+    const p = this._p(key);
+    p.pos.push(...a, ...b, ...c); p.nor.push(...n, ...n, ...n); p.uv.push(...ua, ...ub, ...uc);
+  }
+  // an upright quad from a to b (plan points), z0..z1, facing n
+  wall(key, a, b, z0, z1, n) {
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    // u along the wall from the world origin's side, so textures line up between pieces
+    const u0 = a[0] * Math.abs(n[1]) + a[1] * Math.abs(n[0]), u1 = u0 + L * Math.sign((b[0] - a[0]) * Math.abs(n[1]) + (b[1] - a[1]) * Math.abs(n[0]) || 1);
+    const A0 = [a[0], a[1], z0], B0 = [b[0], b[1], z0], B1 = [b[0], b[1], z1], A1 = [a[0], a[1], z1];
+    this.tri(key, A0, B0, B1, n, [u0, z0], [u1, z0], [u1, z1]);
+    this.tri(key, A0, B1, A1, n, [u0, z0], [u1, z1], [u0, z1]);
+  }
+  // a flat convex polygon (plan points) at z, facing up (dir 1) or down (-1)
+  flat(key, pts, z, dir = 1) {
+    for (let i = 1; i + 1 < pts.length; i++) {
+      const a = pts[0], b = pts[i], c = pts[i + 1];
+      this.tri(key, [a[0], a[1], z], [b[0], b[1], z], [c[0], c[1], z], [0, 0, dir], [a[0], a[1]], [b[0], b[1]], [c[0], c[1]]);
+    }
+  }
+  // any flat polygon (concave too) with holes, triangulated
+  poly(key, outer, z, holes = []) {
+    const tris = THREE.ShapeUtils.triangulateShape(outer.map(([x, y]) => new THREE.Vector2(x, y)), holes.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y))));
+    const all = [...outer, ...holes.flat()];
+    for (const [i, j, k] of tris) {
+      const a = all[i], b = all[j], c = all[k];
+      this.tri(key, [a[0], a[1], z], [b[0], b[1], z], [c[0], c[1], z], [0, 0, 1], [a[0], a[1]], [b[0], b[1]], [c[0], c[1]]);
+    }
+  }
+  // a rectangle at z with rectangular holes cut out of it (clipped to it)
+  slab(key, r, holes, z) {
+    const ring = (q) => [[q.x0, q.y0], [q.x1, q.y0], [q.x1, q.y1], [q.x0, q.y1]];
+    const hs = holes
+      .map((h) => ({ x0: Math.max(h.x0, r.x0 + 0.01), x1: Math.min(h.x1, r.x1 - 0.01), y0: Math.max(h.y0, r.y0 + 0.01), y1: Math.min(h.y1, r.y1 - 0.01) }))
+      .filter((h) => h.x1 - h.x0 > 0.05 && h.y1 - h.y0 > 0.05)
+      .map((h) => ring(h).reverse());
+    this.poly(key, ring(r), z, hs);
+  }
+  // a solid block over a rectangle from z0 to z1
+  block(key, r, z0, z1) {
+    if (z1 - z0 < 0.005) return;
+    const c = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]];
+    const ns = [[0, -1, 0], [1, 0, 0], [0, 1, 0], [-1, 0, 0]];
+    for (let i = 0; i < 4; i++) this.wall(key, c[i], c[(i + 1) % 4], z0, z1, ns[i]);
+    this.flat(key, c, z1, 1);
+  }
+  meshes(material) {
+    const out = [];
+    for (const [key, p] of this.parts) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(p.pos, 3));
+      g.setAttribute("normal", new THREE.Float32BufferAttribute(p.nor, 3));
+      g.setAttribute("uv", new THREE.Float32BufferAttribute(p.uv, 2));
+      out.push(new THREE.Mesh(g, material(key)));
+    }
+    return out;
+  }
+}

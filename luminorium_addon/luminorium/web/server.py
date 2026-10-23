@@ -122,7 +122,9 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         wide = ' data-wide="1"' if key == "house" else ""
         crumbs = ' data-crumbs="Lights@lights"' if key == "light" else ""
         extra_js = (
+            f'<script src="static/vendor/three.min.js?v={__version__}"></script>\n'
             f'<script src="static/pages/house3d.js?v={__version__}"></script>\n'
+            f'<script src="static/pages/house3d_gl.js?v={__version__}"></script>\n'
             f'<script src="static/pages/facade.js?v={__version__}"></script>\n'
             f'<script src="static/pages/site.js?v={__version__}"></script>\n'
             if key == "house"

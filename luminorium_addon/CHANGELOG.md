@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0-dev.56
+
+- **The solid view in WebGL:** the house is drawn with three.js (bundled in the add-on, works
+  offline) under the 2D view, with the same camera: real solids with a depth buffer, so walls,
+  floors, stairs and windows hide each other properly from any angle. Walls are closed boxes (outside
+  walls their full thickness, siding only where they face the open), stairs are solid steps,
+  windows and doors sit in the walls with white frames, floors carry their finishes, and the lawn,
+  walks, beds and trees sit on the ground. Lit by the sun (with shadows) and by up to 12 of the
+  house's lights that are on, in their own colour. Falls back to the 2D drawing where WebGL isn't
+  available.
+
 ## 0.3.0-dev.55
 
 - **Walls have their ends again:** each wall is drawn as a closed solid (sides, ends, cut top),
