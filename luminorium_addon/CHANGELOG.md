@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0-dev.61
+
+- **No walls inside other parts of the house:** a block's face that runs through another block (an
+  entry under the bedroom level) isn't drawn; it was blocking the stair openings and the storage
+  door.
+- **Windows are holes in the wall:** outside walls are cut round every window and door, with see-
+  through glass that lets light through (inside light shows outside at night, daylight comes in).
+- **Day and Night** (tool bar, the solid view): noon, with the sun high overhead and shadows only
+  from the eaves and overhangs; or night under a dim moon, lit by the house's lights. Replaces the
+  low sun that threw long shadows.
+- **Simulate** (tool bar): try lights out in the view instead of showing them as they are. Each
+  light's panel gets **Try it**: on or off, colour and brightness; **All on** and **All off** in the
+  tool bar. Nothing is sent to the lights; the settings are kept in this browser.
+- **Icons** (tool bar): hide the lights' icons and keep their light (the picked light still shows).
+
 ## 0.3.0-dev.60
 
 - **Stairs with head room:** inside, each step sits on a slab that follows the flight's slope, so

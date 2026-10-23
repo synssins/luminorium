@@ -46,7 +46,8 @@ window.HouseGL = class HouseGL {
     this.lamps = new T.Group();
     this.scene.add(this.lamps);
     // daylight: a soft sky and the sun (from above, front left: as the 2D view shades)
-    this.scene.add(new T.HemisphereLight(0xe6eef8, 0x5a4a35, 1.1));
+    this.hemi = new T.HemisphereLight(0xe6eef8, 0x5a4a35, 1.1);
+    this.scene.add(this.hemi);
     const sun = (this.sun = new T.DirectionalLight(0xfff3e0, 1.7));
     sun.castShadow = true;
     sun.shadow.mapSize.set(this.small ? 1024 : 2048, this.small ? 1024 : 2048);
@@ -93,7 +94,7 @@ window.HouseGL = class HouseGL {
       pool: () => std({ color: 0x3fa7d6, roughness: 0.1, metalness: 0.1 }),
       lawn: () => std({ color: 0x5c8a3a, roughness: 1 }),
       other: () => std({ color: 0xb0b8c4, roughness: 1 }),
-      glass: () => std({ color: 0x5d7f9c, roughness: 0.08, metalness: 0.3, emissive: 0x1a2a3a }),
+      glass: () => std({ color: 0x9fc2dc, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false }),
       frame: () => std({ color: 0xf4f1ea, roughness: 0.6 }),
       door: () => std({ color: 0x6b4a2e, roughness: 0.6 }),
       garage: () => std({ color: 0xf0eee8, roughness: 0.7 }),
@@ -139,6 +140,23 @@ window.HouseGL = class HouseGL {
       if (bottom) B.flat(rest, [al, bl, br, ar], z0, -1);
     };
 
+    // every window and outside door, as a line along a wall and its sill and top: the outside walls
+    // leave a hole for each, so light goes through the glass
+    const holesIn = [];
+    for (const o of (s.massing && s.massing.openings) || []) {
+      const y = o.y !== undefined ? o.y : (blocks.find((q) => (o.x0 + o.x1) / 2 >= q.x0 && (o.x0 + o.x1) / 2 <= q.x1) || {}).y0 || 0;
+      holesIn.push({ a: [o.x0, y], b: [o.x1, y], z0: o.z0, z1: o.z1 });
+    }
+    for (const w of t.windows || []) holesIn.push({ a: w.a, b: w.b, z0: w.z0, z1: w.z1 });
+    // the stretches of a face's line (from a, along u) a hole takes: [s0, s1, z0, z1]
+    const holesOn = (a, ux, uy, L) => holesIn.flatMap((h) => {
+      const d = (p) => Math.abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux); // distance off the line
+      if (d(h.a) > th + 0.06 || d(h.b) > th + 0.06) return [];
+      const s0 = (h.a[0] - a[0]) * ux + (h.a[1] - a[1]) * uy, s1 = (h.b[0] - a[0]) * ux + (h.b[1] - a[1]) * uy;
+      const p = Math.max(0, Math.min(s0, s1)), q = Math.min(L, Math.max(s0, s1));
+      return q - p > 0.05 ? [[p, q, h.z0, h.z1]] : [];
+    });
+
     // outside walls: each block's faces as solid walls `th` thick, inward from the face; siding
     // outside where the face is out in the open, plaster against another part of the house,
     // foundation below the ground
@@ -163,10 +181,22 @@ window.HouseGL = class HouseGL {
         for (let k = 0; k + 1 < bands.length; k++) {
           const lo = bands[k], hi = bands[k + 1];
           if (hi - lo < 0.01) continue;
+          const holes = holesOn(a, ux, uy, L);
           for (const [s0, s1, open] of stretches(b, a, c, Math.max(lo, b.z0), hi, blocks)) {
             if (!open) continue;
             const p = (s) => [ia[0] + ux * s, ia[1] + uy * s];
-            box(p(s0), p(s1), th / 2, lo, hi, "plaster", "plaster", hi <= 0.001 ? "foundation" : "siding");
+            const outer = hi <= 0.001 ? "foundation" : "siding";
+            // cut round the windows: full height between them, under the sill and over the top
+            const cuts = holes.filter(([h0, h1, z0, z1]) => h1 > s0 && h0 < s1 && z1 > lo && z0 < hi).sort((m, n) => m[0] - n[0]);
+            let at = s0;
+            for (const [h0, h1, z0, z1] of cuts) {
+              const q0 = Math.max(s0, h0), q1 = Math.min(s1, h1);
+              if (q0 > at + 0.005) box(p(at), p(q0), th / 2, lo, hi, "plaster", "plaster", outer);
+              if (z0 > lo + 0.005) box(p(q0), p(q1), th / 2, lo, Math.min(z0, hi), "plaster", "plaster", outer);
+              if (z1 < hi - 0.005) box(p(q0), p(q1), th / 2, Math.max(z1, lo), hi, "plaster", "plaster", outer, true);
+              at = Math.max(at, q1);
+            }
+            if (s1 > at + 0.005) box(p(at), p(s1), th / 2, lo, hi, "plaster", "plaster", outer);
           }
         }
       }
@@ -241,10 +271,9 @@ window.HouseGL = class HouseGL {
       z1 = Math.min(z1, cut);
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
       const fill = kind === "window" ? "glass" : kind === "garage" ? "garage" : "door";
+      // the glass (or the door) in the middle of the wall's thickness, a frame on each face
+      { const d = -th / 2, A = [a[0] + n[0] * d, a[1] + n[1] * d], C = [b[0] + n[0] * d, b[1] + n[1] * d]; B.wall(fill, A, C, z0, z1, [n[0], n[1], 0]); }
       for (const d of [0.012, -(th + 0.012)]) {
-        const A = [a[0] + n[0] * d, a[1] + n[1] * d], C = [b[0] + n[0] * d, b[1] + n[1] * d];
-        B.wall(fill, A, C, z0, z1, [n[0] * Math.sign(d || 1), n[1] * Math.sign(d || 1), 0]);
-        if (d < 0 && kind !== "window") continue;
         // the frame: four sides and the mullions, a little proud of the glass
         const fw = 0.05, off = d + Math.sign(d) * 0.012;
         const at = (s) => [a[0] + ux * s + n[0] * off, a[1] + uy * s + n[1] * off];
@@ -281,7 +310,11 @@ window.HouseGL = class HouseGL {
       for (const poly of flatPolys(y)) B.poly(YARD[y.kind] || "other", poly, y.kind === "path" ? 0.012 : 0.01);
     }
     const meshes = B.meshes((k) => this.mat(k, redraw));
-    for (const m of meshes) { m.castShadow = true; m.receiveShadow = true; this.house.add(m); }
+    for (const m of meshes) {
+      const glass = m.material === this.mats.glass;
+      m.castShadow = !glass; m.receiveShadow = !glass; m.renderOrder = glass ? 2 : 0;
+      this.house.add(m);
+    }
     // things in the house: a TV (a thin black panel, its screen glossy), a plain box
     for (const o of t.objects || []) {
       if (o.z >= cut - 0.05) continue;
@@ -319,7 +352,8 @@ window.HouseGL = class HouseGL {
     }
     // the sun's shadow box: round the house
     const cx = s.W / 2, cy = s.D / 2, span = Math.max(s.W, s.D) + 16;
-    this.sun.position.set(cx + SUN[0] * 40, cy + SUN[1] * 40, SUN[2] * 40);
+    this.center = [cx, cy];
+    this.sky = null; // placed again by setSky
     this.sun.target.position.set(cx, cy, 0);
     const sc = this.sun.shadow.camera;
     sc.left = -span / 2; sc.right = span / 2; sc.top = span / 2; sc.bottom = -span / 2; sc.near = 1; sc.far = 120;
@@ -350,7 +384,7 @@ window.HouseGL = class HouseGL {
       if (!g) { l.intensity = 0; l.castShadow = false; return; }
       l.castShadow = true;
       l.color.set(g.color);
-      l.intensity = 6 + 26 * (g.level || 0.5);
+      l.intensity = (6 + 26 * (g.level || 0.5)) * (this.nightBoost || 1);
       l.position.set(g.x, g.y, g.z ?? g.floorZ + 2.1);
     });
   }
@@ -401,6 +435,25 @@ window.HouseGL = class HouseGL {
     }
   }
 
+  // Noon (the sun high overhead: shadows only from the eaves and overhangs on the outside) or night
+  // (a dim moon straight overhead; the house's lights do the lighting, through the windows too)
+  setSky(kind) {
+    if (this.sky === kind || !this.center) return;
+    this.sky = kind;
+    const [cx, cy] = this.center, night = kind === "night";
+    if (night) this.sun.position.set(cx, cy, 40);
+    else this.sun.position.set(cx + 4, cy - 9, 40); // noon: a little toward the street, so the eaves shade the front
+    this.sun.color.set(night ? 0x8fa6d6 : 0xfffaf0);
+    this.sun.intensity = night ? 0.6 : 2.1;
+    this.hemi.color.set(night ? 0x4a5c86 : 0xeaf2fb);
+    this.hemi.groundColor.set(night ? 0x08080a : 0x6a5a40);
+    this.hemi.intensity = night ? 0.45 : 0.9;
+    this.renderer.toneMappingExposure = night ? 1.25 : 1.0;
+    this.nightBoost = night ? 1.7 : 1;
+    this.lightKey = null; this.ambiKey = null; // lamps pick up the night boost
+    this.shadowsDirty = true;
+  }
+
   draw(s, cam, W, H, dpr, bg, redraw) {
     const c = this.canvas;
     // the page rebuilds the stage round the 2D canvas: keep this one right under it
@@ -416,9 +469,10 @@ window.HouseGL = class HouseGL {
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(W, H, false);
     this.build(s, redraw);
+    this.setSky(s.sky === "night" ? "night" : "day");
     this.lights(s.glows);
     this.ambilight(s);
-    this.scene.background = new THREE.Color(bg || "#10151d");
+    this.scene.background = new THREE.Color(this.sky === "night" ? "#070b14" : "#b9d1e8");
     const camera = this.camera;
     camera.fov = (2 * Math.atan(H / 2 / cam.focal) * 180) / Math.PI;
     camera.aspect = W / H;
@@ -445,11 +499,14 @@ function stretches(blk, a, c, lo, hi, blocks) {
     if (o === blk || o.z0 >= hi - 0.05 || o.z1 <= lo + 0.05) continue;
     const oy0 = o.y0 || 0, oy1 = oy0 + o.depth;
     let s0, s1;
+    // another block against this face, or one this face runs through (a part of the house
+    // inside another: its face there is no wall)
+    const touches = (lo2, hi2, v) => Math.abs(lo2 - v) <= 0.03 || Math.abs(hi2 - v) <= 0.03 || (lo2 < v && v < hi2);
     if (alongX) {
-      if (Math.abs(oy0 - a[1]) > 0.03 && Math.abs(oy1 - a[1]) > 0.03) continue;
+      if (!touches(oy0, oy1, a[1])) continue;
       s0 = (o.x0 - a[0]) * ux; s1 = (o.x1 - a[0]) * ux;
     } else {
-      if (Math.abs(o.x0 - a[0]) > 0.03 && Math.abs(o.x1 - a[0]) > 0.03) continue;
+      if (!touches(o.x0, o.x1, a[0])) continue;
       s0 = (oy0 - a[1]) * uy; s1 = (oy1 - a[1]) * uy;
     }
     const p = Math.max(0, Math.min(s0, s1)), q = Math.min(L, Math.max(s0, s1));

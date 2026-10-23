@@ -22,6 +22,10 @@
     // the panel open on the left: lights, levels, rooms, blocks, yard, or "" for none
     dims: !!L.store("house.dims", false),          // block dimensions shown in 3D
     solid: !!L.store("house.solid", false),        // solid walls and ground, lit by the lights
+    sky: L.store("house.sky", "day") === "night" ? "night" : "day", // the solid view at noon or at night
+    sim: !!L.store("house.sim", false),            // lights as set here to try them, not as they are
+    simStates: L.store("house.simStates", {}) || {}, // light -> {on, color, level}, kept in this browser
+    hideIcons: !!L.store("house.hideIcons", false), // the lights' orbs hidden (their light still shows)
     dimsInside: L.store("house.dimsInside", true) !== false, // inside (as taped) or overall
     panel: ["lights", "levels", "rooms", "blocks", "yard", ""].includes(L.store("house.panel", "lights")) ? L.store("house.panel", "lights") : "lights",
   };
@@ -94,7 +98,7 @@
       return {
         id: t.id, label: t.name, x: t.world.x, y: t.world.y, z: t.world.z, floorZ: floorZ(t.item.floor), aim: t.item.aim || null, floor: t.item.floor, linked: t.fixtures > 0,
         form: t.item.form || null, icon: lightIcon(t.item),
-        on: t.state === "on", sel, dim: !here && !sel,
+        on: lightOn(t), sel, dim: !here && !sel,
         parts: t.parts.filter((p) => p.world).map((p) => ({ index: p.index, x: p.world.x, y: p.world.y, z: p.world.z, sel: sel && ui.part === p.index })),
       };
     });
@@ -123,6 +127,7 @@
       dims: ui.dims ? blockDims() : [],
       solid: !!ui.solid,
       glows: ui.solid ? glows() : [],
+      sky: ui.sky,
       // a TV's own light (its Ambilight): on or off, its colour and brightness, for the glow round it
       ambi: ui.solid ? ((house.top && house.top.objects) || []).filter((o) => o.light).map((o) => {
         const inv = ((inventory && inventory.lights) || []).find((l) => l.entity_id === o.light) || {};
@@ -133,7 +138,7 @@
       }) : [],
       yardPicks: ui.mode3d === "shape" ? ui.yardPicks || [] : [],
       floors: house.floors.map((f) => ({ ...f, active: f.id === ui.floor, label: L.fmtLen(f.elevation, { signed: true }) })),
-      lights, grid: L.units() === "imperial" ? L.FT : 1,
+      lights: ui.hideIcons ? lights.filter((l) => l.sel) : lights, grid: L.units() === "imperial" ? L.FT : 1,
       placeZ: floorZ(ui.floor), selPart: ui.part, labels: false,
     };
   }
@@ -915,15 +920,21 @@
     }
     return { x: w.x, y: w.y, z: w.z, floorZ: fz, floor, color, level: level * 0.35, r: 1.2 };
   }
+  // Simulate: a light as set here (on, colour, brightness), not as it is in Home Assistant; nothing
+  // is sent to the light
+  function simOf(id) { return ui.simStates[id] || { on: false, color: "#ffd28a", level: 0.8 }; }
+  function lightOn(t) { return ui.sim ? !!simOf(t.id).on : t.state === "on"; }
+  function setSim(id, change) { ui.simStates = { ...ui.simStates, [id]: { ...simOf(id), ...change } }; L.save("house.simStates", ui.simStates); paint(); }
   function glows() {
     const out = [];
     const members = new Map((inventory.fixtures || []).map((f) => [f.id, f.members || []]));
     for (const t of house.targets) {
-      if (!t.world || !t.item || t.state !== "on") continue;
+      if (!t.world || !t.item || !lightOn(t)) continue;
       const look = looks.get(t.id) || looks.get((members.get(t.id) || [])[0]) || {};
-      const color = look.rgb_color ? `#${look.rgb_color.map((v) => v.toString(16).padStart(2, "0")).join("")}`
+      const sim = ui.sim ? simOf(t.id) : null;
+      const color = sim ? sim.color : look.rgb_color ? `#${look.rgb_color.map((v) => v.toString(16).padStart(2, "0")).join("")}`
         : look.color_temp_kelvin ? L.colorHex({ kelvin: look.color_temp_kelvin }) : "#ffd28a";
-      const level = look.brightness != null ? look.brightness / 255 : 0.8;
+      const level = sim ? sim.level : look.brightness != null ? look.brightness / 255 : 0.8;
       if (level <= 0.01) continue;
       // the solid view is cut at the level shown: light on the floors under it isn't seen
       if (t.item.floor !== ui.floor && t.item.floor !== house.outside) continue;
@@ -1249,6 +1260,7 @@
       item ? null : el("div.banner", { style: { fontSize: "14px" } }, "Tap where this light is in 3D, on the Front photo, or in the Top view to place it."),
       item && !(t.fixtures > 0) && !t.parts.length ? formPanel(t) : null,
       item ? beamPanel(t) : null,
+      item && ui.sim ? simPanel(t) : null,
       el("div.row", { style: { gap: "8px" } },
         el("button.btn.primary", { type: "button", disabled: status?.read_only, style: { flex: "1" }, on: { click: () => identify(undefined) } }, "Flash it"),
         item ? el("button.btn", { type: "button", on: { click: removeItem } }, "Remove") : null),
@@ -1306,6 +1318,18 @@
     const what = !d ? "lights all around" : d.kind === "wall" ? "lights a half dome out from the wall"
       : d.tilt < 0 ? (d.beam >= 140 ? "lights the room below it, a wide dome down" : `lights a ${Math.round(d.beam)}° cone down`) : "lights upward";
     return `As its type, it ${what}. Choose Flood or Spot to point it somewhere else (a wall wash, an uplight on a tree), or Half for a wall light.`;
+  }
+  // Try a light out in the solid view: on or off, its colour and brightness (only here)
+  function simPanel(t) {
+    const st = simOf(t.id);
+    return el("section", { "aria-label": "Try it", style: { display: "flex", flexDirection: "column", gap: "10px", borderTop: "1px solid var(--line)", paddingTop: "12px" } },
+      el("div.field", el("span", "Try it (Simulate)"),
+        el("div.seg", { role: "radiogroup", "aria-label": "On or off" }, [[true, "On"], [false, "Off"]].map(([v, label]) =>
+          el("button", { type: "button", role: "radio", "aria-checked": String(!!st.on === v), on: { click: () => setSim(t.id, { on: v }) } }, label)))),
+      el("label.field", el("span", "Colour"), el("input", { type: "color", value: st.color, on: { change: (e) => setSim(t.id, { color: e.target.value, on: true }) } })),
+      el("label.field", el("span", "Brightness", el("span.mono", `${Math.round(st.level * 100)}%`)),
+        el("input", { type: "range", min: 1, max: 100, step: 1, value: Math.round(st.level * 100), on: { change: (e) => setSim(t.id, { level: Number(e.target.value) / 100, on: true }) } })),
+      el("span.small.muted", "Only in this view: nothing is sent to the light."));
   }
   function beamPanel(t) {
     const aim = t.item.aim || null;
@@ -1391,6 +1415,9 @@
     path: "M4 20c4-2 4-6 8-8s4-6 8-8",
     area: "M4 8l6-4 10 4v10l-10 2-6-4z",
     merge: "M4 6h6v6H4zM14 12h6v6h-6zM10 9h2a2 2 0 0 1 2 2v1",
+    sun: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
+    moon: "M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z",
+    eye: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
   };
   // One tool: an icon over a short name
   function tool(label, iconD, { pressed = null, disabled = false, title = null, click }) {
@@ -1421,7 +1448,13 @@
         tool("Merge", I.merge, { disabled: !(ui.mode3d === "shape" && ui.yardPicks && ui.yardPicks.length > 1), title: "Ctrl+click two flat shapes, then merge them into one", click: () => mergeYard(ui.yardPicks) })),
       grp(tool("Aim", I.aim, { pressed: !!ui.aiming, disabled: !canAim, title: canAim ? "Click what the picked light should point at" : "Pick a flood or spot light first",
         click: () => { ui.aiming = !ui.aiming; paint(); } })),
-      grp(tool("Solid", I.solid, { pressed: !!ui.solid, title: "Solid walls and ground, lit by your lights as they are now", click: () => { ui.solid = !ui.solid; L.save("house.solid", ui.solid); if (ui.solid) refreshLooks(); paint(); } })),
+      grp(tool("Solid", I.solid, { pressed: !!ui.solid, title: "Solid walls and ground, lit by your lights as they are now", click: () => { ui.solid = !ui.solid; L.save("house.solid", ui.solid); if (ui.solid) refreshLooks(); paint(); } }),
+        tool(ui.sky === "night" ? "Night" : "Day", ui.sky === "night" ? I.moon : I.sun, { disabled: !ui.solid, title: "The solid view at noon, or at night under the moon", click: () => { ui.sky = ui.sky === "night" ? "day" : "night"; L.save("house.sky", ui.sky); paint(); } }),
+        tool("Simulate", I.bulb, { pressed: !!ui.sim, disabled: !ui.solid, title: "Try lights here (on, colour, brightness in each light's panel) instead of showing them as they are; nothing is sent", click: () => { ui.sim = !ui.sim; L.save("house.sim", ui.sim); paint(); } }),
+        tool("Icons", I.eye, { pressed: !ui.hideIcons, title: "Show or hide the lights' icons (their light still shows)", click: () => { ui.hideIcons = !ui.hideIcons; L.save("house.hideIcons", ui.hideIcons); paint(); } }),
+        ui.sim ? el("div.seg", { role: "group", "aria-label": "Every light", style: { marginLeft: "4px" } },
+          [[true, "All on"], [false, "All off"]].map(([v, label]) => el("button", { type: "button", title: v ? "Every placed light on, as each is set (warm white if not)" : "Every light off",
+            on: { click: () => { const next = { ...ui.simStates }; for (const t of house.targets) if (t.item) next[t.id] = { ...simOf(t.id), on: v }; ui.simStates = next; L.save("house.simStates", next); paint(); } } }, label))) : null),
       grp(tool("Dimensions", I.dims, { pressed: !!ui.dims, title: "Show each block's size", click: () => { ui.dims = !ui.dims; L.save("house.dims", ui.dims); paint(); } }),
         ui.dims ? el("div.seg", { role: "radiogroup", "aria-label": "Dimensions measured", style: { marginLeft: "4px" } },
           [[true, "Inside"], [false, "Overall"]].map(([v, label]) => el("button", { type: "button", role: "radio", "aria-checked": String(!!ui.dimsInside === v),
