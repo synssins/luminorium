@@ -397,8 +397,7 @@ window.House3D = class House3D {
   // ---- windows and doors: on the front wall of their block -----------------------------------
   openingY(o) {
     if (o.y !== undefined) return o.y;
-    const blk = this.scene.massing.blocks.find((b) => (o.x0 + o.x1) / 2 >= b.x0 && (o.x0 + o.x1) / 2 <= b.x1);
-    return blk ? blk.y0 || 0 : 0;
+    return openingFace(o, this.scene.massing.blocks);
   }
   // The window or door under a screen point, nearest first
   hitOpening(sx, sy) {
@@ -1548,6 +1547,11 @@ window.House3D = class House3D {
     if (d.kind === "pinch") { if (this.pointers.size === 0) this.drag = null; return; }
     this.drag = null;
     if (cancel) return;
+    // a right click that didn't slide the view: the menu for what's under it (a light, a door)
+    if (d.kind === "pan" && !d.moved && e.button === 2 && this.h.onMenu) {
+      const p = d.start;
+      return this.h.onMenu({ light: this.hit(p), opening: this.hitOpening(p.x, p.y), pt: p, clientX: e.clientX, clientY: e.clientY });
+    }
     if (d.kind === "cube") {
       const pt = this.local(e);
       if (Math.hypot(pt.x - d.start.x, pt.y - d.start.y) > 6) return;
@@ -1851,3 +1855,13 @@ function hexA(color, alpha) {
   const n = parseInt(m[1], 16);
   return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
+
+// The face an opening is set in: the block it's across (by its middle) whose height takes it in,
+// else the first one across it
+function openingFace(o, blocks) {
+  const mx = (o.x0 + o.x1) / 2, mz = (o.z0 + o.z1) / 2;
+  const across = blocks.filter((b) => mx >= b.x0 && mx <= b.x1);
+  const blk = across.find((b) => mz >= b.z0 && mz <= b.z1) || across[0];
+  return blk ? blk.y0 || 0 : 0;
+}
+window.openingFace = openingFace;

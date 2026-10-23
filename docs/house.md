@@ -441,6 +441,11 @@ CAD layout"):
     shadows yet. Remembered. The view is drawn room by room, the farthest first (each room's
     floor, the walls seen from inside, light on the floor, what's in it, the walls seen from
     outside); interior walls of levels above the one shown are hidden.
+  - **Right-click** in the 3D view (a click that doesn't slide it) opens a menu for what's under
+    it: a light (its icon, or the nearest placed light), a TV or a light bar: On, Off, colour and
+    brightness, sent to the light (`POST /api/lights/{id}/set`), or under Simulate only shown here;
+    **Pick it** selects a light. A garage door: **Open it** / **Close it**, in this browser only
+    (drawn up under the ceiling when open).
   - **Dimensions** (tool bar) labels each block with across × front to back and its height.
     **Inside** takes off the walls, as a tape reads in the room: half an inside wall (2x4 with
     drywall, 4 1/2") where a block meets another face to face, an outside wall (the Top view's

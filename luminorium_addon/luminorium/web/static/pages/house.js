@@ -26,6 +26,7 @@
     sim: !!L.store("house.sim", false),            // lights as set here to try them, not as they are
     simStates: L.store("house.simStates", {}) || {}, // light -> {on, color, level}, kept in this browser
     hideIcons: !!L.store("house.hideIcons", false), // the lights' orbs hidden (their light still shows)
+    open: L.store("house.open", []) || [], // garage doors shown open (in this browser)
     dimsInside: L.store("house.dimsInside", true) !== false, // inside (as taped) or overall
     panel: ["lights", "levels", "rooms", "blocks", "yard", ""].includes(L.store("house.panel", "lights")) ? L.store("house.panel", "lights") : "lights",
   };
@@ -128,9 +129,11 @@
       solid: !!ui.solid,
       glows: ui.solid ? glows() : [],
       sky: ui.sky,
+      open: ui.open,
       // a TV's own light (its Ambilight): on or off, its colour and brightness, for the glow round it
       ambi: ui.solid ? ((house.top && house.top.objects) || []).filter((o) => o.light).map((o) => {
         const inv = ((inventory && inventory.lights) || []).find((l) => l.entity_id === o.light) || {};
+        if (ui.sim) { const q = simOf(objKey(o)); return { id: o.id, on: !!q.on, color: q.color, level: q.level }; }
         const look = looks.get(o.light) || inv.look || {};
         const color = look.rgb_color ? `#${look.rgb_color.map((v) => v.toString(16).padStart(2, "0")).join("")}`
           : look.color_temp_kelvin ? L.colorHex({ kelvin: look.color_temp_kelvin }) : "#8fb4ff";
@@ -148,6 +151,7 @@
       class: "hm-canvas", style: { width: "100%", display: "block", borderRadius: "10px", cursor: "grab" } });
     view3d = canvas3d.view = new window.House3D(canvas3d, { // .view: for scripted checks
       onPick: (id, part) => { const t = target(id); ui.sel = id; ui.part = part; if (t && part === null) ui.floor = floorOfTarget(t); paint(); },
+      onMenu: (at) => openMenu(at),
       onPlace: async (x, y) => {
         const at = { x: r2(x), y: r2(y) };
         if (ui.mode) return lineClick(at);
@@ -936,8 +940,8 @@
         : look.color_temp_kelvin ? L.colorHex({ kelvin: look.color_temp_kelvin }) : "#ffd28a";
       const level = sim ? sim.level : look.brightness != null ? look.brightness / 255 : 0.8;
       if (level <= 0.01) continue;
-      // the solid view is cut at the level shown: light on the floors under it isn't seen
-      if (t.item.floor !== ui.floor && t.item.floor !== house.outside) continue;
+      // the solid view is cut at the level shown: the levels above it aren't drawn
+      if (t.item.floor !== house.outside && floorZ(t.item.floor) > floorZ(ui.floor) + 0.05) continue;
       // several fixtures on one switch: each throws its own light
       const fz = floorZ(t.item.floor);
       const f = t.item.form;
@@ -959,7 +963,117 @@
       const from = fx.length ? fx.map((p) => p.world) : [t.world];
       for (const w of from) out.push(landing(t.item, w, fz, t.item.floor, color, fx.length ? level * 0.8 : level));
     }
+    // a light bar: light down along its length
+    for (const o of (house.top && house.top.objects) || []) {
+      if (o.kind !== "bar") continue;
+      const st = objState(o);
+      if (!st.on || st.level <= 0.01 || o.z > floorZ(ui.floor) + 3.5) continue;
+      for (const p of barPoints(o, Math.max(1, Math.round(Math.max(o.w, o.d) / 1.2)))) {
+        out.push({ x: p.x, y: p.y, z: o.z - 0.05, floorZ: o.z - 2.4, color: st.color, level: st.level * 0.8, r: 1.2 });
+      }
+    }
     return out;
+  }
+  // points spread along a light bar (its long side), at its middle of each of n stretches
+  function barPoints(o, n) {
+    const th = (o.rot || 0) * Math.PI / 180, len = Math.max(o.w, o.d), alongY = o.d >= o.w;
+    const ux = alongY ? Math.sin(th) : Math.cos(th), uy = alongY ? Math.cos(th) : -Math.sin(th);
+    return Array.from({ length: n }, (_, i) => { const k = -len / 2 + (len * (i + 0.5)) / n; return { x: o.x + ux * k, y: o.y + uy * k, z: o.z }; });
+  }
+  // a thing drawn in the house (a TV, a light bar): its light's key for Simulate, and its state
+  function objKey(o) { return o.light || `obj:${o.id}`; }
+  function hexOf(look, dflt) {
+    return look.rgb_color ? `#${look.rgb_color.map((v) => v.toString(16).padStart(2, "0")).join("")}`
+      : look.color_temp_kelvin ? L.colorHex({ kelvin: look.color_temp_kelvin }) : dflt;
+  }
+  function objState(o) {
+    if (ui.sim || !o.light) return simOf(objKey(o));
+    const inv = ((inventory && inventory.lights) || []).find((l) => l.entity_id === o.light) || {};
+    const look = looks.get(o.light) || inv.look || {};
+    return { on: inv.state === "on", color: hexOf(look, "#ffd28a"), level: look.brightness != null ? look.brightness / 255 : 0.8 };
+  }
+  function lookOf(t) {
+    const members = new Map(((inventory && inventory.fixtures) || []).map((f) => [f.id, f.members || []]));
+    const look = looks.get(t.id) || looks.get((members.get(t.id) || [])[0]) || {};
+    return { color: hexOf(look, "#ffd28a"), level: look.brightness != null ? look.brightness / 255 : 0.8 };
+  }
+
+  // ---- the right-click menu in the 3D view: a light (or a TV's, a light bar's) on or off, its
+  // colour and brightness (under Simulate: here only; otherwise sent to the light); a garage
+  // door open or shut ----------------------------------------------------------------------------
+
+  let menuEl = null;
+  function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
+  function openMenu(at) {
+    closeMenu();
+    const thing = menuTarget(at);
+    if (!thing) { toast("Right-click a light, a TV, a light bar or the garage door"); return; }
+    const row = (kids) => el("div", { style: { display: "flex", gap: "6px", alignItems: "center", marginTop: "8px" } }, kids);
+    const btn = (label, click, pressed) => el("button", { type: "button", "aria-pressed": pressed ? "true" : null,
+      style: { flex: "1", outline: pressed ? "2px solid var(--accent)" : null }, on: { click: () => click() } }, label);
+    const kids = [el("div", { style: { fontWeight: "600" } }, thing.name)];
+    if (thing.door) {
+      const open = ui.open.includes(thing.door);
+      kids.push(row([btn(open ? "Close it" : "Open it", () => {
+        ui.open = open ? ui.open.filter((q) => q !== thing.door) : [...ui.open, thing.door];
+        L.save("house.open", ui.open); closeMenu(); paint();
+      })]));
+    } else {
+      const st = thing.state();
+      const sim = ui.sim || !thing.entity;
+      kids.push(el("div", { style: { fontSize: "12px", color: "var(--muted)", marginTop: "2px" } },
+        sim ? (ui.sim ? "Simulate: shown here only, nothing is sent" : "Not linked to a light yet: shown here only") : "Changes the real light"));
+      const send = async (change) => {
+        if (sim) { setSim(thing.key, change); closeMenu(); openMenu(at); return; }
+        const next = { ...st, ...change };
+        const rgb = next.color.match(/[0-9a-f]{2}/gi).map((h) => parseInt(h, 16));
+        await run(() => api(`api/lights/${encodeURIComponent(thing.entity)}/set`, { method: "POST",
+          body: next.on ? { on: true, rgb: change.color ? rgb : null, brightness: change.level != null ? Math.round(next.level * 255) : null } : { on: false } }));
+        toast(`${thing.name}: ${next.on ? "on" : "off"}`);
+      };
+      kids.push(row([btn("On", () => send({ on: true }), st.on), btn("Off", () => send({ on: false }), !st.on)]));
+      const color = el("input", { type: "color", value: st.color, title: "Colour", on: { change: (e) => send({ on: true, color: e.target.value }) } });
+      const level = el("input", { type: "range", min: "1", max: "100", value: String(Math.round(st.level * 100)), title: "Brightness", style: { flex: "1" },
+        on: { change: (e) => send({ on: true, level: Number(e.target.value) / 100 }) } });
+      kids.push(row([color, level]));
+      if (thing.pick) kids.push(row([btn("Pick it", () => { closeMenu(); thing.pick(); })]));
+    }
+    menuEl = el("div", { role: "menu", style: { position: "fixed", left: `${at.clientX}px`, top: `${at.clientY}px`, zIndex: "1000", minWidth: "200px",
+      background: "var(--card2)", border: "1px solid var(--line2)", borderRadius: "10px", padding: "10px", boxShadow: "0 8px 24px rgba(0,0,0,.45)", color: "var(--text)" },
+      on: { contextmenu: (e) => e.preventDefault() } }, kids);
+    document.body.append(menuEl);
+    // kept on the screen
+    const r = menuEl.getBoundingClientRect();
+    if (r.right > innerWidth - 8) menuEl.style.left = `${Math.max(8, innerWidth - r.width - 8)}px`;
+    if (r.bottom > innerHeight - 8) menuEl.style.top = `${Math.max(8, innerHeight - r.height - 8)}px`;
+  }
+  document.addEventListener("pointerdown", (e) => { if (menuEl && !menuEl.contains(e.target)) closeMenu(); }, true);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
+  // What's under a right click: a light's orb, else the nearest light, TV or light bar to it on
+  // the screen, else a garage door
+  function menuTarget(at) {
+    const lightThing = (t) => ({ name: t.name, key: t.id, entity: t.id,
+      state: () => (ui.sim ? simOf(t.id) : { on: t.state === "on", ...lookOf(t) }),
+      pick: () => { ui.sel = t.id; ui.part = null; ui.floor = floorOfTarget(t); paint(); } });
+    if (at.light) { const t = target(at.light.id); if (t) return lightThing(t); }
+    let best = null;
+    const near = (p, r, make) => {
+      const q = view3d.project(p);
+      if (!q) return;
+      const d = Math.hypot(q.x - at.pt.x, q.y - at.pt.y);
+      if (d <= r && (!best || d < best.d)) best = { d, make };
+    };
+    for (const t of house.targets) if (t.world && t.item) near(t.world, 28, () => lightThing(t));
+    for (const o of (house.top && house.top.objects) || []) {
+      if (o.kind === "box") continue;
+      const make = () => ({ name: o.name || (o.kind === "tv" ? "TV" : "Light bar"), key: objKey(o), entity: o.light || null, state: () => objState(o) });
+      if (o.kind === "bar") for (const p of barPoints(o, 9)) near(p, 24, make);
+      else near({ x: o.x, y: o.y, z: o.z + o.h / 2 }, 60, make);
+    }
+    if (best) return best.make();
+    const op = at.opening && ((house.massing && house.massing.openings) || []).find((q) => q.id === at.opening);
+    if (op && op.kind === "garage") return { name: "Garage door", door: op.id };
+    return null;
   }
 
   // ---- dimensions: each block's size, inside (as a tape reads in the room) or overall ----------
@@ -1454,7 +1568,9 @@
         tool("Icons", I.eye, { pressed: !ui.hideIcons, title: "Show or hide the lights' icons (their light still shows)", click: () => { ui.hideIcons = !ui.hideIcons; L.save("house.hideIcons", ui.hideIcons); paint(); } }),
         ui.sim ? el("div.seg", { role: "group", "aria-label": "Every light", style: { marginLeft: "4px" } },
           [[true, "All on"], [false, "All off"]].map(([v, label]) => el("button", { type: "button", title: v ? "Every placed light on, as each is set (warm white if not)" : "Every light off",
-            on: { click: () => { const next = { ...ui.simStates }; for (const t of house.targets) if (t.item) next[t.id] = { ...simOf(t.id), on: v }; ui.simStates = next; L.save("house.simStates", next); paint(); } } }, label))) : null),
+            on: { click: () => { const next = { ...ui.simStates }; for (const t of house.targets) if (t.item) next[t.id] = { ...simOf(t.id), on: v };
+              for (const o of (house.top && house.top.objects) || []) if (o.kind !== "box") next[objKey(o)] = { ...simOf(objKey(o)), on: v };
+              ui.simStates = next; L.save("house.simStates", next); paint(); } } }, label))) : null),
       grp(tool("Dimensions", I.dims, { pressed: !!ui.dims, title: "Show each block's size", click: () => { ui.dims = !ui.dims; L.save("house.dims", ui.dims); paint(); } }),
         ui.dims ? el("div.seg", { role: "radiogroup", "aria-label": "Dimensions measured", style: { marginLeft: "4px" } },
           [[true, "Inside"], [false, "Overall"]].map(([v, label]) => el("button", { type: "button", role: "radio", "aria-checked": String(!!ui.dimsInside === v),

@@ -21,7 +21,7 @@ SHEATHING_SIDING_M = 0.0111 + 0.019
 YARD_KINDS = ("path", "driveway", "patio", "pool", "bed", "lawn", "tree", "bush", "other")
 # Floor finishes the 3D view has a texture for
 FINISHES = ("hardwood", "vinyl", "carpet", "tile", "concrete")
-OBJECT_KINDS = ("tv", "box")
+OBJECT_KINDS = ("tv", "box", "bar")
 WALL_DEFAULT = {"studs": "2x4", "finish": "drywall"}
 
 
@@ -285,11 +285,13 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
                 "z1": z1,
                 "panes": int(_num(w.get("panes", 1), 1, 12)),
                 **({"kind": w["kind"]} if w.get("kind") in ("door", "garage") else {}),
+                # a door's glass: the top part of it, as a share of its height
+                **({"lite": round(_num(w["lite"], 0, 1), 3)} if w.get("kind") == "door" and w.get("lite") else {}),
             }
         )
     out["windows"] = windows
     # Things in the house drawn in 3D: a TV (its light, e.g. an Ambilight strip, glows round it on
-    # the wall when on) or a plain box. x, y is the middle of its footprint; z its bottom above the
+    # the wall when on), a light bar (a long LED fixture; it lights when its light is on) or a plain box. x, y is the middle of its footprint; z its bottom above the
     # ground; w across, h high, d deep; rot turns it from facing the street
     objects = []
     for o in _list(body.get("objects"), 100):

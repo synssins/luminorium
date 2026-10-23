@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0-dev.62
+
+- **Right-click menu in the 3D view:** right-click a light (its icon, or near where it's placed), a
+  TV or a light bar for On, Off, colour and brightness. Under **Simulate** it changes only what's
+  shown here; otherwise it's sent to the light. **Pick it** selects the light as a tap would.
+  Right-click a garage door to open or close it in the view.
+- **New:** `POST api/lights/{id}/set` turns a light (or every light in a fixture) on or off, with an
+  optional colour and brightness.
+- **Simulate lights every level up to the one shown,** not just that level, and **All on** turns on
+  TVs' and light bars' lights too. A TV's Ambilight follows Simulate.
+- **More lights at once:** glows close together are joined into one light, so every lit room gets
+  one; the brightest 8 cast shadows (4 on small screens) and 12 more (6) light without.
+- **Garage doors open:** drawn on their own, down in the opening or up under the ceiling.
+- **Doors with glass:** a door can have a glazed top part (`lite`, a share of its height).
+- **Light bars:** a new kind of thing in the house (`bar`): a long LED fixture that lights along
+  its length when its light is on.
+- **Openings sit on the right face:** a window or door goes on the face of the part of the house
+  its height falls in (the ground floor's set-back front), not the first part above it.
+
 ## 0.3.0-dev.61
 
 - **No walls inside other parts of the house:** a block's face that runs through another block (an

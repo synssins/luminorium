@@ -50,6 +50,17 @@ async def test_test_errors(client):
     assert (await client.post("/api/lights/light.nope/test")).status_code == 404
 
 
+async def test_set_a_light_from_the_house_map(client, fake_ha):
+    eid = "light.front_porch_light"
+    r = await client.post(f"/api/lights/{eid}/set", json={"on": True, "rgb": [255, 0, 0], "brightness": 128})
+    assert r.status_code == 200 and r.json() == {"set": [eid], "on": True}
+    await wait_for(lambda: fake_ha.calls_for(eid), timeout=5)
+    call = fake_ha.calls_for(eid)[-1]
+    assert call.service == "turn_on" and call.data["rgb_color"] == [255, 0, 0]
+    assert (await client.post(f"/api/lights/{eid}/set", json={"on": False})).status_code == 200
+    assert (await client.post("/api/lights/light.nope/set", json={"on": True})).status_code == 404
+
+
 async def test_stop_all_endpoint(client):
     assert (await client.post("/api/stop_all")).json() == {"restored": 0}
 

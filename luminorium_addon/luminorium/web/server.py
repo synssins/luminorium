@@ -46,6 +46,12 @@ class TestBody(BaseModel):
     hold_s: float | None = None
 
 
+class SetBody(BaseModel):
+    on: bool
+    rgb: list[int] | None = None
+    brightness: int | None = None
+
+
 class FixtureBody(BaseModel):
     name: str = ""
     members: list[str]
@@ -272,6 +278,31 @@ def create_app(lum: Luminorium, *, manage_lifecycle: bool = True) -> FastAPI:
         except LightTestError as err:
             raise HTTPException(409, str(err)) from err
         return {"started": entity_id}
+
+    @app.post("/api/lights/{entity_id}/set")
+    async def set_light(entity_id: str, body: SetBody):
+        """Turn a light (or a fixture's lights) on or off, with a colour and brightness: from the
+        house map's right-click menu. Not a test: it stays as set."""
+        if lum.settings.read_only:
+            raise HTTPException(409, "Luminorium is read-only: nothing is sent to lights")
+        fixture = lum.inventory.inventory.fixtures.get(entity_id)
+        if fixture:
+            ids = list(fixture.members)
+        elif lum.inventory.inventory.get(entity_id) is not None:
+            ids = [entity_id]
+        else:
+            raise HTTPException(404, f"unknown light {entity_id}")
+        domain = ids[0].split(".", 1)[0]
+        if domain not in ("light", "switch") or any(i.split(".", 1)[0] != domain for i in ids):
+            raise HTTPException(400, "only lights and switches")
+        data: dict = {}
+        if body.on and domain == "light":
+            if body.rgb is not None and len(body.rgb) == 3:
+                data["rgb_color"] = [max(0, min(255, int(c))) for c in body.rgb]
+            if body.brightness is not None:
+                data["brightness"] = max(1, min(255, int(body.brightness)))
+        await lum.ha.call_service(domain, "turn_on" if body.on else "turn_off", data or None, entity_ids=ids)
+        return {"set": ids, "on": body.on}
 
     @app.post("/api/fixtures")
     async def create_fixture(body: FixtureBody):

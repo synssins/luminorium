@@ -266,13 +266,24 @@ window.HouseGL = class HouseGL {
     }
 
     // windows and doors: glass (or a door) set in the wall with a white frame, outside and in
-    const win = (a, b, z0, z1, n, panes, kind) => {
+    this.garages = [];
+    const win = (a, b, z0, z1, n, panes, kind, id, lite) => {
       if (z0 >= cut - 0.05) return;
       z1 = Math.min(z1, cut);
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
       const fill = kind === "window" ? "glass" : kind === "garage" ? "garage" : "door";
-      // the glass (or the door) in the middle of the wall's thickness, a frame on each face
-      { const d = -th / 2, A = [a[0] + n[0] * d, a[1] + n[1] * d], C = [b[0] + n[0] * d, b[1] + n[1] * d]; B.wall(fill, A, C, z0, z1, [n[0], n[1], 0]); }
+      // the glass (or the door) in the middle of the wall's thickness, a frame on each face; a
+      // garage door is drawn on its own (it opens); a door with a lite has glass in its top part
+      const d = -th / 2, A = [a[0] + n[0] * d, a[1] + n[1] * d], C = [b[0] + n[0] * d, b[1] + n[1] * d];
+      if (kind === "garage") this.garages.push({ id, a: A, b: C, z0, z1, n, th });
+      else if (fill === "door" && lite > 0) {
+        const zl = z1 - (z1 - z0) * lite;
+        B.wall("door", A, C, z0, zl, [n[0], n[1], 0]); B.wall("glass", A, C, zl, z1, [n[0], n[1], 0]);
+        for (const dd of [0.012, -(th + 0.012)]) {
+          const off = dd + Math.sign(dd) * 0.012, at = (q) => [a[0] + ux * q + n[0] * off, a[1] + uy * q + n[1] * off];
+          box(at(0), at(L), 0.012, zl - 0.03, zl + 0.03, "frame");
+        }
+      } else B.wall(fill, A, C, z0, z1, [n[0], n[1], 0]);
       for (const d of [0.012, -(th + 0.012)]) {
         // the frame: four sides and the mullions, a little proud of the glass
         const fw = 0.05, off = d + Math.sign(d) * 0.012;
@@ -283,15 +294,15 @@ window.HouseGL = class HouseGL {
       }
     };
     for (const o of (s.massing && s.massing.openings) || []) {
-      const y = o.y !== undefined ? o.y : (blocks.find((b) => (o.x0 + o.x1) / 2 >= b.x0 && (o.x0 + o.x1) / 2 <= b.x1) || {}).y0 || 0;
-      win([o.x0, y], [o.x1, y], o.z0, o.z1, [0, -1], o.kind === "window" ? Math.max(1, Math.round((o.x1 - o.x0) / 1.1)) : 1, o.kind);
+      const y = o.y !== undefined ? o.y : window.openingFace(o, blocks);
+      win([o.x0, y], [o.x1, y], o.z0, o.z1, [0, -1], o.kind === "window" ? Math.max(1, Math.round((o.x1 - o.x0) / 1.1)) : 1, o.kind, o.id, o.lite || 0);
     }
     for (const w of t.windows || []) {
       const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) || 1;
       let n = [(w.b[1] - w.a[1]) / L, -(w.b[0] - w.a[0]) / L];
       const mx = (w.a[0] + w.b[0]) / 2, my = (w.a[1] + w.b[1]) / 2;
       if (n[0] * (mx - s.W / 2) + n[1] * (my - s.D / 2) < 0) n = [-n[0], -n[1]];
-      win(w.a, w.b, w.z0, w.z1, n, w.panes || 1, w.kind || "window");
+      win(w.a, w.b, w.z0, w.z1, n, w.panes || 1, w.kind || "window", w.id, w.lite || 0);
     }
 
     // sloped and odd surfaces: a stairwell's sloped ceiling, a crawl space's floor
@@ -321,7 +332,7 @@ window.HouseGL = class HouseGL {
       const g = new T.Group();
       g.position.set(o.x, o.y, o.z);
       g.rotation.z = (o.rot || 0) * Math.PI / 180;
-      const bodyMat = o.kind === "tv" ? this.mat("tvbody") : this.mat("plaster");
+      const bodyMat = o.kind === "tv" ? this.mat("tvbody") : o.kind === "bar" ? this.mat("frame") : this.mat("plaster");
       const body = new T.Mesh(new T.BoxGeometry(o.w, o.d, o.h), bodyMat);
       body.position.set(0, 0, o.h / 2);
       g.add(body);
@@ -364,29 +375,63 @@ window.HouseGL = class HouseGL {
   // them. A fixed set of lights, only changed when the lights do (a different number of lights
   // makes the GPU rebuild its shaders: slow, and too much for a tablet every frame)
   lights(glows) {
-    const T = THREE, N = this.small ? 4 : 8;
+    // The nearest-together glows are joined into one light (a strip, a room's cans), so every room
+    // lit gets one. The brightest cast shadows (walls stop their light); the rest light their room
+    // without them, over a shorter reach
+    const T = THREE, NS = this.small ? 4 : 8, NP = this.small ? 6 : 12;
     if (!this.pool) {
-      // each casts shadows, so walls stop its light (no light coming through a wall)
       const ms = this.small ? 256 : 512;
-      this.pool = Array.from({ length: N }, () => {
-        const l = new T.PointLight(0xffffff, 0, 7, 2);
-        l.castShadow = true; l.shadow.mapSize.set(ms, ms); l.shadow.bias = -0.002; l.shadow.camera.near = 0.05; l.shadow.camera.far = 8;
+      this.pool = Array.from({ length: NS + NP }, (_, i) => {
+        const l = new T.PointLight(0xffffff, 0, i < NS ? 7 : 4.5, 2);
+        l.castShadow = i < NS;
+        if (i < NS) { l.shadow.mapSize.set(ms, ms); l.shadow.bias = -0.002; l.shadow.camera.near = 0.05; l.shadow.camera.far = 8; }
         this.lamps.add(l); return l;
       });
     }
-    const on = [...(glows || [])].sort((a, b) => (b.level || 0) - (a.level || 0)).slice(0, N);
-    const key = JSON.stringify(on.map((g) => [g.x, g.y, g.z, g.floorZ, g.color, g.level]));
+    const groups = [];
+    for (const g of [...(glows || [])].sort((a, b) => (b.level || 0) - (a.level || 0))) {
+      const z = g.z ?? g.floorZ + 2.1;
+      const near = groups.find((q) => q.floorZ === g.floorZ && Math.hypot(q.x - g.x, q.y - g.y) < 1.6);
+      if (near) {
+        const w = near.w + (g.level || 0.5);
+        near.x = (near.x * near.w + g.x * (g.level || 0.5)) / w; near.y = (near.y * near.w + g.y * (g.level || 0.5)) / w;
+        near.w = w; near.level = Math.min(1.2, near.level + (g.level || 0.5) * 0.35);
+      } else groups.push({ x: g.x, y: g.y, z, floorZ: g.floorZ, color: g.color, level: g.level || 0.5, w: g.level || 0.5 });
+    }
+    const on = groups.slice(0, NS + NP);
+    const key = JSON.stringify(on.map((g) => [g.x, g.y, g.z, g.color, g.level]));
     if (key === this.lightKey) return;
     this.lightKey = key;
     this.shadowsDirty = true;
     this.pool.forEach((l, i) => {
       const g = on[i];
-      if (!g) { l.intensity = 0; l.castShadow = false; return; }
-      l.castShadow = true;
+      if (!g) { l.intensity = 0; return; }
       l.color.set(g.color);
-      l.intensity = (6 + 26 * (g.level || 0.5)) * (this.nightBoost || 1);
-      l.position.set(g.x, g.y, g.z ?? g.floorZ + 2.1);
+      l.intensity = (6 + 26 * Math.min(1, g.level)) * (i < NS ? 1 : 0.7) * (this.nightBoost || 1);
+      l.position.set(g.x, g.y, g.z);
     });
+  }
+
+  // Garage doors: down in the opening, or (open) up under the ceiling, run back into the garage
+  doors(s) {
+    const T = THREE, open = new Set(s.open || []);
+    const key = JSON.stringify([(this.garages || []).map((g) => [g.id, g.a, g.b, g.z0, g.z1]), [...open]]);
+    if (key === this.doorKey) return;
+    this.doorKey = key;
+    this.shadowsDirty = true;
+    if (!this.doorGroup) { this.doorGroup = new T.Group(); this.scene.add(this.doorGroup); }
+    for (const c of [...this.doorGroup.children]) { c.geometry && c.geometry.dispose(); this.doorGroup.remove(c); }
+    for (const g of this.garages || []) {
+      const L = Math.hypot(g.b[0] - g.a[0], g.b[1] - g.a[1]), H = g.z1 - g.z0;
+      const mx = (g.a[0] + g.b[0]) / 2, my = (g.a[1] + g.b[1]) / 2, ang = Math.atan2(g.b[1] - g.a[1], g.b[0] - g.a[0]);
+      const up = open.has(g.id);
+      const m = new T.Mesh(up ? new T.BoxGeometry(L, H, 0.04) : new T.BoxGeometry(L, 0.04, H), this.mat("garage"));
+      m.rotation.z = ang;
+      if (up) m.position.set(mx - g.n[0] * (g.th / 2 + H / 2), my - g.n[1] * (g.th / 2 + H / 2), g.z1 - 0.04);
+      else m.position.set(mx, my, g.z0 + H / 2);
+      m.castShadow = m.receiveShadow = true;
+      this.doorGroup.add(m);
+    }
   }
 
   // A TV's light (an Ambilight strip behind it) when it's on: a glow of its colour on the wall
@@ -472,6 +517,7 @@ window.HouseGL = class HouseGL {
     this.setSky(s.sky === "night" ? "night" : "day");
     this.lights(s.glows);
     this.ambilight(s);
+    this.doors(s);
     this.scene.background = new THREE.Color(this.sky === "night" ? "#070b14" : "#b9d1e8");
     const camera = this.camera;
     camera.fov = (2 * Math.atan(H / 2 / cam.focal) * 180) / Math.PI;

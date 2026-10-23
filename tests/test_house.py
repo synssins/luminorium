@@ -595,6 +595,10 @@ async def test_top_view_walls_yard_and_plans(client, lum):
     win = {"id": "w1", "a": [15, 2], "b": [15, 3.1], "z0": 1.4, "z1": 3.2, "panes": 2}
     top = (await client.put("/api/house/site", json={**body, "windows": [win]})).json()["top"]
     assert top["windows"] == [win]
+    # a door with glass in its top part
+    door = {**win, "id": "bd", "kind": "door", "panes": 1, "lite": 0.45}
+    top = (await client.put("/api/house/site", json={**body, "windows": [door]})).json()["top"]
+    assert top["windows"] == [door]
     for broken in ({**win, "b": [15, 2.05]}, {**win, "z1": 1.45}):
         bad = {**body, "windows": [broken]}
         assert (await client.put("/api/house/site", json=bad)).status_code == 400
@@ -626,9 +630,11 @@ async def test_top_view_walls_yard_and_plans(client, lum):
         "thick": 0.02,
     }
     crawl = {"id": "cr", "wall": "w", "at": 6, "width": 0.5, "top": 1.2, "sill": 0.6}
-    extra = {"objects": [tv], "planes": [slope], "doors": [*body["doors"], crawl]}
+    bar = {**tv, "id": "bar", "kind": "bar", "name": "Light bar", "w": 0.06, "h": 0.03, "d": 4.88}
+    del bar["light"]
+    extra = {"objects": [tv, bar], "planes": [slope], "doors": [*body["doors"], crawl]}
     top = (await client.put("/api/house/site", json={**body, **extra})).json()["top"]
-    assert top["objects"] == [tv] and top["planes"] == [slope]
+    assert top["objects"] == [tv, bar] and top["planes"] == [slope]
     assert next(d for d in top["doors"] if d["id"] == "cr")["sill"] == 0.6
     for broken in (
         {"objects": [{**tv, "kind": "sofa"}]},

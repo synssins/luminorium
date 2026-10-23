@@ -134,6 +134,13 @@ Starts the Test sequence. Optional body `{"transition_ms": 3000, "effect": "cand
 0–30 s). `{"started": entity_id}`; `409` if read-only, excluded, unavailable, part of a fixture
 (test the fixture), already testing, in use, or the options are out of range; `404` if unknown.
 
+## `POST /api/lights/{entity_id}/set`
+
+Turns a light on or off from the house map's right-click menu. Body `{"on": true, "rgb": [255, 0,
+0], "brightness": 128}` (`rgb` and `brightness`, 0–255, optional and only with `on`). A fixture's id
+sets every member. `{"set": [entity_id, …], "on": bool}`; `409` if read-only; `404` if unknown;
+`400` for anything but a light or a switch.
+
 ## Fixtures
 
 | Request | Body | Result |
