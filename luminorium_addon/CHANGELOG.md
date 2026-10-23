@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.54
+
+- **Walls are solids:** the solid view draws only the faces of walls and steps that are turned
+  toward you, so turning the view no longer shows into a wall or its back faces, and faces are
+  edged in their own colour, so no thin seams show between them.
+
 ## 0.3.0-dev.53
 
 - **Stairwell walls:** a wall can run through more than its level (`z0`, `z1` on a Top view wall):

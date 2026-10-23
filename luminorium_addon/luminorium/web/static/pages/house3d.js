@@ -653,6 +653,7 @@ window.House3D = class House3D {
     };
     // an upright face from z0 to z1, in two where it goes into the ground: warm beige, lit by
     // which way it faces (n points out of the block)
+    const sees = (n, at) => n[0] * (cam.pos.x - at[0]) + n[1] * (cam.pos.y - at[1]) + n[2] * (cam.pos.z - at[2]) > 0;
     const wallFace = (a, b, z0, z1, meta) => {
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, n = [(b[1] - a[1]) / L, -(b[0] - a[0]) / L, 0];
       const parts = z0 < 0 && z1 > 0 ? [[z0, 0], [0, z1]] : [[z0, z1]];
@@ -663,22 +664,24 @@ window.House3D = class House3D {
         const outside = meta.rank === 4 && lo >= -0.001;
         const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
         const lit = 0.62 + 0.4 * Math.max(0, n[0] * SUN[0] + n[1] * SUN[1]);
-        items.push({ depth: avgDepth(q), below: hi <= 0.001, ...meta, draw: () => {
-          this.poly(q, fill, 0.97, edge, 0.35);
+        // a solid wall: only the faces turned toward the camera are drawn (no looking into it),
+        // edged in their own colour (no seams)
+        const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+        if (sees(n, [mx, my, (lo + hi) / 2])) items.push({ depth: avgDepth(q), below: hi <= 0.001, ...meta, draw: () => {
+          this.poly(q, fill, 1, fill, 1);
           if (outside && q.every(Boolean)) {
             this.texture("siding", (s, t) => ({ x: a[0] + ux * s, y: a[1] + uy * s, z: hi - t }), L, hi - lo, [q], { color: "#000", alpha: Math.max(0, 1 - lit) * 0.8 });
-            this.poly(q, fill, 0, edge, 0.35);
+            this.poly(q, fill, 0, edge, 0.25);
           }
         } });
-        // the wall's thickness: its inside face (plaster, where the interior walls meet it) and
-        // its cut top, so it's a solid wall, not a shell
+        // its thickness: the inside face (plaster, where the interior walls meet it) and its cut top
         const th = (this.scene.top && this.scene.top.ext_thick) || 0.13;
         const ia = [a[0] - n[0] * th, a[1] - n[1] * th], ib = [b[0] - n[0] * th, b[1] - n[1] * th];
         const qi = [[ia[0], ia[1], lo], [ib[0], ib[1], lo], [ib[0], ib[1], hi], [ia[0], ia[1], hi]].map(([x, y, z]) => P(x, y, z));
         const qt = [[a[0], a[1], hi], [b[0], b[1], hi], [ib[0], ib[1], hi], [ia[0], ia[1], hi]].map(([x, y, z]) => P(x, y, z));
         const inFill = shade(BEIGE, [-n[0], -n[1], 0]), topFill = shade(BEIGE, [0, 0, 1], 0.95);
-        items.push({ depth: avgDepth(qi), below: hi <= 0.001, ...meta, draw: () => this.poly(qi, inFill, 1, inFill, 1) });
-        items.push({ depth: avgDepth(qt) - 0.01, below: hi <= 0.001, ...meta, draw: () => this.poly(qt, topFill, 1, edge, 0.4) });
+        if (sees([-n[0], -n[1], 0], [mx - n[0] * th, my - n[1] * th, (lo + hi) / 2])) items.push({ depth: avgDepth(qi), below: hi <= 0.001, ...meta, draw: () => this.poly(qi, inFill, 1, inFill, 1) });
+        if (sees([0, 0, 1], [mx, my, hi])) items.push({ depth: avgDepth(qt) - 0.01, below: hi <= 0.001, ...meta, draw: () => this.poly(qt, topFill, 1, topFill, 1) });
       }
     };
     // A block that goes into the ground (a basement) leaves a hole in the grid where it goes in
@@ -902,9 +905,14 @@ window.House3D = class House3D {
       const push = (pts, n, top = false) => {
         const q = pts.map(([x, y, z]) => P(x, y, z));
         if (!q.every(Boolean)) return;
+        // solid steps: only the faces turned toward the camera
+        if (solid) {
+          const c = pts.reduce((m, p) => [m[0] + p[0] / pts.length, m[1] + p[1] / pts.length, m[2] + p[2] / pts.length], [0, 0, 0]), cam = this.cam;
+          if (n[0] * (cam.pos.x - c[0]) + n[1] * (cam.pos.y - c[1]) + n[2] * (cam.pos.z - c[2]) <= 0) return;
+        }
         const fill = shade(tone, n, top ? 1.08 : 1);
         items.push({ depth: avgDepth(q), room, rank: 3, draw: () => (solid
-          ? this.poly(q, fill, 0.98, shade(tone, n, 0.7), 0.6)
+          ? this.poly(q, fill, 1, shade(tone, n, 0.82), 0.5)
           : this.poly(q, picked ? "#ff8a3d" : "#f0b429", top ? 0.22 : 0.1, picked ? "#ff8a3d" : "#f0b429", 0.8)) });
       };
       const at = (s, c, z) => (fl.along === "x" ? [s, c, z] : [c, s, z]);
@@ -948,6 +956,10 @@ window.House3D = class House3D {
         // another wall), only its cut top and a header's underside
         for (const fc of boxFaces(pc, (w.thick || 0.12) / 2)) {
           if (fc.end) continue;
+          // only the faces turned toward the camera: a solid, not a skin to see into
+          const c = fc.pts.reduce((m, p) => [m[0] + p[0] / 4, m[1] + p[1] / 4, m[2] + p[2] / 4], [0, 0, 0]);
+          const cam = this.cam;
+          if (fc.n[0] * (cam.pos.x - c[0]) + fc.n[1] * (cam.pos.y - c[1]) + fc.n[2] * (cam.pos.z - c[2]) <= 0) continue;
           const q = fc.pts.map(([x, y, z]) => P(x, y, z));
           if (!q.every(Boolean)) continue;
           const fill = shade(BEIGE, fc.n);
