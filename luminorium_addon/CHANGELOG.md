@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-dev.55
+
+- **Walls have their ends again:** each wall is drawn as a closed solid (sides, ends, cut top),
+  only the faces turned toward you, so a wall seen end-on isn't two thin skins.
+- **Siding only outdoors:** a block's face that's against another part of the house is plaster;
+  only the stretches out in the open (the sides of the front door's recess, say) get siding.
+- **Front steps are solid:** stairs get a back face down to the ground, so the stoop isn't hollow.
+
 ## 0.3.0-dev.54
 
 - **Walls are solids:** the solid view draws only the faces of walls and steps that are turned

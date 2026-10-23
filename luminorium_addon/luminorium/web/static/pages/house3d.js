@@ -654,7 +654,36 @@ window.House3D = class House3D {
     // an upright face from z0 to z1, in two where it goes into the ground: warm beige, lit by
     // which way it faces (n points out of the block)
     const sees = (n, at) => n[0] * (cam.pos.x - at[0]) + n[1] * (cam.pos.y - at[1]) + n[2] * (cam.pos.z - at[2]) > 0;
-    const wallFace = (a, b, z0, z1, meta) => {
+    // Where a block's face is against another block (a wall inside the house, not out to the
+    // weather): stretches along it, [s0, s1] from a
+    const blocksAll = this.scene.massing.blocks;
+    const covered = (blk, a, b, lo, hi) => {
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+      const alongX = Math.abs(uy) < 1e-6, out = [];
+      for (const o of blocksAll) {
+        if (o === blk || o.z0 >= hi - 0.05 || o.z1 <= lo + 0.05) continue;
+        const oy0 = o.y0 || 0, oy1 = oy0 + o.depth;
+        if (alongX) {
+          if (Math.abs(oy0 - a[1]) > 0.03 && Math.abs(oy1 - a[1]) > 0.03) continue;
+          const s0 = (o.x0 - a[0]) * ux, s1 = (o.x1 - a[0]) * ux;
+          out.push([Math.max(0, Math.min(s0, s1)), Math.min(L, Math.max(s0, s1))]);
+        } else {
+          if (Math.abs(o.x0 - a[0]) > 0.03 && Math.abs(o.x1 - a[0]) > 0.03) continue;
+          const s0 = (oy0 - a[1]) * uy, s1 = (oy1 - a[1]) * uy;
+          out.push([Math.max(0, Math.min(s0, s1)), Math.min(L, Math.max(s0, s1))]);
+        }
+      }
+      // what's left out in the open
+      const open = [];
+      let s = 0;
+      for (const [c0, c1] of out.filter(([c0, c1]) => c1 - c0 > 0.02).sort((p, q) => p[0] - q[0])) {
+        if (c0 > s + 0.02) open.push([s, c0]);
+        s = Math.max(s, c1);
+      }
+      if (L > s + 0.02) open.push([s, L]);
+      return open;
+    };
+    const wallFace = (a, b, z0, z1, meta, blk) => {
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, n = [(b[1] - a[1]) / L, -(b[0] - a[0]) / L, 0];
       const parts = z0 < 0 && z1 > 0 ? [[z0, 0], [0, z1]] : [[z0, z1]];
       for (const [lo, hi] of parts) {
@@ -670,8 +699,14 @@ window.House3D = class House3D {
         if (sees(n, [mx, my, (lo + hi) / 2])) items.push({ depth: avgDepth(q), below: hi <= 0.001, ...meta, draw: () => {
           this.poly(q, fill, 1, fill, 1);
           if (outside && q.every(Boolean)) {
-            this.texture("siding", (s, t) => ({ x: a[0] + ux * s, y: a[1] + uy * s, z: hi - t }), L, hi - lo, [q], { color: "#000", alpha: Math.max(0, 1 - lit) * 0.8 });
-            this.poly(q, fill, 0, edge, 0.25);
+            // siding only where the face is out in the open (not against another part of the house)
+            for (const [s0, s1] of blk ? covered(blk, a, b, lo, hi) : [[0, L]]) {
+              const at = (s, z) => P(a[0] + ux * s, a[1] + uy * s, z);
+              const part = [at(s0, lo), at(s1, lo), at(s1, hi), at(s0, hi)];
+              if (!part.every(Boolean)) continue;
+              this.texture("siding", (s, t) => ({ x: a[0] + ux * (s0 + s), y: a[1] + uy * (s0 + s), z: hi - t }), s1 - s0, hi - lo, [part], { color: "#000", alpha: Math.max(0, 1 - lit) * 0.8 });
+              this.poly(part, fill, 0, edge, 0.25);
+            }
           }
         } });
         // its thickness: the inside face (plaster, where the interior walls meet it) and its cut top
@@ -716,10 +751,10 @@ window.House3D = class House3D {
       if (solid) {
         // walls cut off at the level shown, like a dollhouse with the floors above lifted off
         const top = Math.min(z1, cut);
-        if (!inner.y0) wallFace([x0, y0], [x1, y0], z0, top, W.y0);
-        if (!inner.y1) wallFace([x1, y1], [x0, y1], z0, top, W.y1);
-        if (!inner.x0) wallFace([x0, y1], [x0, y0], z0, top, W.x0);
-        if (!inner.x1) wallFace([x1, y0], [x1, y1], z0, top, W.x1);
+        if (!inner.y0) wallFace([x0, y0], [x1, y0], z0, top, W.y0, b);
+        if (!inner.y1) wallFace([x1, y1], [x0, y1], z0, top, W.y1, b);
+        if (!inner.x0) wallFace([x0, y1], [x0, y0], z0, top, W.x0, b);
+        if (!inner.x1) wallFace([x1, y0], [x1, y1], z0, top, W.x1, b);
         // its floor, open where stairs come up through it
         const fh = this.holed(P, { x0, x1, y0, y1 }, z0 + 0.005, this.stairHoles(z0));
         const ffill = shade(FLOOR, [0, 0, 1]), fedge = shade(FLOOR, [0, 0, 1], 0.7);
@@ -930,6 +965,9 @@ window.House3D = class House3D {
         const last = profile[profile.length - 1], first = profile[0];
         const side = [...profile, [last[0], base], [first[0], base]];
         for (const c of [c0, c1]) push(side.map(([s, z]) => at(s, c, z)), fl.along === "x" ? [0, c === c0 ? -1 : 1, 0] : [c === c0 ? -1 : 1, 0, 0]);
+        // and the back, at the top end, down to the bottom: a solid flight, not a shell
+        const e = last[0], ztop = last[1];
+        if (ztop - base > 0.02) push([at(e, c0, base), at(e, c1, base), at(e, c1, ztop), at(e, c0, ztop)], fl.along === "x" ? [fl.up, 0, 0] : [0, fl.up, 0]);
       }
     }
     // interior walls: from each level's floor to its ceiling, open where a doorway is (the wall
@@ -952,10 +990,8 @@ window.House3D = class House3D {
           items.push({ depth: avgDepth(q), room, rank: 3, draw: () => this.poly(q, BEIGE_HEX, active ? 0.16 : 0.06, BEIGE_HEX, active ? 0.65 : 0.22) });
           continue;
         }
-        // one plaster surface: no outlines between pieces, and no end faces (a wall's end meets
-        // another wall), only its cut top and a header's underside
+        // a solid: its sides, ends, cut top and a header's underside, each edged in its own colour
         for (const fc of boxFaces(pc, (w.thick || 0.12) / 2)) {
-          if (fc.end) continue;
           // only the faces turned toward the camera: a solid, not a skin to see into
           const c = fc.pts.reduce((m, p) => [m[0] + p[0] / 4, m[1] + p[1] / 4, m[2] + p[2] / 4], [0, 0, 0]);
           const cam = this.cam;
