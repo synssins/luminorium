@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0-dev.65
+
+- **No light over cut-off walls:** where the view is cut (the level shown), a light is kept under
+  the cut, so it no longer shines out over the tops of the cut walls.
+
 ## 0.3.0-dev.64
 
 - **Right-click any fixture of a light:** each bulb or fixture of a light on one switch (or a

@@ -379,7 +379,7 @@ window.HouseGL = class HouseGL {
   // the house's lights that are on: a light of their colour at each, lighting the walls round
   // them. A fixed set of lights, only changed when the lights do (a different number of lights
   // makes the GPU rebuild its shaders: slow, and too much for a tablet every frame)
-  lights(glows) {
+  lights(glows, cut = null) {
     // The nearest-together glows are joined into one light (a strip, a room's cans), so every room
     // lit gets one. The brightest cast shadows (walls stop their light); the rest light their room
     // without them, over a shorter reach
@@ -404,7 +404,7 @@ window.HouseGL = class HouseGL {
       } else groups.push({ x: g.x, y: g.y, z, floorZ: g.floorZ, color: g.color, level: g.level || 0.5, w: g.level || 0.5 });
     }
     const on = groups.slice(0, NS + NP);
-    const key = JSON.stringify(on.map((g) => [g.x, g.y, g.z, g.color, g.level]));
+    const key = JSON.stringify([cut, on.map((g) => [g.x, g.y, g.z, g.color, g.level])]);
     if (key === this.lightKey) return;
     this.lightKey = key;
     this.shadowsDirty = true;
@@ -413,7 +413,10 @@ window.HouseGL = class HouseGL {
       if (!g) { l.intensity = 0; return; }
       l.color.set(g.color);
       l.intensity = (6 + 26 * Math.min(1, g.level)) * (i < NS ? 1 : 0.7) * (this.nightBoost || 1);
-      l.position.set(g.x, g.y, this.underCeiling(g));
+      // under the ceiling over it, and under the cut (the walls stop there: a light above them
+      // would shine out over them)
+      const z = this.underCeiling(g);
+      l.position.set(g.x, g.y, cut != null ? Math.min(z, Math.max((g.floorZ ?? z) + 0.2, cut - 0.15)) : z);
     });
   }
 
@@ -532,7 +535,7 @@ window.HouseGL = class HouseGL {
     this.renderer.setSize(W, H, false);
     this.build(s, redraw);
     this.setSky(s.sky === "night" ? "night" : "day");
-    this.lights(s.glows);
+    this.lights(s.glows, s.cutZ ?? null);
     this.ambilight(s);
     this.doors(s);
     this.scene.background = new THREE.Color(this.sky === "night" ? "#070b14" : "#b9d1e8");
