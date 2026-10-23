@@ -121,6 +121,14 @@
       dims: ui.dims ? blockDims() : [],
       solid: !!ui.solid,
       glows: ui.solid ? glows() : [],
+      // a TV's own light (its Ambilight): on or off, its colour and brightness, for the glow round it
+      ambi: ui.solid ? ((house.top && house.top.objects) || []).filter((o) => o.light).map((o) => {
+        const inv = ((inventory && inventory.lights) || []).find((l) => l.entity_id === o.light) || {};
+        const look = looks.get(o.light) || inv.look || {};
+        const color = look.rgb_color ? `#${look.rgb_color.map((v) => v.toString(16).padStart(2, "0")).join("")}`
+          : look.color_temp_kelvin ? L.colorHex({ kelvin: look.color_temp_kelvin }) : "#8fb4ff";
+        return { id: o.id, on: inv.state === "on", color, level: look.brightness != null ? look.brightness / 255 : 0.8 };
+      }) : [],
       yardPicks: ui.mode3d === "shape" ? ui.yardPicks || [] : [],
       floors: house.floors.map((f) => ({ ...f, active: f.id === ui.floor, label: L.fmtLen(f.elevation, { signed: true }) })),
       lights, grid: L.units() === "imperial" ? L.FT : 1,

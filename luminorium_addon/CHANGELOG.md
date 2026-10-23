@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0-dev.58
+
+- **WebGL stays on:** the check for WebGL ran every frame and each run took one of the browser's
+  few WebGL contexts, so after some turning the browser dropped the view's own context (the
+  tablet fell back to 2D). It's checked once now. When the solid view does draw in 2D, it says why
+  at the top left.
+- **Things in the house** (`site.objects`): a TV (a black panel with a glossy screen) or a plain
+  box, placed by its middle, bottom, size and turn. A TV can name its light (an Ambilight strip):
+  when that light is on, the wall round the TV glows in its colour and a few lights behind its
+  edges wash the wall and the room.
+- **Sloped surfaces** (`site.planes`): any flat polygon in 3D, such as a stairwell's sloped ceiling or
+  a storage floor.
+- **Openings partway up a wall** (a doorway's `sill`): a crawl-through.
+
 ## 0.3.0-dev.57
 
 - **The WebGL view on tablets:** the house's lights are a fixed set that only changes when the

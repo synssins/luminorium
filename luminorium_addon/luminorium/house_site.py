@@ -21,6 +21,7 @@ SHEATHING_SIDING_M = 0.0111 + 0.019
 YARD_KINDS = ("path", "driveway", "patio", "pool", "bed", "lawn", "tree", "bush", "other")
 # Floor finishes the 3D view has a texture for
 FINISHES = ("hardwood", "vinyl", "carpet", "tile", "concrete")
+OBJECT_KINDS = ("tv", "box")
 WALL_DEFAULT = {"studs": "2x4", "finish": "drywall"}
 
 
@@ -185,6 +186,9 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
         # few steps can top out lower, at the next level's ceiling); none: a door's 80"
         if d.get("top") not in (None, ""):
             door["top"] = _num(d["top"], 0.5, 10)
+        # an opening that starts above the wall's bottom (a crawl-through, a pass-through): its sill
+        if d.get("sill") not in (None, ""):
+            door["sill"] = _num(d["sill"], 0, 40)
         doors.append(door)
     out["doors"] = doors
     rooms = []
@@ -283,6 +287,51 @@ def clean_site(body: dict, photo: dict | None, floors: set[str], areas: set[str]
             }
         )
     out["windows"] = windows
+    # Things in the house drawn in 3D: a TV (its light, e.g. an Ambilight strip, glows round it on
+    # the wall when on) or a plain box. x, y is the middle of its footprint; z its bottom above the
+    # ground; w across, h high, d deep; rot turns it from facing the street
+    objects = []
+    for o in _list(body.get("objects"), 100):
+        kind = o.get("kind") or "box"
+        if kind not in OBJECT_KINDS:
+            raise SiteError(f"unknown object {kind}")
+        obj: dict[str, Any] = {
+            "id": _id(o.get("id")),
+            "kind": kind,
+            "name": _id(o.get("name"), 60),
+            "x": _num(o.get("x")),
+            "y": _num(o.get("y")),
+            "z": _num(o.get("z", 0), -20, 40),
+            "w": _num(o.get("w"), 0.01, 20),
+            "h": _num(o.get("h"), 0.01, 20),
+            "d": _num(o.get("d", 0.05), 0.005, 20),
+            "rot": _num(o.get("rot", 0), -360, 360),
+        }
+        if o.get("light"):
+            obj["light"] = _id(o["light"], 120)
+        objects.append(obj)
+    out["objects"] = objects
+    # Flat surfaces at any slope (a stairwell's sloped ceiling, a crawl space's floor): corners in
+    # house metres, x, y and z
+    planes = []
+    for p in _list(body.get("planes"), 100):
+        pts = p.get("pts")
+        if not isinstance(pts, list) or not 3 <= len(pts) <= 12:
+            raise SiteError("a plane has 3 to 12 corners")
+        corners = []
+        for q in pts:
+            if not isinstance(q, list | tuple) or len(q) != 3:
+                raise SiteError("a plane's corner is [x, y, z]")
+            corners.append([_num(q[0]), _num(q[1]), _num(q[2], -20, 40)])
+        planes.append(
+            {
+                "id": _id(p.get("id")),
+                "name": _id(p.get("name"), 60),
+                "pts": corners,
+                "thick": _num(p.get("thick", 0.02), 0, 1),
+            }
+        )
+    out["planes"] = planes
     return out
 
 

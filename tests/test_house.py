@@ -605,6 +605,36 @@ async def test_top_view_walls_yard_and_plans(client, lum):
     assert (sw["z0"], sw["z1"]) == (-1.0, 5.2)
     bad = {**body, "walls": [{**well, "z1": -0.95}]}
     assert (await client.put("/api/house/site", json=bad)).status_code == 400
+    # a TV with its Ambilight, a sloped ceiling, and a crawl-through partway up a wall
+    tv = {
+        "id": "tv",
+        "kind": "tv",
+        "name": "TV",
+        "x": 5,
+        "y": 4,
+        "z": 2,
+        "w": 1.5,
+        "h": 0.9,
+        "d": 0.04,
+        "rot": 0,
+        "light": "light.tv_ambilight",
+    }
+    slope = {
+        "id": "p",
+        "name": "Stair ceiling",
+        "pts": [[1, 1, 2], [3, 1, 3.5], [3, 2, 3.5]],
+        "thick": 0.02,
+    }
+    crawl = {"id": "cr", "wall": "w", "at": 6, "width": 0.5, "top": 1.2, "sill": 0.6}
+    extra = {"objects": [tv], "planes": [slope], "doors": [*body["doors"], crawl]}
+    top = (await client.put("/api/house/site", json={**body, **extra})).json()["top"]
+    assert top["objects"] == [tv] and top["planes"] == [slope]
+    assert next(d for d in top["doors"] if d["id"] == "cr")["sill"] == 0.6
+    for broken in (
+        {"objects": [{**tv, "kind": "sofa"}]},
+        {"planes": [{**slope, "pts": slope["pts"][:2]}]},
+    ):
+        assert (await client.put("/api/house/site", json={**body, **broken})).status_code == 400
     # the walls are the eaves' depth (24") inside the roof outline
     assert top["plan"][0] == pytest.approx([0.6096, 0], abs=1e-3)
     assert top["plan"][2] == pytest.approx([14.3904, 9.1808], abs=1e-3)

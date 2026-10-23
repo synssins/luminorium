@@ -7,9 +7,19 @@
 "use strict";
 
 window.HouseGL = class HouseGL {
+  // Whether WebGL can be used, checked once (a test context each call would use up the
+  // browser's handful of WebGL contexts, and it drops the oldest, ours)
   static ok() {
+    if (HouseGL._ok !== undefined) return HouseGL._ok;
     if (!window.THREE) return false;
-    try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; }
+    try {
+      const c = document.createElement("canvas");
+      const gl = c.getContext("webgl2") || c.getContext("webgl");
+      if (gl) { const ext = gl.getExtension("WEBGL_lose_context"); if (ext) ext.loseContext(); HouseGL._ok = true; return true; }
+      HouseGL.why = "This browser won't give the page WebGL (hardware acceleration off?): drawing in 2D";
+    } catch (err) { HouseGL.why = `WebGL check failed: ${err.message}`; }
+    HouseGL._ok = false;
+    return false;
   }
 
   constructor(host) {
@@ -26,7 +36,7 @@ window.HouseGL = class HouseGL {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = this.small ? T.PCFShadowMap : T.PCFSoftShadowMap;
     // if the GPU drops the context (out of memory on a tablet), go back to the 2D drawing
-    this.canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); this.lost = true; HouseGL.ok = () => false; this.hide(); if (this.onLost) this.onLost(); });
+    this.canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); this.lost = true; HouseGL.why = "WebGL: the graphics chip dropped the view (out of memory?): drawing in 2D"; HouseGL._ok = false; this.hide(); if (this.onLost) this.onLost(); });
     this.scene = new T.Scene();
     this.camera = new T.PerspectiveCamera(40, 1, 0.05, 600);
     this.camera.up.set(0, 0, 1);
@@ -87,6 +97,8 @@ window.HouseGL = class HouseGL {
       garage: () => std({ color: 0xf0eee8, roughness: 0.7 }),
       trunk: () => std({ color: 0x6b4c30, roughness: 1 }),
       leaves: () => std({ color: 0x2f6b34, roughness: 1 }),
+      tvbody: () => std({ color: 0x141518, roughness: 0.5, metalness: 0.3 }),
+      screen: () => std({ color: 0x07090c, roughness: 0.12, metalness: 0.6 }),
     };
     this.mats[key] = (make[key] || make.other)();
     return this.mats[key];
@@ -212,6 +224,12 @@ window.HouseGL = class HouseGL {
       win(w.a, w.b, w.z0, w.z1, n, w.panes || 1, "window");
     }
 
+    // sloped and odd surfaces: a stairwell's sloped ceiling, a crawl space's floor
+    for (const pl of t.planes || []) {
+      if (Math.min(...pl.pts.map((p) => p[2])) >= cut - 0.05) continue;
+      B.plane3("plaster", pl.pts.map((p) => [p[0], p[1], Math.min(p[2], cut)]));
+    }
+
     // the ground: the lawn, with a hole where a block goes into it; the yard on it
     const gx0 = -8, gx1 = s.W + 8, gy0 = -14, gy1 = s.D + 6;
     const pits = blocks.filter((b) => b.z0 < -0.01).map((b) => ({ x0: b.x0, x1: b.x1, y0: b.y0 || 0, y1: (b.y0 || 0) + b.depth }));
@@ -223,6 +241,25 @@ window.HouseGL = class HouseGL {
     }
     const meshes = B.meshes((k) => this.mat(k, redraw));
     for (const m of meshes) { m.castShadow = true; m.receiveShadow = true; this.house.add(m); }
+    // things in the house: a TV (a thin black panel, its screen glossy), a plain box
+    for (const o of t.objects || []) {
+      if (o.z >= cut - 0.05) continue;
+      const g = new T.Group();
+      g.position.set(o.x, o.y, o.z);
+      g.rotation.z = (o.rot || 0) * Math.PI / 180;
+      const bodyMat = o.kind === "tv" ? this.mat("tvbody") : this.mat("plaster");
+      const body = new T.Mesh(new T.BoxGeometry(o.w, o.d, o.h), bodyMat);
+      body.position.set(0, 0, o.h / 2);
+      g.add(body);
+      if (o.kind === "tv") {
+        // the screen on the front (toward -y before turning), inset in a thin bezel
+        const scr = new T.Mesh(new T.PlaneGeometry(o.w - 0.02, o.h - 0.02), this.mat("screen"));
+        scr.rotation.x = Math.PI / 2; scr.position.set(0, -o.d / 2 - 0.001, o.h / 2);
+        g.add(scr);
+      }
+      g.traverse((m) => { m.castShadow = m.receiveShadow = true; });
+      this.house.add(g);
+    }
     // trees and bushes
     for (const y of t.yard || []) {
       if (!y.c) continue;
@@ -269,6 +306,51 @@ window.HouseGL = class HouseGL {
     });
   }
 
+  // A TV's light (an Ambilight strip behind it) when it's on: a glow of its colour on the wall
+  // round the TV, and a few lights just behind its edges that wash the wall and the room
+  ambilight(s) {
+    const T = THREE;
+    const objs = ((s.top && s.top.objects) || []).filter((o) => o.kind === "tv" && o.light);
+    const state = new Map((s.ambi || []).map((a) => [a.id, a]));
+    const key = JSON.stringify(objs.map((o) => [o.id, o.x, o.y, o.z, o.w, o.h, o.rot, state.get(o.id)]));
+    if (key === this.ambiKey) return;
+    this.ambiKey = key;
+    if (!this.ambiGroup) { this.ambiGroup = new T.Group(); this.scene.add(this.ambiGroup); }
+    if (!this.ambiPool) this.ambiPool = Array.from({ length: 4 }, () => { const l = new T.PointLight(0xffffff, 0, 3.5, 2); this.scene.add(l); return l; });
+    for (const c of [...this.ambiGroup.children]) { c.geometry && c.geometry.dispose(); this.ambiGroup.remove(c); }
+    this.ambiPool.forEach((l) => { l.intensity = 0; });
+    let used = 0;
+    for (const o of objs) {
+      const a = state.get(o.id);
+      if (!a || !a.on || (a.level ?? 1) <= 0.01) continue;
+      const col = new T.Color(a.color || "#8fb4ff"), lvl = a.level ?? 1;
+      // the glow on the wall: a soft gradient, added onto what's there
+      if (!this.glowTex) {
+        const c = document.createElement("canvas"); c.width = c.height = 256;
+        const x = c.getContext("2d"), g = x.createRadialGradient(128, 128, 30, 128, 128, 128);
+        g.addColorStop(0, "rgba(255,255,255,0.95)"); g.addColorStop(0.45, "rgba(255,255,255,0.5)"); g.addColorStop(1, "rgba(255,255,255,0)");
+        x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+        this.glowTex = new T.CanvasTexture(c);
+      }
+      const m = new T.MeshBasicMaterial({ map: this.glowTex, color: col.clone().multiplyScalar(0.6 + 0.6 * lvl), transparent: true, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide });
+      const glow = new T.Mesh(new T.PlaneGeometry(o.w * 1.9, o.h * 2.1), m);
+      const g = new T.Group();
+      g.position.set(o.x, o.y, o.z);
+      g.rotation.z = (o.rot || 0) * Math.PI / 180;
+      glow.rotation.x = Math.PI / 2; glow.position.set(0, o.d / 2 + 0.004, o.h / 2); // on the wall behind it
+      g.add(glow);
+      this.ambiGroup.add(g);
+      g.updateMatrixWorld(true);
+      // lights behind the edges, just off the wall
+      for (const [dx, dz] of [[-0.5, 0.5], [0.5, 0.5], [0, 1.05], [0, -0.05]]) {
+        if (used >= this.ambiPool.length) break;
+        const l = this.ambiPool[used++], p = new T.Vector3(dx * o.w, -0.12, dz * o.h);
+        g.localToWorld(p);
+        l.position.copy(p); l.color.copy(col); l.intensity = 3 + 8 * lvl;
+      }
+    }
+  }
+
   draw(s, cam, W, H, dpr, bg, redraw) {
     const c = this.canvas;
     // the page rebuilds the stage round the 2D canvas: keep this one right under it
@@ -285,6 +367,7 @@ window.HouseGL = class HouseGL {
     this.renderer.setSize(W, H, false);
     this.build(s, redraw);
     this.lights(s.glows);
+    this.ambilight(s);
     this.scene.background = new THREE.Color(bg || "#10151d");
     const camera = this.camera;
     camera.fov = (2 * Math.atan(H / 2 / cam.focal) * 180) / Math.PI;
@@ -376,6 +459,13 @@ class QuadBuilder {
       const a = all[i], b = all[j], c = all[k];
       this.tri(key, [a[0], a[1], z], [b[0], b[1], z], [c[0], c[1], z], [0, 0, 1], [a[0], a[1]], [b[0], b[1]], [c[0], c[1]]);
     }
+  }
+  // a flat polygon at any slope (3D corners, in order), uv from x and y
+  plane3(key, pts) {
+    const [a, b, c] = pts, u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]], l = Math.hypot(...n) || 1;
+    const nn = n.map((q) => q / l);
+    for (let i = 1; i + 1 < pts.length; i++) this.tri(key, pts[0], pts[i], pts[i + 1], nn, [pts[0][0], pts[0][1]], [pts[i][0], pts[i][1]], [pts[i + 1][0], pts[i + 1][1]]);
   }
   // a rectangle at z with rectangular holes cut out of it (clipped to it)
   slab(key, r, holes, z) {

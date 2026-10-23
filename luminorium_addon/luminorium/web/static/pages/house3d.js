@@ -120,7 +120,8 @@ window.House3D = class House3D {
         ctx.clearRect(0, 0, W, H);
       } catch (err) {
         console.error("WebGL view failed, drawing in 2D", err);
-        HouseGL.ok = () => false;
+        HouseGL.why = `WebGL failed: ${(err && err.message) || err}`;
+        HouseGL._ok = false;
         return this.render();
       }
     } else {
@@ -282,6 +283,8 @@ window.House3D = class House3D {
       if (p && dm.at.z <= cut + 0.05 + (dm.top ? 0.01 : 0)) this.text(dm.text, p.x, p.y, "#ffffff", 12, "center", true);
     }
     this.drawCube(col, W);
+    // the solid view without WebGL: say why, so it can be fixed on that device
+    if (s.solid && !glOn && window.HouseGL) this.text(HouseGL.why || (window.THREE ? "WebGL isn't available in this browser: drawing in 2D" : "three.js didn't load: drawing in 2D"), 12, 22, "#ffb366", 12, "left", true);
     // a hint (the page shows it under the view on narrow screens)
     if (W >= 520) this.text(this.aimMode ? "Aim: click what the light should point at (a wall, the ground, a tree)"
       : this.mode === "shape" ? "Shape: drag a yellow handle to size · drag the block to move it, Shift+drag up and down, or drag an arrow · Alt: no snapping"
@@ -1684,13 +1687,15 @@ function wallPieces(w, doors, z0, z1) {
   const ux = (w.b[0] - w.a[0]) / L, uy = (w.b[1] - w.a[1]) / L;
   const at = (s) => [w.a[0] + ux * s, w.a[1] + uy * s];
   const gaps = doors.filter((d) => d.wall === w.id)
-    .map((d) => ({ s0: Math.max(0, d.at - d.width / 2), s1: Math.min(L, d.at + d.width / 2), top: Math.min(z1, z0 + (d.top ?? 2.032)) }))
+    .map((d) => ({ s0: Math.max(0, d.at - d.width / 2), s1: Math.min(L, d.at + d.width / 2), top: Math.min(z1, z0 + (d.top ?? 2.032)), sill: Math.min(z1, z0 + (d.sill || 0)) }))
     .sort((p, q) => p.s0 - q.s0);
   const out = [];
   let s = 0;
   for (const g of gaps) {
     if (g.s0 > s + 0.01) out.push({ a: at(s), b: at(g.s0), z0, z1 });
     if (g.top < z1 - 0.01) out.push({ a: at(g.s0), b: at(g.s1), z0: g.top, z1, header: true });
+    // an opening that starts up the wall (a crawl-through): the wall under it
+    if (g.sill > z0 + 0.01) out.push({ a: at(g.s0), b: at(g.s1), z0, z1: g.sill });
     s = Math.max(s, g.s1);
   }
   if (L > s + 0.01) out.push({ a: at(s), b: at(L), z0, z1 });
